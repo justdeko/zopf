@@ -1,0 +1,49 @@
+{
+  "name": "github-issue",
+  "description": "File a GitHub issue with gh, and hand its number and URL to the next node",
+  "run": "run.py",
+  "timeoutSeconds": 60,
+  "env": [
+    {
+      "name": "GH_TOKEN",
+      "description": "Only needed when gh is not already logged in; gh's own auth is used otherwise",
+      "keychain": "gh-token",
+      "required": false
+    }
+  ],
+  "inputs": [
+    {
+      "name": "title",
+      "description": "The issue title, one line",
+      "required": true
+    },
+    {
+      "name": "body",
+      "description": "Markdown body. A whole ${node.result} is the usual thing to put here",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "repo",
+      "description": "OWNER/REPO. Empty uses whatever repo the connector directory sits in",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "labels",
+      "description": "Comma-separated label names. Labels the repo does not have make gh refuse",
+      "required": false,
+      "default": ""
+    }
+  ],
+  "outputs": [
+    {
+      "name": "url",
+      "description": "Link to the issue, for a later node to quote"
+    },
+    {
+      "name": "number",
+      "description": "The issue number on its own, e.g. for a branch name"
+    }
+  ]
+}

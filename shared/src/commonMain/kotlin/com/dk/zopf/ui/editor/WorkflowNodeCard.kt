@@ -1,0 +1,270 @@
+package com.dk.zopf.ui.editor
+
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.dk.kuiver.SelectionMode
+import com.dk.kuiver.renderer.KuiverInteractionCallbacks
+import com.dk.kuiver.renderer.KuiverNodeScope
+import com.dk.kuiver.renderer.KuiverViewer
+import com.dk.kuiver.renderer.KuiverViewerConfig
+import com.dk.kuiver.ui.LocalKuiverColors
+import com.dk.zopf.model.NodeType
+import com.dk.zopf.model.WorkflowNode
+import com.dk.zopf.model.label
+import com.dk.zopf.runtime.RunStatus
+import com.dk.zopf.ui.preview.PreviewFixtures
+import com.dk.zopf.ui.runs.StatusDot
+import com.dk.zopf.ui.runs.color
+import com.dk.zopf.ui.theme.KuiverBridge
+import com.dk.zopf.ui.theme.PathIcon
+import com.dk.zopf.ui.theme.ZopfIcons
+import com.dk.zopf.ui.theme.ZopfTheme
+import com.dk.zopf.ui.theme.colors
+
+private val CardWidth = 260.dp
+
+val NodeType.icon: ImageVector
+    get() =
+        when (this) {
+            NodeType.AGENT -> ZopfIcons.NodeAgent
+            NodeType.SHELL -> ZopfIcons.NodeShell
+            NodeType.CONNECTOR -> ZopfIcons.NodeConnector
+            NodeType.GATE -> ZopfIcons.NodeGate
+            NodeType.BRANCH -> ZopfIcons.NodeBranch
+            NodeType.INPUT -> ZopfIcons.NodeInput
+        }
+
+@Composable
+fun KuiverNodeScope.WorkflowNodeCard(
+    node: WorkflowNode,
+    isSelected: Boolean,
+    hasIssue: Boolean,
+    isConnectSource: Boolean,
+    isConnectable: Boolean,
+    connectMode: Boolean,
+    onConnectClick: () -> Unit,
+    runStatus: RunStatus? = null,
+) {
+    val scheme = MaterialTheme.colorScheme
+
+    val roles = node.type.colors()
+    val accent = roles.accent
+
+    val outline by animateColorAsState(
+        when {
+            isConnectSource -> scheme.primary
+            connectMode && isConnectable -> scheme.tertiary
+            hasIssue -> scheme.error
+            isSelected -> scheme.primary
+            runStatus != null && runStatus != RunStatus.QUEUED -> runStatus.color()
+            isHovered -> accent
+            else -> scheme.outlineVariant
+        },
+        label = "nodeOutline",
+    )
+    val outlineWidth by animateDpAsState(
+        if (isSelected || isConnectSource || runStatus?.showsProgress == true) 2.dp else 1.dp,
+        label = "nodeOutlineWidth",
+    )
+
+    Surface(
+        modifier = Modifier.width(CardWidth),
+        shape = RoundedCornerShape(14.dp),
+        color = if (isSelected) scheme.secondaryContainer else scheme.surfaceContainer,
+        border = androidx.compose.foundation.BorderStroke(outlineWidth, outline),
+        shadowElevation = if (isDragging) 8.dp else 1.dp,
+    ) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(roles.container)
+                    .padding(start = 10.dp, end = 4.dp, top = 3.dp, bottom = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PathIcon(
+                    node.type.icon,
+                    contentDescription = node.type.label,
+                    size = 14.dp,
+                    tint = if (hasIssue) scheme.error else roles.onContainer,
+                )
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    node.type.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (hasIssue) scheme.error else roles.onContainer,
+                    maxLines = 1,
+                )
+                Spacer(Modifier.weight(1f))
+                if (runStatus != null) {
+                    Box(
+                        Modifier.size(16.dp).background(scheme.surfaceContainerLowest, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        StatusDot(runStatus, size = 8)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                }
+                ConnectHandle(
+                    isArmed = isConnectSource,
+                    onClick = onConnectClick,
+                    visible = !connectMode || isConnectSource,
+                )
+            }
+
+            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp)) {
+                Text(
+                    node.displayTitle,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val subtitle = node.subtitle()
+                if (subtitle.isNotBlank()) {
+                    Spacer(Modifier.size(2.dp))
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = if (node.type.subtitleIsCode) FontFamily.Monospace else null,
+                        color = scheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectHandle(
+    isArmed: Boolean,
+    onClick: () -> Unit,
+    visible: Boolean,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .alpha(if (visible) 1f else 0f)
+            .then(if (visible) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(4.dp)
+            .background(if (isArmed) scheme.primary else Color.Transparent, CircleShape)
+            .border(1.dp, if (isArmed) scheme.primary else scheme.outlineVariant, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        PathIcon(
+            ZopfIcons.Link,
+            contentDescription = if (isArmed) "Cancel connection" else "Connect from here",
+            size = 12.dp,
+            tint = if (isArmed) scheme.onPrimary else scheme.onSurfaceVariant,
+        )
+    }
+}
+
+private val NodeType.subtitleIsCode: Boolean
+    get() = this == NodeType.SHELL || this == NodeType.BRANCH
+
+private fun WorkflowNode.subtitle(): String =
+    when (type) {
+        NodeType.AGENT -> {
+            promptFile.ifBlank {
+                prompt
+                    .lineSequence()
+                    .firstOrNull { it.isNotBlank() }
+                    ?.trim()
+                    .orEmpty()
+            }
+        }
+        NodeType.SHELL ->
+            command
+                .lineSequence()
+                .firstOrNull { it.isNotBlank() }
+                ?.trim()
+                .orEmpty()
+        NodeType.CONNECTOR -> connector
+        NodeType.BRANCH -> expression
+        NodeType.GATE -> "Waits for approval"
+
+        NodeType.INPUT ->
+            prompt
+                .lineSequence()
+                .firstOrNull { it.isNotBlank() }
+                ?.trim()
+                .orEmpty()
+    }
+
+@Preview
+@Composable
+private fun WorkflowNodeCardPreview() {
+    val workflow = PreviewFixtures.workflow()
+    val canvas = rememberEditorCanvas(workflow)
+    ZopfTheme {
+        Surface {
+            Box(Modifier.size(620.dp, 340.dp)) {
+                KuiverBridge {
+                    KuiverViewer(
+                        state = canvas.viewer,
+                        modifier = Modifier.fillMaxSize(),
+                        config = KuiverViewerConfig(selectionMode = SelectionMode.NONE),
+                        callbacks = KuiverInteractionCallbacks(),
+                        nodeContent = { kuiverNode ->
+                            workflow.node(kuiverNode.id)?.let { node ->
+                                WorkflowNodeCard(
+                                    node = node,
+                                    isSelected = node.id == "plan",
+                                    hasIssue = node.id == "notify",
+                                    isConnectSource = node.id == "brief",
+                                    isConnectable = node.id == "tests",
+                                    connectMode = true,
+                                    onConnectClick = {},
+                                    runStatus = if (node.id == "route") RunStatus.RUNNING else null,
+                                )
+                            }
+                        },
+                        edgeContent = { _, from, to ->
+                            WorkflowEdgeContent(
+                                from = from,
+                                to = to,
+                                direction = canvas.direction,
+                                label = null,
+                                color = LocalKuiverColors.current.edge,
+                                dashed = false,
+                            )
+                        },
+                    )
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,60 @@
+name: verify
+description: |-
+  Run the suite, and only when it goes red spend a turn on it.
+
+  The edge to "diagnose" is `on: failure`, so the failing run is what triggers it and
+  ${tests.result} is the output that failed — no exit-code file, no branch, and nothing that has to
+  succeed in order to report that it didn't.
+repos:
+  - id: self
+    path: ..
+defaults:
+  repo: self
+nodes:
+  - id: tests
+    type: shell
+    title: ./gradlew :shared:jvmTest
+    command: ./gradlew --console=plain :shared:jvmTest
+  - id: passed
+    type: connector
+    title: Say it is green
+    connector: macos-notify
+    inputs:
+      title: zopf verify
+      subtitle: :shared:jvmTest
+      message: All green.
+  - id: diagnose
+    type: agent
+    title: Fix the failing tests
+    permissionMode: acceptEdits
+    allowedTools:
+      - Read
+      - Edit
+      - Write
+      - Glob
+      - Grep
+      - Bash
+    prompt: |
+      `./gradlew --console=plain :shared:jvmTest` just failed in this repo. Its output:
+
+      ${tests.result}
+
+      Read CLAUDE.md first — it is the only design record this repo has, and the layering rules
+      and deliberate non-goals in it are decisions rather than accidents.
+
+      Then find the cause and fix it. Two things to weigh before you edit:
+
+      - A test that fails because the behaviour it asserts was deliberately changed should have the
+        test updated. A test that fails because the behaviour broke should have the code fixed.
+        Say which of the two you concluded, and why, before you make the change.
+      - If the fix contradicts something CLAUDE.md states, the file is the thing to correct as well
+        — a change that leaves it standing is how the next session gets misled.
+
+      Re-run the suite when you are done and report what is green. If you cannot tell which of the
+      two cases you are in, stop and say so rather than guessing at the assertion.
+edges:
+  - from: tests
+    to: passed
+  - from: tests
+    to: diagnose
+    on: failure

@@ -1,0 +1,95 @@
+name: review-changes
+description: |-
+  Read the diff and run the suite at once, then join both into one verdict.
+
+  A diamond. The reviewing node gets the diff through ${changes.result} rather than a Bash grant, so
+  it is read-only by construction and never stops for a permission. The suite's command ends in
+  `echo "exit=$?"` so that the node succeeds either way and the verdict is written whether the tests
+  were green or red — an `on: failure` edge would give you one or the other, and this is the graph
+  that wants both.
+repos:
+  - id: self
+    path: ..
+defaults:
+  repo: self
+nodes:
+  - id: changes
+    type: shell
+    title: What changed
+    command: git --no-pager diff --stat HEAD && echo && git --no-pager diff HEAD | head -800
+  - id: review
+    type: agent
+    title: Review the diff
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+    prompt: |
+      Review the uncommitted changes in this repo. Here is the diff, truncated at 800 lines:
+
+      ${changes.result}
+
+      Read CLAUDE.md before you judge anything. It is the whole design record — the layering rules,
+      the verified CLI facts and the deliberate non-goals are all decisions, so a change that looks
+      like an oversight is often one of them being honoured.
+
+      Open the files around the hunks; a diff on its own hides the caller that makes a change wrong.
+      Look for, in this order:
+
+      1. Correctness — a case the change gets wrong, with the input that would do it.
+      2. A layering break — model/ reaching into store/, runtime/ into ui/, or code moved into
+         :desktopApp that the UI calls.
+      3. Something the change makes untrue in CLAUDE.md that it did not update.
+      4. Comments that narrate what the code plainly does, rather than why it is that way.
+
+      Report only what you can point at a line for. Say "nothing worth flagging" if that is the
+      answer — a review that manufactures findings costs more than one that doesn't.
+  - id: tests
+    type: shell
+    title: ./gradlew :shared:jvmTest
+    command: ./gradlew --console=plain :shared:jvmTest; echo "exit=$?"
+  - id: verdict
+    type: agent
+    title: Ship or hold
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+    prompt: |
+      Two things ran against the same working tree. Turn them into one answer.
+
+      The review said:
+
+      ${review.result}
+
+      The suite said this, ending in the exit code it reported:
+
+      ${tests.result}
+
+      Weigh them together — a green suite does not clear a correctness finding, and a red suite over
+      an unrelated flake does not sink a clean diff. Open a file if you need to decide which you are
+      looking at.
+
+      Answer in at most eight lines, and make the last line exactly one of:
+
+      SHIP: <the reason, in one clause>
+      HOLD: <what has to happen first, in one clause>
+  - id: notify
+    type: connector
+    title: Say the verdict out loud
+    connector: macos-notify
+    inputs:
+      title: zopf review
+      subtitle: working tree
+      message: ${verdict.result}
+edges:
+  - from: changes
+    to: review
+  - from: changes
+    to: tests
+  - from: review
+    to: verdict
+  - from: tests
+    to: verdict
+  - from: verdict
+    to: notify

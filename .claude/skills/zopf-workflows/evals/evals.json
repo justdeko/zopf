@@ -1,0 +1,29 @@
+{
+  "skill_name": "zopf-workflows",
+  "evals": [
+    {
+      "id": 0,
+      "name": "lint-fix-with-gate",
+      "prompt": "this repo's got a .zopf workspace already. add me a workflow called lint-fix — run `npm run lint`, and when it comes back dirty have claude actually fix the violations. i want to eyeball what it's planning before it touches any of my files though. stick a notification on the end either way so i know it finished. just write it, don't run it.",
+      "expected_output": "A .zopf/workflows/lint-fix.yaml that validates clean: a shell node running npm run lint, an on: failure edge to the fixing path (not a branch on exitCode), a gate before the node that writes, and macos-notify reached on both the clean and the fixed path.",
+      "fixture": "eval-0/pkg",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "branch-on-claude-prose",
+      "prompt": "need a zopf workflow in here, call it triage-commit. take the most recent commit, have claude read the actual diff (not just regex the subject line) and work out whether it's a user-facing change or internal plumbing. if it's user-facing, file a github issue asking someone to write release notes for it. if it's plumbing, just ping me a notification and leave it. don't run it.",
+      "expected_output": "Gives the branch a value to compare rather than a whole final message, since == against prose never matches — preferably a schema: field on the agent node (e.g. audience: user-facing|internal) branched on directly, or failing that a shell node reducing the prose to a token. Branch has exactly one when:true and one when:false edge. Uses github-issue and macos-notify with the required inputs their manifests declare (title for the issue, message for the notification).",
+      "fixture": "eval-1/etl",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "fix-broken-workflow",
+      "prompt": "the nightly workflow in .zopf/workflows is broken — zopf refuses to run it and the error it prints isn't making sense to me. can you sort it out? i want it to build, and if the build breaks i want a written summary of what went wrong, then clean up the tmp dir at the end regardless.",
+      "expected_output": "Identifies all four defects: ${build.exitCode} == 0 can never be true (a non-zero exit fails the node, so the branch is skipped) and should be an on: failure edge; the branch is missing its when:false arm; promtFile: is a typo that parses silently and is ignored; ${build.result} in title: is not interpolated. Produces a corrected file that passes zopf validate and matches the stated intent (summary on failure, cleanup always).",
+      "fixture": "eval-2/tool",
+      "files": []
+    }
+  ]
+}

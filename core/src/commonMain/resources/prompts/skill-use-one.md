@@ -1,0 +1,1 @@
+Use the {{skill}} skill.

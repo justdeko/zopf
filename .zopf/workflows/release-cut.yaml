@@ -1,0 +1,235 @@
+name: release-cut
+description: |-
+  Draft the notes, run the checks and cut the tag, with a person between the verdict and the push.
+
+  The notes, the impact read and the suite run at once and join on one verdict. The suite writes its
+  own exit code and always succeeds, because a fan-in runs as soon as one edge arrives — a failing
+  arm would not stop it, it would leave it reading ${checks.result} verbatim. The branch before the
+  gate is what keeps an unattended run from parking on a question nobody is there to answer.
+repos:
+  - id: self
+    path: ..
+defaults:
+  repo: self
+nodes:
+  - id: bump
+    type: input
+    title: Bump size
+    default: patch
+    choices:
+      - patch
+      - minor
+      - major
+    prompt: |
+      Which part of the version does this release bump?
+  - id: history
+    type: shell
+    title: What has landed since the last tag
+    command: |
+      last=$(git describe --tags --abbrev=0 2>/dev/null || true)
+      echo "Previous tag: ${last:-none}"
+      echo
+      git --no-pager log --no-merges --pretty='%h %s' ${last:+$last..}HEAD | head -200
+      if [ -n "$last" ]; then
+        echo
+        git --no-pager diff --stat "$last..HEAD" | tail -40
+      fi
+  - id: checks
+    type: shell
+    title: ktlint and the whole suite
+    timeoutSeconds: 1800
+    command: |
+      log=$(mktemp)
+      ./gradlew --console=plain ktlintCheck :core:jvmTest :shared:jvmTest :cli:test > "$log" 2>&1
+      status=$?
+      tail -60 "$log"
+      rm -f "$log"
+      echo "exit=$status"
+  - id: version
+    type: shell
+    title: Work out the version to cut
+    command: |
+      set -eu
+      last=$(git describe --tags --abbrev=0 2>/dev/null || true)
+      if [ -z "$last" ]; then
+        grep '^zopfVersion=' gradle.properties | cut -d= -f2
+        exit 0
+      fi
+      v=${last#v}
+      major=${v%%.*}
+      rest=${v#*.}
+      minor=${rest%%.*}
+      patch=${rest#*.}
+      case "${bump.result}" in
+        major) echo "$((major + 1)).0.0" ;;
+        minor) echo "$major.$((minor + 1)).0" ;;
+        *) echo "$major.$minor.$((patch + 1))" ;;
+      esac
+  - id: notes
+    type: agent
+    title: Draft the release notes
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+    prompt: |
+      Draft the release notes for zopf ${version.result}.
+
+      What has landed since the last release:
+
+      ${history.result}
+
+      Read CHANGELOG.md first — its existing entry is the voice to match: prose saying what the
+      release lets someone do, not a list of commit subjects. Open the files behind a commit whose
+      subject doesn't say what actually changed; "cleanup" and "fix encoding" are not release notes.
+
+      Write the entry body only — no version heading, no preamble, nothing about how it was written.
+      Leave out what a user cannot see: refactors, test changes, build wiring. If the release really
+      is only internal work, say that in one line rather than inflating it.
+  - id: impact
+    type: agent
+    title: Is this the right size of release?
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+    schema:
+      - name: advises
+        description: patch, minor or major — the bump these commits actually justify
+      - name: changelog
+        description: present or missing — whether CHANGELOG.md already has an entry for this version
+      - name: concern
+        description: the one thing that should hold the release, or exactly "none"
+    prompt: |
+      zopf ${version.result} is being cut as a ${bump.result} bump. Judge whether that is the right
+      size, and whether anything should hold it.
+
+      What has landed since the last release:
+
+      ${history.result}
+
+      Read CHANGELOG.md and CLAUDE.md, then weigh three things:
+
+      - Semantics. A change to what a workflow YAML may say, to what `zopf run` exits, or to where
+        files are written is a minor at least — those are contracts other people's files and scripts
+        already hold. Internal work is a patch however large the diff.
+      - Whether CHANGELOG.md already carries an entry for ${version.result}.
+      - Anything half-landed: a flag added but undocumented, a claim in CLAUDE.md the commits have
+        made untrue, a format change with no path for files already written.
+
+      Report the single thing most worth holding the release for as `concern`, in one line, or
+      exactly `none`. Do not manufacture one.
+  - id: reconcile
+    type: agent
+    title: Ready to offer?
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+    schema:
+      - name: ready
+        description: yes or no — whether a person should be asked to approve the tag at all
+      - name: because
+        description: the one line that decided it
+    prompt: |
+      Three things ran against the tree that would become v${version.result}. Turn them into one
+      answer.
+
+      The drafted notes:
+
+      ${notes.result}
+
+      The impact read: the commits justify a ${impact.advises} bump against the ${bump.result} being
+      cut, the changelog entry is ${impact.changelog}, and the concern raised was:
+
+      ${impact.concern}
+
+      ktlint and the suite, ending in the exit code they reported:
+
+      ${checks.result}
+
+      `ready` is no if anything here makes the release wrong to publish — a non-zero exit, a bump
+      smaller than the changes justify, a concern that isn't `none`. It is yes when the tree is clean
+      and what's left is a judgment a person can make at the gate; the notes' wording is not one of
+      those, it is theirs to edit afterwards.
+
+      Give `because` as one line naming the thing that decided it. Then, in at most six lines, say
+      what someone needs to know before they approve.
+  - id: ready
+    type: branch
+    title: Clean enough to offer?
+    expression: ${reconcile.ready} == yes
+  - id: blocked
+    type: connector
+    title: Say why it is not being cut
+    connector: macos-notify
+    inputs:
+      title: zopf release
+      subtitle: ${version.result} held
+      message: ${reconcile.because}
+      sound: Basso
+  - id: approve
+    type: gate
+    title: Push the tag and let the release build?
+  - id: tag
+    type: shell
+    title: Tag it and push
+    command: |
+      set -eu
+      body=$(mktemp)
+      cat <<'ZOPF_RELEASE_NOTES' > "$body"
+      ${notes.result}
+      ZOPF_RELEASE_NOTES
+      git tag -a "v${version.result}" -F "$body"
+      rm -f "$body"
+      git push origin "v${version.result}"
+      echo "pushed v${version.result}"
+  - id: shipped
+    type: connector
+    title: Say the tag is pushed
+    connector: macos-notify
+    inputs:
+      title: zopf release
+      subtitle: ${version.result} pushed
+      message: The release workflow is building it, and will leave the release as a draft.
+  - id: failed
+    type: connector
+    title: Say the push did not go through
+    connector: macos-notify
+    inputs:
+      title: zopf release
+      subtitle: ${version.result} not pushed
+      message: The tag or the push failed. The run's transcript has what git said.
+      sound: Basso
+edges:
+  - from: bump
+    to: version
+  - from: version
+    to: notes
+  - from: history
+    to: notes
+  - from: version
+    to: impact
+  - from: history
+    to: impact
+  - from: notes
+    to: reconcile
+  - from: impact
+    to: reconcile
+  - from: checks
+    to: reconcile
+  - from: reconcile
+    to: ready
+  - from: ready
+    to: blocked
+    when: false
+  - from: ready
+    to: approve
+    when: true
+  - from: approve
+    to: tag
+  - from: tag
+    to: shipped
+  - from: tag
+    to: failed
+    on: failure

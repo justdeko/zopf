@@ -1,0 +1,75 @@
+package com.dk.zopf
+
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import com.dk.zopf.platform.WithFullWindowContent
+import com.dk.zopf.platform.ZopfMenuBar
+import com.dk.zopf.platform.ZopfTray
+import com.dk.zopf.platform.toFrame
+import com.dk.zopf.platform.toWindowState
+import com.dk.zopf.store.Log
+import com.dk.zopf.ui.AppState
+import java.awt.Desktop
+import java.awt.Dimension
+
+fun main() {
+    System.setProperty("apple.awt.enableTemplateImages", "true")
+
+    System.setProperty("apple.awt.application.appearance", "system")
+
+    System.setProperty("apple.laf.useScreenMenuBar", "true")
+
+    System.setProperty("apple.awt.application.name", "zopf")
+
+    Log.start("zopf.app")
+    Log.installCrashHandler("zopf.app")
+
+    application {
+        val app = remember { AppState() }
+        val windowState =
+            remember {
+                app.settings.current.window
+                    .toWindowState()
+            }
+        var windowVisible by remember { mutableStateOf(true) }
+
+        fun quit() {
+            Log.info("quitting")
+            app.rememberWindow(windowState.toFrame())
+            app.shutdown()
+            exitApplication()
+        }
+
+        remember {
+            runCatching {
+                Desktop.getDesktop().setQuitHandler { _, _ -> quit() }
+            }
+        }
+
+        ZopfTray(app, onShowWindow = { windowVisible = true }, onQuit = { quit() })
+
+        @Suppress("DEPRECATION")
+        val windowIcon = painterResource("icon.svg")
+
+        Window(
+            onCloseRequest = { windowVisible = false },
+            state = windowState,
+            visible = windowVisible,
+            title = "zopf",
+            icon = windowIcon,
+        ) {
+            LaunchedEffect(window) { window.minimumSize = Dimension(800, 600) }
+
+            ZopfMenuBar(app, onHideWindow = { windowVisible = false })
+            WithFullWindowContent(windowState.placement) {
+                App(app)
+            }
+        }
+    }
+}

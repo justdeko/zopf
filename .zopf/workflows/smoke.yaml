@@ -1,0 +1,65 @@
+name: smoke
+description: |-
+  The engine end to end without spending anything — run it after touching WorkflowEngine.
+
+  Shell, an `on: failure` edge, both arms of a branch, a gate and a connector, with a ${...}
+  crossing between them; the one workflow here with no agent node, so it is also free after a
+  change to ConnectorRunner. The branch pins the `claude` version this was last run against, so the
+  false arm tells you the CLI moved under the run rather than that the engine broke.
+repos:
+  - id: self
+    path: ..
+defaults:
+  repo: self
+nodes:
+  - id: probe
+    type: shell
+    title: Is the claude CLI reachable?
+    command: claude --version
+  - id: missing
+    type: connector
+    title: Say it is not on PATH
+    connector: macos-notify
+    inputs:
+      title: zopf smoke
+      subtitle: claude CLI
+      message: Not on PATH. A packaged build asks the login shell for its environment, so check that `claude` resolves in a login zsh.
+      sound: Basso
+  - id: expected
+    type: branch
+    title: Still the version this was last run against?
+    expression: ${probe.result} == 2.1.234 (Claude Code)
+  - id: confirm
+    type: gate
+    title: Version matches — send the notification?
+  - id: notify
+    type: connector
+    title: Say so in Notification Center
+    connector: macos-notify
+    inputs:
+      title: zopf smoke
+      subtitle: claude CLI
+      message: ${probe.result}
+  - id: moved
+    type: connector
+    title: Say the CLI has moved
+    connector: macos-notify
+    inputs:
+      title: zopf smoke
+      subtitle: claude CLI moved
+      message: ${probe.result} — smoke was last run against 2.1.234. The CLI moved; re-check whatever leans on its output.
+      sound: Basso
+edges:
+  - from: probe
+    to: missing
+    on: failure
+  - from: probe
+    to: expected
+  - from: expected
+    to: confirm
+    when: true
+  - from: expected
+    to: moved
+    when: false
+  - from: confirm
+    to: notify

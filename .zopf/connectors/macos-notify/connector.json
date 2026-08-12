@@ -1,0 +1,41 @@
+{
+  "name": "macos-notify",
+  "description": "Post a macOS notification, so a run can say how it went with the window closed",
+  "run": "run.py",
+  "timeoutSeconds": 20,
+  "inputs": [
+    {
+      "name": "message",
+      "description": "The body. A whole ${node.result} is fine — it is trimmed to what a banner shows",
+      "required": true
+    },
+    {
+      "name": "title",
+      "description": "Bold first line",
+      "required": false,
+      "default": "zopf"
+    },
+    {
+      "name": "subtitle",
+      "description": "Smaller line under the title",
+      "required": false,
+      "default": ""
+    },
+    {
+      "name": "sound",
+      "description": "A name from /System/Library/Sounds, e.g. Basso or Glass. Empty is silent",
+      "required": false,
+      "default": ""
+    }
+  ],
+  "outputs": [
+    {
+      "name": "shown",
+      "description": "The body as it was actually displayed, after collapsing and trimming"
+    },
+    {
+      "name": "truncated",
+      "description": "\"true\" when the message was longer than a banner holds"
+    }
+  ]
+}

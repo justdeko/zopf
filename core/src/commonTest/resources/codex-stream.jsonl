@@ -1,0 +1,7 @@
+{"type":"thread.started","thread_id":"0199a4c2-6f11-7a3e-9d64-2f0b1c8ee551"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_0","item_type":"command_execution","command":"echo hello","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_0","item_type":"command_execution","command":"echo hello","aggregated_output":"hello","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_1","item_type":"reasoning","text":"The command printed one word, so there is nothing else to check."}}
+{"type":"item.completed","item":{"id":"item_2","item_type":"agent_message","text":"It printed `hello`."}}
+{"type":"turn.completed","usage":{"input_tokens":2451,"cached_input_tokens":1920,"output_tokens":183}}

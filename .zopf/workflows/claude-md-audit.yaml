@@ -1,0 +1,59 @@
+name: claude-md-audit
+description: |-
+  Read the recent commits against CLAUDE.md, show the drift, and correct the file once you agree.
+
+  CLAUDE.md is the only design record this repo has, and it says so: a change that contradicts it
+  and leaves it standing is how the next session gets misled. Nothing is written until the gate is
+  approved, so the audit itself is safe to run whenever.
+repos:
+  - id: self
+    path: ..
+defaults:
+  repo: self
+nodes:
+  - id: survey
+    type: shell
+    title: Recent commits
+    command: git --no-pager log --oneline -40 -- shared desktopApp CLAUDE.md
+  - id: audit
+    type: agent
+    title: Where has the doc drifted?
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+    promptFile: prompts/claude-md-audit.md
+  - id: approve
+    type: gate
+    title: Apply these corrections to CLAUDE.md?
+  - id: apply
+    type: agent
+    title: Correct CLAUDE.md
+    permissionMode: acceptEdits
+    allowedTools:
+      - Read
+      - Edit
+      - Glob
+      - Grep
+    prompt: |
+      An audit of CLAUDE.md against this repo found the following, and a human has approved acting
+      on it:
+
+      ${audit.result}
+
+      Apply the corrections to CLAUDE.md. Confirm each one against the code first — the audit was a
+      separate session and may have misread something, and a wrong correction to the only record is
+      worse than the drift it replaces. Skip anything you cannot confirm and say which.
+
+      Keep the file's voice: it explains why a thing is the way it is, names the alternative that was
+      rejected, and states non-goals as decisions rather than gaps. Do not restructure sections, do
+      not add a changelog.
+
+      Finish by listing what you edited and what you left alone.
+edges:
+  - from: survey
+    to: audit
+  - from: audit
+    to: approve
+  - from: approve
+    to: apply

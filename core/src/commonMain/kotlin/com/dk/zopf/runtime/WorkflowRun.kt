@@ -1,0 +1,182 @@
+package com.dk.zopf.runtime
+
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.dk.zopf.model.NodeType
+import com.dk.zopf.model.Workflow
+import com.dk.zopf.store.NodeRunRecord
+import com.dk.zopf.store.RunRecord
+import com.dk.zopf.store.Workspace
+import kotlinx.coroutines.Job
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.time.Duration
+import java.time.Instant
+
+@Stable
+class WorkflowRun(
+    val id: String,
+    val workflowName: String,
+    val workspaceRoot: Path?,
+    val isInteractive: Boolean,
+    val startedAt: Instant = Instant.now(),
+) {
+    val nodes = mutableStateListOf<NodeRun>()
+
+    var outcome by mutableStateOf<RunStatus?>(null)
+        internal set
+
+    var finishedAt by mutableStateOf<Instant?>(null)
+        internal set
+
+    var job: Job? = null
+        internal set
+
+    var workflow: Workflow? = null
+        internal set
+
+    internal var workspace: Workspace? = null
+
+    internal var stopping: Boolean = false
+
+    var fromArchive: Boolean = false
+        internal set
+
+    var archiveDir: Path? = null
+        internal set
+
+    internal var transcriptLoaded: Boolean = false
+
+    val status: RunStatus
+        get() =
+            outcome ?: when {
+                nodes.any { it.status == RunStatus.WAITING } -> RunStatus.WAITING
+                nodes.any { it.status.showsProgress } -> RunStatus.RUNNING
+                else -> RunStatus.STARTING
+            }
+
+    val isActive: Boolean get() = outcome == null
+
+    val focusNode: NodeRun?
+        get() =
+            nodes.firstOrNull { it.status == RunStatus.WAITING }
+                ?: nodes.lastOrNull { it.status.showsProgress }
+                ?: nodes.lastOrNull { it.status.isFinished && it.status != RunStatus.SKIPPED }
+                ?: nodes.firstOrNull()
+
+    fun node(nodeId: String): NodeRun? = nodes.firstOrNull { it.nodeId == nodeId }
+
+    val costUsd: Double?
+        get() = nodes.mapNotNull { it.costUsd }.takeIf { it.isNotEmpty() }?.sum()
+
+    val tokens: Int?
+        get() = nodes.mapNotNull { it.tokens }.takeIf { it.isNotEmpty() }?.sum()
+
+    val settledCount: Int get() = nodes.count { it.status.isFinished }
+
+    val reachedCount: Int get() = nodes.count { it.status != RunStatus.QUEUED }
+
+    fun elapsed(now: Instant = Instant.now()): Duration = Duration.between(startedAt, finishedAt ?: now)
+
+    fun summary(): String =
+        buildString {
+            append(status.label)
+            if (nodes.size > 1) append(" · $reachedCount/${nodes.size}")
+            if (isActive) {
+                nodes
+                    .firstOrNull { it.status == RunStatus.WAITING || it.status.showsProgress }
+                    ?.let { append(" · ${it.nodeTitle}") }
+            }
+            spend(costUsd, tokens)?.let { append(" · $it") }
+        }
+
+    internal fun record(): RunRecord =
+        RunRecord(
+            id = id,
+            workflow = workflowName,
+            workspace = workspaceRoot?.toString(),
+            startedAt = startedAt.toString(),
+            finishedAt = finishedAt?.toString(),
+            status = status.name,
+            nodes =
+                nodes.map { node ->
+                    NodeRunRecord(
+                        nodeId = node.nodeId,
+                        type = node.nodeType,
+                        provider = node.provider,
+                        status = node.status.name,
+                        startedAt = node.startedAt.toString(),
+                        finishedAt = node.finishedAt?.toString(),
+                        cwd = node.cwd?.toString(),
+                        sessionId = node.sessionId,
+                        command = node.command,
+                        exitCode = node.exitCode,
+                        costUsd = node.costUsd,
+                    )
+                },
+        )
+
+    companion object {
+        fun restored(
+            record: RunRecord,
+            orphaned: Boolean = true,
+        ): WorkflowRun {
+            val run =
+                WorkflowRun(
+                    id = record.id,
+                    workflowName = record.workflow,
+                    workspaceRoot = record.workspace?.let { Paths.get(it) },
+                    isInteractive = false,
+                    startedAt = parseInstant(record.startedAt),
+                )
+            run.fromArchive = true
+            record.nodes.forEach { node ->
+                run.nodes +=
+                    NodeRun(
+                        id = "${record.id}:${node.nodeId}",
+                        workflowName = record.workflow,
+                        nodeId = node.nodeId,
+                        nodeTitle = node.nodeId,
+                        nodeType = node.type,
+                        cwd = node.cwd?.let { Paths.get(it) },
+                        startedAt = parseInstant(node.startedAt),
+                        provider = node.provider,
+                    ).apply {
+                        sessionId = node.sessionId
+                        costUsd = node.costUsd
+                        exitCode = node.exitCode
+                        command = node.command
+                        finishedAt = node.finishedAt?.let(::parseInstant)
+                        if (orphaned) {
+                            status = RunStatus.DETACHED
+                            notice("Started before zopf last quit, and is still running outside it.")
+                        } else {
+                            status = statusOf(node.status)
+                        }
+                    }
+            }
+            run.finishedAt = record.finishedAt?.let(::parseInstant)
+            run.outcome = if (orphaned) RunStatus.DETACHED else statusOf(record.status)
+            return run
+        }
+
+        private fun statusOf(name: String): RunStatus =
+            runCatching { RunStatus.valueOf(name) }
+                .getOrDefault(RunStatus.STOPPED)
+                .let { if (it.isActive) RunStatus.STOPPED else it }
+
+        private fun parseInstant(value: String): Instant = runCatching { Instant.parse(value) }.getOrElse { Instant.now() }
+    }
+}
+
+data class RunNotification(
+    val runId: String,
+    val title: String,
+    val body: String,
+    val isFailure: Boolean,
+)
+
+internal fun NodeType.needsProcess(): Boolean = this == NodeType.AGENT || this == NodeType.SHELL || this == NodeType.CONNECTOR

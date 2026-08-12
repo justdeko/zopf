@@ -1,0 +1,42 @@
+name: Check
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["v*.*.*"]
+  pull_request:
+
+concurrency:
+  # A second push to the same branch makes the first one's result irrelevant.
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Same runner the release builds on, so a green check means the release job's
+    # lint-and-test step will be green too.
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Lint and test
+        run: ./gradlew ktlintCheck :core:jvmTest :shared:jvmTest :cli:test
+
+      - name: Check dependency licenses
+        run: |
+          ./gradlew :cli:exportLibraryDefinitions :desktopApp:exportLibraryDefinitions
+          git diff --exit-code cli/src/main/resources/aboutlibraries.json \
+            shared/src/commonMain/composeResources/files/aboutlibraries.json
+
+      - name: Validate the committed workspace
+        run: |
+          ./gradlew :cli:installDist
+          cli/build/install/zopf-cli/bin/zopf validate --workspace .zopf

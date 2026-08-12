@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Apple Silicon only
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Resolve the version from the tag
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: echo "value=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Import the Developer ID certificate into a throwaway keychain
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/release-signing.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
+          rm "$CERT_PATH"
+
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Lint and test
+        run: ./gradlew ktlintCheck :core:jvmTest :shared:jvmTest :cli:test
+
+      - name: Build, sign, notarize and package the dmg
+        env:
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          NOTARIZATION_APPLE_ID: ${{ secrets.NOTARIZATION_APPLE_ID }}
+          NOTARIZATION_PASSWORD: ${{ secrets.NOTARIZATION_PASSWORD }}
+          NOTARIZATION_TEAM_ID: ${{ secrets.NOTARIZATION_TEAM_ID }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          ./gradlew :desktopApp:notarizeDmg \
+            -PpackageVersion="$VERSION" \
+            -Pcompose.desktop.mac.sign=true \
+            -Pcompose.desktop.mac.signing.identity="$MACOS_SIGNING_IDENTITY" \
+            -Pcompose.desktop.mac.signing.keychain="$KEYCHAIN_PATH" \
+            -Pcompose.desktop.mac.notarization.appleID="$NOTARIZATION_APPLE_ID" \
+            -Pcompose.desktop.mac.notarization.password="$NOTARIZATION_PASSWORD" \
+            -Pcompose.desktop.mac.notarization.teamID="$NOTARIZATION_TEAM_ID"
+
+      - name: Build the CLI tarball
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: ./gradlew :cli:distTar -PpackageVersion="$VERSION"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          DMG=$(find desktopApp/build/compose/binaries/main/dmg -name "*.dmg" | head -n1)
+          FINAL="zopf-${VERSION}.dmg"
+          mv "$DMG" "$FINAL"
+          TARBALL=$(find cli/build/distributions -name "*.tar.gz" | head -n1)
+          # install.sh verifies the tarball against this before it unpacks anything.
+          (cd "$(dirname "$TARBALL")" && shasum -a 256 "$(basename "$TARBALL")" > "$(basename "$TARBALL").sha256")
+          gh release create "$TAG" "$FINAL" "$TARBALL" "$TARBALL.sha256" \
+            --draft --title "$VERSION" --generate-notes
+
+      - name: Delete the throwaway keychain
+        if: always()
+        env:
+          KEYCHAIN_PATH: ${{ env.KEYCHAIN_PATH }}
+        run: security delete-keychain "$KEYCHAIN_PATH" || true
