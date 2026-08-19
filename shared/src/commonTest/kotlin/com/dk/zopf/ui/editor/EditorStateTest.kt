@@ -197,6 +197,7 @@ class EditorStateTest {
             workspace = workspace,
             connectorsProvider = { emptyList() },
             onRefreshConnectors = {},
+            executableExists = { true },
             onSave = {},
         )
     }

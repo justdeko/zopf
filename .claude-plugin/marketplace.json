@@ -1,0 +1,17 @@
+{
+  "name": "zopf",
+  "owner": {
+    "name": "Denis Koljada",
+    "url": "https://github.com/justdeko"
+  },
+  "description": "The zopf plugin: skills for authoring zopf workflows and connectors.",
+  "plugins": [
+    {
+      "name": "zopf",
+      "source": "./plugins/zopf",
+      "description": "Write, edit and debug zopf workflows and connectors — the YAML that zopf runs as a graph of agent, shell, gate, input and branch steps.",
+      "category": "workflow",
+      "tags": ["zopf", "workflows", "connectors"]
+    }
+  ]
+}

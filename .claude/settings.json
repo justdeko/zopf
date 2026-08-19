@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "zopf": {
+      "source": {
+        "source": "directory",
+        "path": "."
+      }
+    }
+  },
+  "enabledPlugins": {
+    "zopf@zopf": true
+  }
+}

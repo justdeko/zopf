@@ -242,7 +242,7 @@ These guard things a normal unit test wouldn't:
 
 - `store/DogfoodWorkspaceTest.kt` parses and validates this repo's own `.zopf/` workspace, so a
   model change that breaks the committed workflows fails the build. CI runs `zopf validate` on it too.
-- `store/SkillExamplesTest.kt` re-encodes every fenced YAML workflow in `.claude/skills/**` and
+- `store/SkillExamplesTest.kt` re-encodes every fenced YAML workflow in `plugins/zopf/skills/**` and
   asserts it is byte-identical to what the editor would write — the skill docs cannot drift from the
   serializer.
 - `store/EditorRoundTripTest.kt` (in `:shared`) drives editor commands and asserts the file on disk.

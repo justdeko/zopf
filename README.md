@@ -29,7 +29,7 @@ CLI which allows you to run zopf workflows headlessly.
 ## Getting Started
 
 You need **macOS on Apple Silicon**
-and [Claude Code]([https://claude.com/claude-code](https://code.claude.com/docs/en/quickstart#step-1-install-claude-code))
+and [Claude Code](https://code.claude.com/docs/en/quickstart#step-1-install-claude-code)
 or [Codex](https://learn.chatgpt.com/docs/codex/cli) installed and signed in.
 
 ### The App
@@ -101,8 +101,13 @@ Some things that are crucial to understanding workflow nodes:
 - data along edges is implicit, you can embed it in the next node execution using literals: `${tests.result}`
 - some edges have implicit assumptions like true/false from gates or `on: failure` in the example
 
-The editor reads and writes to workflow files, so you can hand-edit it or draw it on the canvas. Or you can invoke
-the [claude skill](.claude/skills/zopf-workflows) to construct one.
+The editor reads and writes to workflow files, so you can hand-edit it or draw it on the canvas. Or you can invoke the
+[claude skills](plugins/zopf/skills) to construct one. To add them:
+
+```
+/plugin marketplace add justdeko/zopf
+/plugin install zopf@zopf
+```
 
 ## What you could build with it
 

@@ -9,7 +9,7 @@
 set -euo pipefail
 
 FX="${1:-$(cd "$(dirname "$0")" && pwd)/fixtures}"
-CONNECTORS="${CONNECTORS:-$(cd "$(dirname "$0")/../../../../.zopf/connectors" && pwd)}"
+CONNECTORS="${CONNECTORS:-$(cd "$(dirname "$0")/../../../../../.zopf/connectors" && pwd)}"
 
 rm -rf "$FX"; mkdir -p "$FX"
 

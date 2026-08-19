@@ -43,6 +43,7 @@ class EditorState(
     val defaultProvider: AgentProviderId = AgentProviderId.CLAUDE,
     val defaultModel: String? = null,
     val workspaceDefaults: NodeDefaults = NodeDefaults(),
+    private val executableExists: (AgentProviderId) -> Boolean = AgentProviders::isInstalled,
     private val onSave: (Workflow) -> Unit,
 ) {
     val resolvedWorkflow: Workflow get() = workflow.withDefaultsFrom(workspaceDefaults)
@@ -89,7 +90,7 @@ class EditorState(
                 knownSkills = workspace?.let { skills.mapTo(mutableSetOf(), DiscoveredSkill::name) },
                 promptText = promptTexts::get,
                 defaultProvider = fallbackProvider,
-                executableExists = AgentProviders::isInstalled,
+                executableExists = executableExists,
             )
 
     val connectors: List<Connector> get() = connectorsProvider()

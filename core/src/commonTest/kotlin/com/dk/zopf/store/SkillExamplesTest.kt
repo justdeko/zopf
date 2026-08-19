@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SkillExamplesTest {
-    private val skills: Path = Paths.get("../.claude/skills").toAbsolutePath().normalize()
+    private val skills: Path = Paths.get("../plugins/zopf/skills").toAbsolutePath().normalize()
 
     @Test
     fun everyWorkflowInTheSkillDocsIsWrittenTheWayTheEditorWouldWriteIt() {
