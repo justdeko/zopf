@@ -32,7 +32,6 @@ dependencies {
 
 aboutLibraries {
     collect {
-        fetchRemoteLicense = true
         includePlatform = false
     }
     license {

@@ -11,7 +11,6 @@ plugins {
 // the app's superset. The JSON lands in resources and so travels inside the jar.
 aboutLibraries {
     collect {
-        fetchRemoteLicense = true
         includePlatform = false
     }
     license {
