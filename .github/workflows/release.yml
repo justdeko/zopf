@@ -12,6 +12,7 @@ jobs:
   release:
     # Apple Silicon only
     runs-on: macos-14
+    environment: release
 
     steps:
       - uses: actions/checkout@v4
