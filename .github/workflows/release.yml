@@ -60,7 +60,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
           # no configuration cache because deprecated ascProvider throws when read
-          ./gradlew :desktopApp:notarizeDmg --no-configuration-cache \
+          ./gradlew :desktopApp:notarizeDmg --no-configuration-cache -Pcompose.desktop.verbose=true \
             -PpackageVersion="$VERSION" \
             -Pcompose.desktop.mac.sign=true \
             -Pcompose.desktop.mac.signing.identity="$MACOS_SIGNING_IDENTITY" \
