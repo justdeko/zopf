@@ -16,6 +16,12 @@ It runs claude code in the non-interactive mode using `claude -p`, but you can a
 instead. There's also a CLI which allows you to run zopf workflows headlessly.
 
 <p align="center">
+  <a href="https://github.com/justdeko/zopf/releases/latest/download/zopf-macos-arm64.dmg">
+    <img src="docs/download-mac.svg" alt="Download for macOS" width="264" height="60">
+  </a>
+</p>
+
+<p align="center">
   <img src="docs/screenshot.png" alt="zopf window" width="900">
 </p>
 
@@ -44,8 +50,8 @@ You need **macOS on Apple Silicon** and one of these installed and signed in:
 
 ### The App
 
-Download `zopf-<version>.dmg` from the [releases](../../releases) and drag it to Applications. On first launch it
-creates `~/.zopf` as your workspace.
+Download `zopf-<version>.dmg` from the [latest release](../../releases/latest) and drag it to Applications. On first
+launch it creates `~/.zopf` as your workspace.
 
 ### The CLI
 

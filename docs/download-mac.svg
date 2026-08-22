@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="264" height="60" viewBox="0 0 264 60" role="img"
+     aria-label="Download for macOS">
+    <defs>
+        <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#E97430"/>
+            <stop offset="1" stop-color="#DE6118"/>
+        </linearGradient>
+    </defs>
+    <rect x="0.5" y="0.5" width="263" height="59" rx="13" fill="#C9540F"/>
+    <rect x="0.5" y="0.5" width="263" height="57" rx="13" fill="url(#face)"/>
+    <g transform="translate(24,17)" fill="none" stroke="#FFFFFF" stroke-width="2.1" stroke-linecap="round"
+       stroke-linejoin="round">
+        <path d="M13 1v14"/>
+        <path d="M7 9.5l6 6 6-6"/>
+        <path d="M1 19v4a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2v-4"/>
+    </g>
+    <text x="70" y="26" fill="#FFFFFF"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16"
+          font-weight="600">Download for macOS
+    </text>
+    <text x="70" y="43" fill="#FFE3D4"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5">
+        Apple Silicon &#183; .dmg
+    </text>
+</svg>
