@@ -122,8 +122,10 @@ will ignore it. Adding a provider means a new `AgentProvider` and a new row in t
 not mean an `if (codex)` anywhere in `:shared`.
 
 Subprocesses get the **login shell's** environment and PATH, resolved once in
-`runtime/CommandLookup.kt` via `zsh -lc`, because a `.app` launched from Finder inherits almost
-nothing and `claude` would not be found. Shell nodes run `zsh -lc <command>` with stdin at
+`runtime/CommandLookup.kt` via `zsh -lic`, because a `.app` launched from Finder inherits almost
+nothing and `claude` would not be found. The `-i` is load-bearing: a non-interactive login shell
+never sources `.zshrc`, which is where a PATH usually gets built. That makes the probe untrusted
+output, hence the sentinel and the watchdog. Shell nodes run `zsh -lc <command>` with stdin at
 `/dev/null`, so a command that prompts gets EOF rather than parking the run.
 
 ## Workspaces and where state goes
