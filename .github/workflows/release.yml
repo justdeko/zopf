@@ -59,7 +59,8 @@ jobs:
           NOTARIZATION_TEAM_ID: ${{ secrets.NOTARIZATION_TEAM_ID }}
           VERSION: ${{ steps.version.outputs.value }}
         run: |
-          ./gradlew :desktopApp:notarizeDmg \
+          # no configuration cache because deprecated ascProvider throws when read
+          ./gradlew :desktopApp:notarizeDmg --no-configuration-cache \
             -PpackageVersion="$VERSION" \
             -Pcompose.desktop.mac.sign=true \
             -Pcompose.desktop.mac.signing.identity="$MACOS_SIGNING_IDENTITY" \
