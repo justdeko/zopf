@@ -507,6 +507,46 @@ class GraphEditorScreenTest {
         val bare = backTop(null)
         assertTrue(bare < inset, "Back is at $bare, padded for a title bar that isn't there")
     }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `with nothing selected the inspector spends the room on what is wrong, and a click lands on the node`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, _) =
+                editor(
+                    Workflow(
+                        name = "w",
+                        nodes =
+                            listOf(
+                                WorkflowNode("alpha", NodeType.AGENT, prompt = "do a thing"),
+                                WorkflowNode("beta", NodeType.SHELL, command = ""),
+                            ),
+                        edges = listOf(WorkflowEdge("alpha", "beta")),
+                    ).handPlaced(),
+                )
+            showInspector()
+
+            assertNull(state.selectedNode)
+            onNodeWithText("Not ready to run").assertIsDisplayed()
+            onNodeWithText("beta needs a command").assertIsDisplayed()
+
+            onNodeWithText("beta needs a command").performClick()
+            waitForIdle()
+
+            assertEquals("beta", state.selectedNode?.id)
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a workflow with nothing wrong says so instead of leaving the inspector blank`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            editor(twoNodes.copy(edges = listOf(WorkflowEdge("alpha", "beta"))).handPlaced())
+            showInspector()
+
+            onNodeWithText("Ready to run").assertIsDisplayed()
+            onNodeWithText("Nothing to fix.").assertIsDisplayed()
+            onNodeWithText("1 agent").assertIsDisplayed()
+        }
 }
 
 class NodeInspectorTest {

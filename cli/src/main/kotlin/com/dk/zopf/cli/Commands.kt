@@ -2,29 +2,23 @@ package com.dk.zopf.cli
 
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowIssue
-import com.dk.zopf.model.validate
-import com.dk.zopf.runtime.AgentProviders
 import com.dk.zopf.runtime.UpdateCheck
+import com.dk.zopf.runtime.issues
 import com.dk.zopf.runtime.money
 import com.dk.zopf.runtime.updateChecksSilenced
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.BuildInfo
-import com.dk.zopf.store.ConnectorStore
 import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.RunRecord
 import com.dk.zopf.store.SettingsStore
 import com.dk.zopf.store.WorkflowStore
 import com.dk.zopf.store.Workspace
-import com.dk.zopf.store.availableSkills
 import java.io.PrintStream
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlin.io.path.exists
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.readText
 
 val LIST_OPTIONS = setOf("workspace")
 val VALIDATE_OPTIONS = setOf("workspace")
@@ -184,18 +178,9 @@ private fun notifiable(): Boolean =
         !updateChecksSilenced() &&
         SettingsStore().load().checkForUpdates
 
-fun Workflow.issues(workspace: Workspace): List<WorkflowIssue> =
-    validate(
-        repoExists = { workspace.resolvePath(it.path).exists() },
-        fileExists = { workspace.resolvePath(it).isRegularFile() },
-        connector = { name -> ConnectorStore(workspace).find(name)?.manifest },
-        knownSkills = availableSkills(workspace, this).mapTo(mutableSetOf()) { it.name },
-        promptText = { raw -> runCatching { workspace.resolvePath(raw).readText() }.getOrNull() },
-        defaultProvider = SettingsStore().load().defaultProvider,
-        executableExists = AgentProviders::isInstalled,
-    )
+fun Workflow.issues(workspace: Workspace): List<WorkflowIssue> = issues(workspace, SettingsStore().load().defaultProvider)
 
-private fun WorkflowIssue.render(): String {
+internal fun WorkflowIssue.render(): String {
     val level = if (severity == WorkflowIssue.Severity.ERROR) "error" else "warning"
     return "$level: $message"
 }

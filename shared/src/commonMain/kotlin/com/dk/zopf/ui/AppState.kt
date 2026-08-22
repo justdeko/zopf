@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
+import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.providerFor
 import com.dk.zopf.runtime.AgentProviders
@@ -16,6 +17,8 @@ import com.dk.zopf.runtime.RunRegistry
 import com.dk.zopf.runtime.TerminalLauncher
 import com.dk.zopf.runtime.UpdateCheck
 import com.dk.zopf.runtime.WorkflowRun
+import com.dk.zopf.runtime.errors
+import com.dk.zopf.runtime.issues
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.BrokenConnector
@@ -279,8 +282,22 @@ class AppState(
     val runnableWorkflow: Workflow?
         get() = (editing?.workflow ?: selectedWorkflow)?.takeIf { it.nodes.isNotEmpty() }
 
+    private fun blockers(workflow: Workflow): List<WorkflowIssue> {
+        val editor = editing?.takeIf { it.workflow.name == workflow.name }
+        val found = editor?.issues ?: workflow.issues(activeWorkspace?.workspace, settings.current.defaultProvider)
+        return found.errors()
+    }
+
     fun runWorkflow(workflow: Workflow? = null) {
         val target = workflow ?: editing?.workflow ?: selectedWorkflow ?: return
+        val blocking = blockers(target)
+        if (blocking.isNotEmpty()) {
+            val rest = blocking.size - 1
+            message =
+                "${target.name} can't run yet. ${blocking.first().message}" +
+                if (rest > 0) " (and ${if (rest == 1) "1 more thing" else "$rest more things"} to fix)" else ""
+            return
+        }
         runs
             .startWorkflow(activeWorkspace?.workspace, target)
             .onSuccess {

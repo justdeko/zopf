@@ -184,7 +184,8 @@ A workflow's optional `version:` says which format it was written in. Three case
 - **absent** — read as the current format. This is the normal case.
 - **older** — `store/WorkflowMigrations.kt` carries the file forward to current before it is parsed.
 - **newer** — `isFromTheFuture`, which is a validation error *and* a refusal from
-  `WorkflowEngine.start`. It has to be in the engine: `zopf run` only validates under `--dry-run`.
+  `WorkflowEngine.start`. It has to be in both: the front ends' gate doesn't cover `startNode` or
+  `retry`.
 
 `WORKFLOW_VERSION` comes from `workflowVersion` in `gradle.properties`, through `:core:writeVersion`
 and `store/BuildInfo.kt`, like the app's version. Bump it in the same commit as the migration.

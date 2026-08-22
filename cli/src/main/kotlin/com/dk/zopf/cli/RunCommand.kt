@@ -4,7 +4,6 @@ import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.RepoRef
 import com.dk.zopf.model.Workflow
-import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.model.runOrder
 import com.dk.zopf.runtime.NodeExecutor
 import com.dk.zopf.runtime.NodeRun
@@ -12,6 +11,7 @@ import com.dk.zopf.runtime.ProcessNodeExecutor
 import com.dk.zopf.runtime.RunStatus
 import com.dk.zopf.runtime.WorkflowEngine
 import com.dk.zopf.runtime.WorkflowRun
+import com.dk.zopf.runtime.errors
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.LiveSettings
@@ -73,6 +73,13 @@ fun runWorkflow(
 
     if (options.has("dry-run")) return describeRun(workflow, workspace, out)
 
+    val errors = workflow.issues(workspace).errors()
+    if (errors.isNotEmpty()) {
+        err.println("zopf: ${workflow.name} didn't start, because it wouldn't get through the run. Fix these and try again:")
+        errors.forEach { err.println("  ${it.render()}") }
+        return EXIT_USAGE
+    }
+
     val settings = LiveSettings(runSettings(options))
     val screen = renderer(format, out, colour = System.console() != null)
     val decisions = Decisions(gatePolicy, answers)
@@ -118,8 +125,8 @@ private fun describeRun(
     out: PrintStream,
 ): Int {
     val issues = workflow.issues(workspace)
-    issues.forEach { out.println("${if (it.severity == WorkflowIssue.Severity.ERROR) "error" else "warning"}: ${it.message}") }
-    if (issues.any { it.severity == WorkflowIssue.Severity.ERROR }) return EXIT_USAGE
+    issues.forEach { out.println(it.render()) }
+    if (issues.errors().isNotEmpty()) return EXIT_USAGE
 
     out.println("${workflow.name} · ${workflow.nodes.size} nodes · nothing started")
     workflow.runOrder().forEachIndexed { wave, ids ->

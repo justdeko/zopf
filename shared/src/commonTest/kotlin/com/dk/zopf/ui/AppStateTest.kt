@@ -165,3 +165,48 @@ class EditorRunPanelTest {
         assertNull(runs.runForEditor("beta"))
     }
 }
+
+class RunGateTest {
+    private val dirs = mutableListOf<Path>()
+    private val apps = mutableListOf<AppState>()
+
+    @AfterTest
+    fun cleanup() {
+        apps.forEach { it.shutdown() }
+        dirs.forEach { it.toFile().deleteRecursively() }
+    }
+
+    private fun tempDir(): Path = Files.createTempDirectory("zopf-gate").also { dirs.add(it) }
+
+    private fun app(): AppState =
+        AppState(WorkspaceRegistry(tempDir().resolve("workspaces.json")))
+            .also { apps.add(it) }
+            .also { it.addWorkspace(tempDir().resolve("ws")) }
+
+    private val broken =
+        Workflow(
+            name = "demo",
+            nodes = listOf(WorkflowNode(id = "build", type = NodeType.SHELL, command = "true", repo = "app")),
+        )
+
+    @Test
+    fun `the Run button refuses what the canvas is already painting red`() {
+        val app = app()
+
+        app.runWorkflow(broken)
+
+        assertEquals(0, app.runs.runs.size)
+        assertEquals("demo can't run yet. build runs in \"app\", which isn't declared", app.message)
+    }
+
+    @Test
+    fun `the editor's own view of the errors is what an open editor is judged on`() {
+        val app = app()
+        app.openEditor(broken)
+
+        app.runWorkflow()
+
+        assertEquals(0, app.runs.runs.size)
+        assertNotNull(app.message)
+    }
+}

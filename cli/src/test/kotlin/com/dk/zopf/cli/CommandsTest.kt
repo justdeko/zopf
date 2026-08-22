@@ -334,6 +334,40 @@ class RunCommandTest {
     }
 
     @Test
+    fun `run refuses what validate refuses, instead of failing halfway through the graph`() {
+        sandbox.save(workflow(nodes = listOf(shell("build").copy(repo = "app"), shell("test")), edges = listOf("build" to "test")))
+        val executor = FakeExecutor()
+
+        val (code, streams) = sandbox.run(listOf("demo"), executor)
+
+        assertEquals(EXIT_USAGE, code)
+        assertEquals(emptyList(), executor.started)
+        assertContains(streams.errors(), "isn't declared")
+        assertEquals(0, RunArchive.all(sandbox.archiveRoot).size)
+    }
+
+    @Test
+    fun `the refusal goes to stderr, so --format json stays parseable`() {
+        sandbox.save(workflow(nodes = listOf(shell("build").copy(repo = "app"))))
+
+        val (_, streams) = sandbox.run(listOf("demo", "--format", "json"))
+
+        assertEquals("", streams.output())
+        assertContains(streams.errors(), "didn't start")
+    }
+
+    @Test
+    fun `a warning is not a reason to refuse a run`() {
+        sandbox.save(workflow(nodes = listOf(shell("build"), shell("stray"))))
+        val executor = FakeExecutor()
+
+        val (code, _) = sandbox.run(listOf("demo"), executor)
+
+        assertEquals(EXIT_OK, code)
+        assertEquals(listOf("build", "stray"), executor.started.sorted())
+    }
+
+    @Test
     fun `a failed node exits one, and says which`() {
         sandbox.save(workflow(nodes = listOf(shell("build"), shell("ship")), edges = listOf("build" to "ship")))
 

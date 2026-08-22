@@ -316,7 +316,11 @@ fun GraphEditorScreen(
                     ) {
                         val selected = state.selectedNode
                         if (selected == null) {
-                            InspectorPlaceholder(state.issues)
+                            WorkflowOverview(
+                                workflow = state.workflow,
+                                issues = state.issues,
+                                onSelectNode = state::select,
+                            )
                         } else {
                             NodeInspector(
                                 state = state,
@@ -600,7 +604,7 @@ private fun EditorTopBar(
     }
 }
 
-private fun count(
+internal fun count(
     n: Int,
     noun: String,
 ) = if (n == 1) "1 $noun" else "$n ${noun}s"
@@ -734,30 +738,6 @@ private fun EmptyCanvasHint() {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun InspectorPlaceholder(issues: List<WorkflowIssue>) {
-    val workflowIssues = issues.filter { it.nodeId == null }
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Text(
-            "Select a node to edit it.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (workflowIssues.isNotEmpty()) {
-            Gap()
-            SectionLabel("Needs attention")
-            Gap(4)
-            workflowIssues.forEach { issue ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                    Icon(ZopfIcons.Warning, contentDescription = null, Modifier.size(14.dp), tint = issue.tint())
-                    Spacer(Modifier.width(8.dp))
-                    Text(issue.message, style = MaterialTheme.typography.labelSmall, color = issue.tint())
-                }
-            }
-        }
     }
 }
 
