@@ -8,11 +8,12 @@
   <b>A macOS app for running agent workflows as a graph.</b>
 </p>
 
-zopf allows you to conenct several claude or codex sessions into a graph and run them together instead of one terminal
-session at a time. You can also span this across multiple directories and invoke skills and other context on the side.
+zopf allows you to conenct several claude, codex or deepseek sessions into a graph and run them together instead of one
+terminal session at a time. You can also span this across multiple directories and invoke skills and other context on
+the side.
 
-It runs claude code in the non-interactive mode using `claude -p`, but you can also use codex instead. There's also a
-CLI which allows you to run zopf workflows headlessly.
+It runs claude code in the non-interactive mode using `claude -p`, but you can also use codex or DeepSeek Harness
+instead. There's also a CLI which allows you to run zopf workflows headlessly.
 
 <p align="center">
   <img src="docs/screenshot.png" alt="zopf window" width="900">
@@ -28,9 +29,18 @@ CLI which allows you to run zopf workflows headlessly.
 
 ## Getting Started
 
-You need **macOS on Apple Silicon**
-and [Claude Code](https://code.claude.com/docs/en/quickstart#step-1-install-claude-code)
-or [Codex](https://learn.chatgpt.com/docs/codex/cli) installed and signed in.
+You need **macOS on Apple Silicon** and one of these installed and signed in:
+
+| CLI                                                                                  | `provider:` | What zopf runs              |
+|--------------------------------------------------------------------------------------|-------------|-----------------------------|
+| [Claude Code](https://code.claude.com/docs/en/quickstart#step-1-install-claude-code) | `claude`    | `claude -p`, streaming JSON |
+| [Codex](https://learn.chatgpt.com/docs/codex/cli)                                    | `codex`     | `codex exec --json`         |
+| [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)                  | `dsh`       | `dsh --profile headless`    |
+
+> [!NOTE]
+> So far, only the Claude Code path was used daily and tested against a real CLI. The codex and dsh paths are built from those
+> CLIs' documented flags and covered by unit tests, but they haven't been tested end to end here.
+> Please open an issue if you notice a bug in their implementations.
 
 ### The App
 
@@ -120,14 +130,14 @@ The editor reads and writes to workflow files, so you can hand-edit it or draw i
 
 ## Node types
 
-| Type        | What it does                                                                            |
-|-------------|-----------------------------------------------------------------------------------------|
-| `agent`     | A headless agent session. Set `provider: codex` to switch CLIs (or change your default) |
-| `shell`     | A command that runs in your login shell in the repo you point it at                     |
-| `connector` | A script that talks to something outside                                                |
-| `gate`      | Stops and waits for you to approve or reject                                            |
-| `input`     | Asks you a question and passes the answer on as `${ask.result}`                         |
-| `branch`    | Picks one outgoing based on a condition, e.g.: `"${build.exitCode} == 0"`.              |
+| Type        | What it does                                                                                               |
+|-------------|------------------------------------------------------------------------------------------------------------|
+| `agent`     | A headless agent session. Set `provider: codex` or `provider: dsh` to switch CLIs (or change your default) |
+| `shell`     | A command that runs in your login shell in the repo you point it at                                        |
+| `connector` | A script that talks to something outside                                                                   |
+| `gate`      | Stops and waits for you to approve or reject                                                               |
+| `input`     | Asks you a question and passes the answer on as `${ask.result}`                                            |
+| `branch`    | Picks one outgoing based on a condition, e.g.: `"${build.exitCode} == 0"`.                                 |
 
 Steps read previous output with `${step.result}`. There's no expression language on top of it.
 
@@ -194,6 +204,7 @@ you're confident of its contents.
 
 ## Trademarks
 
-zopf is an independent personal project. It is not affiliated with, sponsored by or endorsed by Anthropic, OpenAI, Apple
-or GitHub. Claude and Claude Code are trademarks of Anthropic PBC; Codex is a trademark of OpenAI; macOS and Finder are
-trademarks of Apple Inc. They're named here only to say which tools zopf uses.
+zopf is an independent personal project. It is not affiliated with, sponsored by or endorsed by Anthropic, OpenAI,
+DeepSeek, Apple or GitHub. Claude and Claude Code are trademarks of Anthropic PBC; Codex is a trademark of OpenAI;
+DeepSeek is a trademark of Hangzhou DeepSeek Artificial Intelligence Co., Ltd.; macOS and Finder are trademarks of
+Apple Inc. They're named here only to say which tools zopf uses.

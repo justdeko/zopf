@@ -34,6 +34,7 @@ import com.dk.zopf.model.PermissionMode
 import com.dk.zopf.model.RepoRef
 import com.dk.zopf.model.Sandbox
 import com.dk.zopf.model.addRepo
+import com.dk.zopf.model.capabilities
 import com.dk.zopf.model.removeRepo
 import com.dk.zopf.store.Workspace
 import com.dk.zopf.store.knownRepoPaths
@@ -118,14 +119,16 @@ fun WorkflowSettingsDialog(
                     noneLabel = "Default (${state.defaultProvider.label})",
                     supportingText = "Which agent CLI this workflow's agent nodes run, unless they name their own.",
                 )
-                Gap(8)
-                ModelField(
-                    provider = defaultProvider,
-                    selected = workflow.defaults.model,
-                    onSelect = { model -> state.edit { it.copy(defaults = it.defaults.copy(model = model)) } },
-                    noneLabel = "Whatever ${defaultProvider.cliValue} is set to",
-                    supportingText = "Read by nodes running ${defaultProvider.label}. A node on the other CLI names its own.",
-                )
+                if (defaultProvider.capabilities.modelSelection) {
+                    Gap(8)
+                    ModelField(
+                        provider = defaultProvider,
+                        selected = workflow.defaults.model,
+                        onSelect = { model -> state.edit { it.copy(defaults = it.defaults.copy(model = model)) } },
+                        noneLabel = "Whatever ${defaultProvider.cliValue} is set to",
+                        supportingText = "Read by nodes running ${defaultProvider.label}. A node on another CLI names its own.",
+                    )
+                }
                 Gap(8)
                 InspectorDropdown(
                     label = "Permission mode",

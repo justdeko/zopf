@@ -338,6 +338,24 @@ class NodeRunTest {
     }
 
     @Test
+    fun `a dsh run has no stream, so its stdout is the answer and the whole answer`() {
+        val text = "Both tests pass.\n\nThe flake was the clock, not the parser.\n"
+        val run =
+            NodeRun("r", "demo", "analyze", "Analyze", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.DSH)
+                .apply {
+                    DshEvents.parseAll(text).forEach(::consume)
+                    finish(RunStatus.SUCCEEDED, 0)
+                }
+
+        assertFalse(run.canFollowUp)
+        assertFalse(run.canTakeOver)
+        assertNull(run.sessionId)
+
+        assertEquals(text.trim(), run.output().result, "the blank line between paragraphs survives")
+        assertEquals(1, run.entries.filterIsInstance<ConsoleEntry.Message>().size)
+    }
+
+    @Test
     fun `deltas accumulate into one row until the block is complete`() {
         val run = run()
         run.consume(AgentEvent.TextDelta("s1", "Hel", isThinking = false))

@@ -29,6 +29,7 @@ object CodexProvider : AgentProvider {
             }
             add("exec")
             add("--json")
+            add("--skip-git-repo-check")
             add(invocation.prompt)
         }
 

@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.dk.zopf.model.AgentProviderId
+import com.dk.zopf.model.capabilities
 import com.dk.zopf.runtime.ASKABLE_TOOLS
 import com.dk.zopf.runtime.Release
 import com.dk.zopf.store.AppPaths
@@ -88,18 +89,20 @@ fun SettingsScreen(
             Gap(8)
             SectionLabel("Agents")
             AgentField(settings.defaultProvider) { chosen -> onChange { it.copy(defaultProvider = chosen) } }
-            Gap(4)
-            ModelField(
-                provider = settings.defaultProvider,
-                selected = settings.defaultModel,
-                onSelect = { model -> onChange { it.copy(defaultModel = model) } },
-                noneLabel = "Whatever ${settings.defaultProvider.cliValue} is set to",
-                supportingText =
-                    "Used only when neither the node nor its workflow names one, and only for nodes " +
-                        "running ${settings.defaultProvider.label} — a model name belongs to the CLI it was written for.",
-            )
+            if (settings.defaultProvider.capabilities.modelSelection) {
+                Gap(4)
+                ModelField(
+                    provider = settings.defaultProvider,
+                    selected = settings.defaultModel,
+                    onSelect = { model -> onChange { it.copy(defaultModel = model) } },
+                    noneLabel = "Whatever ${settings.defaultProvider.cliValue} is set to",
+                    supportingText =
+                        "Used only when neither the node nor its workflow names one, and only for nodes " +
+                            "running ${settings.defaultProvider.label} — a model name belongs to the CLI it was written for.",
+                )
+            }
             Hint(
-                "Both of these are only this machine's fallback. A workspace that names a provider or " +
+                "These are only this machine's fallback. A workspace that names a provider or " +
                     "model under defaults: in its zopf.yaml wins over them, so a repo can pin what its " +
                     "own workflows run on.",
             )
@@ -190,10 +193,31 @@ private fun AgentField(
         "Used only by an agent node that names no CLI, in a workflow whose defaults name none either. " +
             "zopf drives whichever you pick with the login you already have.",
     )
-    Hint(
-        "codex takes one turn per node: no follow-ups, no take-over, no inline approval, and a " +
-            "sandbox instead of a permission mode. What it reports is tokens rather than dollars.",
-    )
+    caveats(value)?.let { Hint(it) }
+}
+
+private fun caveats(provider: AgentProviderId): String? {
+    val can = provider.capabilities
+    val missing =
+        buildList {
+            if (!can.followUps) add("follow-ups")
+            if (!can.resumeInTerminal) add("take-over")
+            if (!can.inlineApproval) add("inline approval")
+            if (!can.toolPermissions) add("a permission mode")
+            if (!can.skills) add("skills")
+            if (!can.modelSelection) add("a model you pick")
+            if (!can.reportsCostUsd) add("a dollar cost")
+        }
+    if (missing.isEmpty()) return null
+    val head = missing.dropLast(1)
+    return buildString {
+        append(provider.label)
+        append(if (can.followUps) " has no " else " takes one turn per node, with no ")
+        if (head.isNotEmpty()) append("${head.joinToString()} or ")
+        append(missing.last())
+        append(".")
+        if (can.sandbox) append(" It takes a sandbox instead.")
+    }
 }
 
 @Composable

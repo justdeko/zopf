@@ -83,7 +83,7 @@ private fun dispatch(
 fun usage(out: PrintStream) {
     out.println(
         """
-        zopf runs agent workflows from a terminal, driving the claude or codex CLI you already have.
+        zopf runs agent workflows from a terminal, driving the claude, codex or dsh CLI you already have.
 
         zopf run <workflow>       run a workflow to the end, then exit with its verdict
           --workspace <dir>       workspace to read from (default: the one around you)
@@ -92,7 +92,7 @@ fun usage(out: PrintStream) {
           --answer <node>=<value> answer an input node up front
           --concurrency <n>       how many nodes may run at once (overrides settings.json)
           --model <name>          model for nodes that don't name one
-          --provider <name>       claude or codex, for agent nodes that don't name one
+          --provider <name>       claude, codex or dsh, for agent nodes that don't name one
           --timeout <seconds>     stop the run if it hasn't finished by then
           --format <format>       text (default), json (the archive's NDJSON) or quiet
           --dry-run               print the order nodes would run in, start nothing

@@ -139,6 +139,9 @@ enum class AgentProviderId {
     @SerialName("codex")
     CODEX,
 
+    @SerialName("dsh")
+    DSH,
+
     ;
 
     val cliValue: String
@@ -146,6 +149,7 @@ enum class AgentProviderId {
             when (this) {
                 CLAUDE -> "claude"
                 CODEX -> "codex"
+                DSH -> "dsh"
             }
 
     val label: String
@@ -153,6 +157,7 @@ enum class AgentProviderId {
             when (this) {
                 CLAUDE -> "Claude Code"
                 CODEX -> "codex"
+                DSH -> "DeepSeek Harness"
             }
 }
 

@@ -262,17 +262,19 @@ private fun AgentFields(
         )
     }
 
-    Gap()
-    ModelField(
-        provider = provider,
-        selected = node.model,
-        onSelect = { state.updateNode(node.copy(model = it)) },
-        noneLabel =
-            state.resolvedWorkflow
-                .inheritedModel(provider, state.defaultProvider, state.defaultModel)
-                ?.let { "Inherited ($it)" }
-                ?: "Whatever ${provider.cliValue} is set to",
-    )
+    if (can.modelSelection) {
+        Gap()
+        ModelField(
+            provider = provider,
+            selected = node.model,
+            onSelect = { state.updateNode(node.copy(model = it)) },
+            noneLabel =
+                state.resolvedWorkflow
+                    .inheritedModel(provider, state.defaultProvider, state.defaultModel)
+                    ?.let { "Inherited ($it)" }
+                    ?: "Whatever ${provider.cliValue} is set to",
+        )
+    }
 
     if (can.toolPermissions) {
         Gap(8)
@@ -299,7 +301,7 @@ private fun AgentFields(
             onSelect = { state.updateNode(node.copy(sandbox = it)) },
             noneLabel =
                 workflow.defaults.sandbox?.let { "Workflow default (${it.cliValue})" }
-                    ?: "Whatever codex is configured for",
+                    ?: "Whatever ${provider.cliValue} is configured for",
             supportingText =
                 "Chosen before launch, since ${provider.label} has no way to ask mid-turn. " +
                     "Nothing here can be approved inline.",

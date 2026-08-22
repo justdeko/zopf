@@ -66,6 +66,8 @@ class AgentInvocationTest {
 
     private fun codex(invocation: AgentInvocation = this.invocation) = CodexProvider.command(invocation, "codex")
 
+    private fun dsh(invocation: AgentInvocation = this.invocation) = DshProvider.command(invocation, "dsh")
+
     @Test
     fun `the claude command streams both ways and pins the session id`() {
         val command = claude()
@@ -126,6 +128,7 @@ class AgentInvocationTest {
     fun `a resolved executable path replaces the bare name`() {
         assertEquals("/opt/claude", ClaudeProvider.command(invocation, "/opt/claude").first())
         assertEquals("/opt/codex", CodexProvider.command(invocation, "/opt/codex").first())
+        assertEquals("/opt/dsh", DshProvider.command(invocation, "/opt/dsh").first())
     }
 
     @Test
@@ -137,7 +140,13 @@ class AgentInvocationTest {
         assertTrue(command.indexOf("--ask-for-approval") < exec)
         assertTrue(command.indexOf("--sandbox") < exec)
         assertTrue(command.indexOf("--model") < exec)
-        assertEquals(listOf("exec", "--json", "hi"), command.drop(exec))
+        assertEquals(listOf("exec", "--json", "--skip-git-repo-check", "hi"), command.drop(exec))
+    }
+
+    @Test
+    fun `codex is not asked to check for a git repo, since a node may run in a workspace that isn't one`() {
+        assertTrue("--skip-git-repo-check" in codex())
+        assertFalse("--skip-git-repo-check" in claude(), "claude never had the check to skip")
     }
 
     @Test
@@ -168,9 +177,20 @@ class AgentInvocationTest {
     }
 
     @Test
+    fun `dsh is the profile name and the prompt, and nothing either other CLI takes`() {
+        val command = dsh()
+
+        assertEquals(listOf("dsh", "--profile", "headless", "hi"), command)
+        assertFalse("--model" in command)
+        assertFalse("--sandbox" in command)
+        assertFalse("--json" in command)
+    }
+
+    @Test
     fun `only the CLI that can resume one chooses the session id up front`() {
         assertNotNull(ClaudeProvider.newSessionId())
         assertNull(CodexProvider.newSessionId())
+        assertNull(DshProvider.newSessionId())
     }
 
     private fun List<String>.containsInOrder(vararg values: String): Boolean {
@@ -200,6 +220,22 @@ class AgentCapabilitiesTest {
         assertTrue(codex.sandbox)
 
         assertEquals(emptyList(), CodexProvider.terminalArgs("t-1"), "there is no exec session to resume")
+    }
+
+    @Test
+    fun `a dsh node offers no model, because the headless profile has no flag to carry one`() {
+        val dsh = DshProvider.capabilities
+
+        assertFalse(dsh.modelSelection)
+        assertFalse(dsh.sandbox)
+        assertFalse(dsh.followUps)
+        assertFalse(dsh.reportsCostUsd)
+
+        assertEquals(
+            listOf("model"),
+            AgentProviderId.DSH.ignoredFields(WorkflowNode(id = "n", type = NodeType.AGENT, model = "deepseek-chat")),
+        )
+        assertEquals(emptyList(), DshProvider.terminalArgs("s-1"), "the headless profile leaves nothing to reopen")
     }
 
     @Test

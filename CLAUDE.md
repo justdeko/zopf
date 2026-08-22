@@ -112,14 +112,22 @@ packaged `.app` while working perfectly under `:desktopApp:run`.
 
 ## Providers
 
-An agent node is a provider behind `runtime/AgentProvider.kt`: `ClaudeProvider` and `CodexProvider`
-build an argv, parse a line of streamed JSON into an `AgentEvent`, and say how to reopen a session in
-a terminal. Everything the two CLIs disagree about is declared once, as data, in
+An agent node is a provider behind `runtime/AgentProvider.kt`: `ClaudeProvider`, `CodexProvider` and
+`DshProvider` build an argv, turn a line of the CLI's output into an `AgentEvent`, and say how to
+reopen a session in a terminal. Everything the CLIs disagree about is declared once, as data, in
 `model/AgentCapabilities.kt` — follow-ups, inline approval, take-over, cost reporting, skills, tool
-permissions, extra directories, output schema, sandbox. The UI reads capabilities to decide what to
-offer, and `ignoredFields()` reads the same table to warn about a field set on a node whose provider
-will ignore it. Adding a provider means a new `AgentProvider` and a new row in that table; it should
-not mean an `if (codex)` anywhere in `:shared`.
+permissions, extra directories, output schema, sandbox, model selection. The UI reads capabilities to
+decide what to offer, and `ignoredFields()` reads the same table to warn about a field set on a node
+whose provider will ignore it. Adding a provider means a new `AgentProvider` and a new row in that
+table; it should not mean an `if (codex)` anywhere in `:shared`.
+
+A provider's `AgentProviderId` serial name is the executable it runs — `claude`, `codex`, `dsh` — so
+`provider:` in a workflow, `--provider` on the CLI and the binary on your PATH are all one word.
+
+Streamed JSON is Claude Code's and codex's shape, not a requirement. `dsh --profile headless` prints
+plain text, so `DshEvents` turns each stdout line into a `TextDelta`; the message `NodeRun.finish`
+closes is the node's result, the way a shell node's stdout is. No `Result` event means no cost and no
+token count.
 
 Subprocesses get the **login shell's** environment and PATH, resolved once in
 `runtime/CommandLookup.kt` via `zsh -lic`, because a `.app` launched from Finder inherits almost
@@ -163,8 +171,8 @@ kotaml is the maintained fork of kaml, which is archived; it keeps the `com.char
 and continues the same version line, so the imports are not a leftover and nothing but the coordinate
 in `libs.versions.toml` changed.
 `strictMode = false` keeps an unknown key from making a file unopenable; `store/UnknownKey.kt` then
-reports those keys as warnings against the serializer descriptors, which is a better failure than
-refusing to load. Files are written through `store/AtomicWrite.kt`.
+reports those keys as warnings against the serializer descriptors. Files are written through
+`store/AtomicWrite.kt`.
 
 ## The workflow format version
 
@@ -215,7 +223,7 @@ unzip ~/.gradle/caches/modules-2/files-2.1/io.github.justdeko/kuiver-jvm/*/*/cor
 ```
 
 Material 3's expressive APIs are opted into once for the whole `:shared` source set in its
-`build.gradle.kts`, not per file — the theme is app-wide, so per-call-site annotations would be noise.
+`build.gradle.kts`, not per file — the theme is app-wide.
 
 `.mcp.json` wires up `:desktopApp:hotMcpServer`, which drives a running hot-reload instance —
 screenshots, the semantic tree, clicks. That is how to check a UI change actually looks right rather
@@ -256,8 +264,7 @@ These guard things a normal unit test wouldn't:
 
 ## Deliberate non-goals
 
-These are decisions, not gaps. If a change would undo one, that is a real decision to make, not a
-detail:
+These are decisions, not gaps. If a change would undo one, that is a real decision to make:
 
 - **No triggers, no scheduler, no daemon, no `--watch`.** A run starts when someone clicks Run or
   something calls the CLI. cron, CI and git hooks already do scheduling better than a desktop app.
@@ -267,9 +274,9 @@ detail:
   face. zopf is for graphs with judgment in them — agent, gate, input. The rest belongs in a script.
 - **macOS on Apple Silicon only.** `AppPaths` resolves `~/Library`, the runners spawn `zsh`, and
   `:cli`'s `startScripts` deletes the Windows launcher rather than shipping something that can't work.
-- **zopf redistributes neither CLI and installs nothing.** It hands you the release page. `zopf run`
-  never touches the network on its own account; `ZOPF_NO_UPDATE_CHECK=1` or `DO_NOT_TRACK=1` silences
-  the app's daily check.
+- **zopf redistributes none of the CLIs and installs nothing.** It hands you the release page.
+  `zopf run` never touches the network on its own account; `ZOPF_NO_UPDATE_CHECK=1` or
+  `DO_NOT_TRACK=1` silences the app's daily check.
 - **Content the agent read can reach a shell.** `${analyze.result}` interpolating into a `shell`
   node's command is the design, not an oversight — gates and inline approval are the answer to it.
   Don't "fix" it by sanitising interpolation.

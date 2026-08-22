@@ -54,7 +54,7 @@ Declare `self` explicitly even though zopf can infer it from the enclosing git r
 | key              | applies to                    | notes                                                               |
 |------------------|-------------------------------|---------------------------------------------------------------------|
 | `repo`           | every node                    | The repo id nodes run in unless they name their own. Set this once. |
-| `provider`       | `agent` nodes                 | `claude` (default) or `codex`. A node naming its own wins.          |
+| `provider`       | `agent` nodes                 | `claude` (default), `codex` or `dsh`. A node naming its own wins.   |
 | `model`          | `agent` nodes                 | e.g. `opus`, `sonnet`. A node naming its own wins.                  |
 | `permissionMode` | `agent` nodes                 | Claude Code only. See the node table.                               |
 | `sandbox`        | `agent` nodes                 | codex only. See the node table.                                     |
@@ -70,7 +70,7 @@ node → workflow `defaults` → workspace `defaults` → the app's Settings.
 | `id`             | string            | all                           | **Required.** Unique. Must match `[A-Za-z0-9_-]+` to be referenceable as `${id.field}`.                                    |
 | `type`           | enum              | all                           | **Required.** `agent` \| `shell` \| `connector` \| `gate` \| `branch` \| `input`.                                          |
 | `title`          | string            | all                           | Display name. Falls back to `id`. **Not interpolated.**                                                                    |
-| `provider`       | enum              | `agent`                       | `claude` \| `codex`. Which agent CLI runs the node. Absent means `defaults.provider`, then the app's default, then claude. |
+| `provider`       | enum              | `agent`                       | `claude` \| `codex` \| `dsh`. Which agent CLI runs the node. Absent means `defaults.provider`, then the app's default, then claude. |
 | `repo`           | string            | `agent`, `shell`              | Repo id to run in. Must be declared.                                                                                       |
 | `timeoutSeconds` | int               | `agent`, `shell`, `connector` | Overrides `defaults`.                                                                                                      |
 | `position`       | `{x, y}`          | all                           | Canvas coordinate. **Do not hand-write** — one manual position turns off auto-layout for the whole graph.                  |
@@ -79,7 +79,7 @@ node → workflow `defaults` → workspace `defaults` → the app's Settings.
 | `alsoRead`       | list of string    | `agent`                       | Extra declared repo ids the node may access (`--add-dir`). Grants write access too, not just read.                         |
 | `allowedTools`   | list of string    | `agent`                       | e.g. `Read`, `Edit`, `Write`, `Glob`, `Grep`, `Bash`, `WebFetch`. Empty means the CLI's own default. **Not interpolated.** |
 | `skills`         | list of string    | `agent`                       | Skill **names**, not paths. Resolved against the workflow's repos, the workspace `skills/`, and `~/.claude/skills`.        |
-| `model`          | string            | `agent`                       | Overrides `defaults.model`.                                                                                                |
+| `model`          | string            | `agent`                       | Overrides `defaults.model`. Not read by `dsh`, which has no flag for one.                                                  |
 | `permissionMode` | enum              | `agent` (claude)              | `acceptEdits` \| `auto` \| `bypassPermissions` \| `manual` \| `dontAsk` \| `plan`.                                         |
 | `sandbox`        | enum              | `agent` (codex)               | `read-only` \| `workspace-write` \| `danger-full-access`. Chosen before launch; codex cannot be asked mid-turn.            |
 | `schema`         | list of field     | `agent`                       | Declares the answer's shape. Each name becomes `${id.name}`. Absent means prose, as before. See [schema](#schema).         |
@@ -93,7 +93,8 @@ node → workflow `defaults` → workspace `defaults` → the app's Settings.
 ### Model names belong to a CLI
 
 `opus`, `sonnet` and `haiku` are Claude Code's. codex takes its own names, and zopf ships no list of them — write one
-into the node's `model:` or leave it out and let codex use whatever it is configured for. This is enforced rather than
+into the node's `model:` or leave it out and let codex use whatever it is configured for. `dsh` takes none at all: its
+headless profile has no `--model`, so a `model:` on a dsh node is a validation warning. This is enforced rather than
 merely documented: `defaults.model` is read only by nodes running the *workflow's* default CLI, and the app's default
 model only by nodes running the *machine's* default CLI, so `model: opus` in a workflow's defaults never reaches
 `codex --model opus`. A node's own `model:` is always honoured, because it was written next to its `provider:`.
@@ -103,6 +104,9 @@ model only by nodes running the *machine's* default CLI, so `model: opus` in a w
 `provider: claude` is the default and has everything: follow-ups, take-over in Terminal, inline approval, `skills:`,
 `allowedTools:`, `alsoRead:`, `schema:` and a dollar cost. `provider: codex` runs `codex exec`, which is **one turn**:
 no follow-up, no take-over, no inline approval, `sandbox:` in place of `permissionMode:`, and tokens instead of dollars.
+`provider: dsh` runs DeepSeek Harness's headless profile, which is one turn and nothing else: `prompt:`, `repo:` and
+`timeoutSeconds:` are the only node keys it reads, and its whole stdout becomes `${id.result}`.
+
 A field the chosen CLI has no version of is left out of the command and `zopf validate` warns, naming it — so `skills:`
 on a codex node is a warning rather than a silent no-op.
 

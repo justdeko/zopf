@@ -1,6 +1,6 @@
 ---
 name: zopf-workflows
-description: Write, edit and validate zopf workflow YAML — the graph-based agent workflows (Claude Code or codex) that live in a workspace's workflows/ directory. Use this whenever the user mentions a zopf workflow, asks to add or change a node, edge, gate, branch or connector step, is touching a file under .zopf/workflows/ or any workflows/*.yaml sitting beside a zopf.yaml, wants something to happen when a step fails or wants a person asked before continuing, or wants zopf run / zopf validate used on one. Reach for it too when the user describes an automation in zopf's terms — "run the suite then have Claude fix what broke", "notify me when the review is done", "ask me before it commits" — even if they never say the word workflow.
+description: Write, edit and validate zopf workflow YAML — the graph-based agent workflows (Claude Code, codex or DeepSeek Harness) that live in a workspace's workflows/ directory. Use this whenever the user mentions a zopf workflow, asks to add or change a node, edge, gate, branch or connector step, is touching a file under .zopf/workflows/ or any workflows/*.yaml sitting beside a zopf.yaml, wants something to happen when a step fails or wants a person asked before continuing, or wants zopf run / zopf validate used on one. Reach for it too when the user describes an automation in zopf's terms — "run the suite then have Claude fix what broke", "notify me when the review is done", "ask me before it commits" — even if they never say the word workflow.
 ---
 
 # Writing zopf workflows
@@ -122,10 +122,11 @@ Reach for them like this:
   that gathers context for an `agent` node is the single most useful shape in this format: `git diff` into a prompt
   makes the reviewing node read-only by construction, where a `Bash`
   grant would have it stopping for permissions and burning turns.
-- **`agent`** for judgment: a headless session of the `claude` CLI, or of `codex` when the node says
-  `provider: codex`. Give it the narrowest `allowedTools:` that can do the job — a node that only reads should have
-  `[Read, Glob, Grep]` and no `Bash`. Leave `provider:` out unless the user asks for codex by name; a codex node takes
-  one turn and has no skills, no tool allowlist and no inline approval.
+- **`agent`** for judgment: a headless session of the `claude` CLI, or of `codex` or `dsh` when the node names one in
+  `provider:`. Give it the narrowest `allowedTools:` that can do the job — a node that only reads should have
+  `[Read, Glob, Grep]` and no `Bash`. Leave `provider:` out unless the user asks for another CLI by name; a codex or
+  dsh node takes one turn and has no skills, no tool allowlist and no inline approval, and a dsh node has no model
+  either.
 - **`connector`** for a side effect with a contract: filing an issue, sending a notification. Call one that exists. A
   `shell` node running the same CLI (`gh issue create`, `curl`) is a fine choice too and often the simpler one — the
   connector earns its place when the call needs a secret, has outputs a later node reads by name, or is used by more

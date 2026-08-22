@@ -28,7 +28,7 @@ interface AgentProvider {
 }
 
 object AgentProviders {
-    val all: List<AgentProvider> = listOf(ClaudeProvider, CodexProvider)
+    val all: List<AgentProvider> = listOf(ClaudeProvider, CodexProvider, DshProvider)
 
     private val onPath: Set<AgentProviderId> by lazy {
         all.filter { CommandLookup.which(it.executable) != null }.mapTo(mutableSetOf()) { it.id }

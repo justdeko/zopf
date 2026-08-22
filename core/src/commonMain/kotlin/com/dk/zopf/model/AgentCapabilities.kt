@@ -10,6 +10,7 @@ data class AgentCapabilities(
     val extraDirectories: Boolean,
     val outputSchema: Boolean,
     val sandbox: Boolean,
+    val modelSelection: Boolean,
 )
 
 val AgentProviderId.capabilities: AgentCapabilities
@@ -26,6 +27,7 @@ val AgentProviderId.capabilities: AgentCapabilities
                     extraDirectories = true,
                     outputSchema = true,
                     sandbox = false,
+                    modelSelection = true,
                 )
             }
 
@@ -40,6 +42,22 @@ val AgentProviderId.capabilities: AgentCapabilities
                     extraDirectories = false,
                     outputSchema = false,
                     sandbox = true,
+                    modelSelection = true,
+                )
+            }
+
+            AgentProviderId.DSH -> {
+                AgentCapabilities(
+                    followUps = false,
+                    inlineApproval = false,
+                    resumeInTerminal = false,
+                    reportsCostUsd = false,
+                    skills = false,
+                    toolPermissions = false,
+                    extraDirectories = false,
+                    outputSchema = false,
+                    sandbox = false,
+                    modelSelection = false,
                 )
             }
         }
@@ -49,6 +67,7 @@ val AgentProviderId.modelOptions: List<String>
         when (this) {
             AgentProviderId.CLAUDE -> listOf("opus", "sonnet", "haiku")
             AgentProviderId.CODEX -> emptyList()
+            AgentProviderId.DSH -> emptyList()
         }
 
 fun AgentProviderId.ignoredFields(node: WorkflowNode): List<String> =
@@ -60,6 +79,7 @@ fun AgentProviderId.ignoredFields(node: WorkflowNode): List<String> =
         if (!can.extraDirectories && node.alsoRead.isNotEmpty()) add("alsoRead")
         if (!can.outputSchema && node.schema.isNotEmpty()) add("schema")
         if (!can.sandbox && node.sandbox != null) add("sandbox")
+        if (!can.modelSelection && node.model != null) add("model")
     }
 
 fun Workflow.providerFor(
