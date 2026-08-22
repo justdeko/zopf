@@ -8,7 +8,7 @@
   <b>A macOS app for running agent workflows as a graph.</b>
 </p>
 
-zopf allows you to conenct several claude, codex or deepseek sessions into a graph and run them together instead of one
+zopf allows you to connect several claude, codex or deepseek sessions into a graph and run them together instead of one
 terminal session at a time. You can also span this across multiple directories and invoke skills and other context on
 the side.
 
@@ -123,7 +123,7 @@ The editor reads and writes to workflow files, so you can hand-edit it or draw i
 
 * Fan one migration out over a dozen repos in parallel and collect a diff from each
 * Review with an expensive model, then apply the fixes with a cheap one
-* Run the something as a shell step, then do things based on the potential outcomes consistently
+* Run something as a shell step, then do things based on the potential outcomes consistently
 * Send a failure or result to an external platform
 * Summarize a folder of documents in parallel, then have a second agent write the digest
 * Ask for user input after or in between an expensive automated parallelized task

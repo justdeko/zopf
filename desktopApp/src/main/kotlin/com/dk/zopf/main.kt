@@ -11,6 +11,7 @@ import androidx.compose.ui.window.application
 import com.dk.zopf.platform.WithFullWindowContent
 import com.dk.zopf.platform.ZopfMenuBar
 import com.dk.zopf.platform.ZopfTray
+import com.dk.zopf.platform.bringToFront
 import com.dk.zopf.platform.toFrame
 import com.dk.zopf.platform.toWindowState
 import com.dk.zopf.store.Log
@@ -38,6 +39,7 @@ fun main() {
                     .toWindowState()
             }
         var windowVisible by remember { mutableStateOf(true) }
+        var showRequests by remember { mutableStateOf(0) }
 
         fun quit() {
             Log.info("quitting")
@@ -52,7 +54,13 @@ fun main() {
             }
         }
 
-        ZopfTray(app, onShowWindow = { windowVisible = true }, onQuit = { quit() })
+        fun showWindow() {
+            windowVisible = true
+            windowState.isMinimized = false
+            showRequests++
+        }
+
+        ZopfTray(app, onShowWindow = { showWindow() }, onQuit = { quit() })
 
         @Suppress("DEPRECATION")
         val windowIcon = painterResource("icon.svg")
@@ -65,6 +73,9 @@ fun main() {
             icon = windowIcon,
         ) {
             LaunchedEffect(window) { window.minimumSize = Dimension(800, 600) }
+            LaunchedEffect(window, showRequests) {
+                if (showRequests > 0) window.bringToFront()
+            }
 
             ZopfMenuBar(app, onHideWindow = { windowVisible = false })
             WithFullWindowContent(windowState.placement) {

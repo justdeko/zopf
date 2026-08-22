@@ -57,9 +57,11 @@ fun ApplicationScope.ZopfTray(
     val active = runs.runs.filter { it.isActive }
 
     fun show(run: WorkflowRun? = null) {
-        run?.let { runs.select(it) }
-        app.screen = Screen.RUNS
-        app.showRunPanel = run != null
+        run?.let {
+            runs.select(it)
+            app.screen = Screen.RUNS
+            app.showRunPanel = true
+        }
         onShowWindow()
     }
 

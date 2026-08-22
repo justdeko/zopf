@@ -141,12 +141,11 @@ private fun MenuScope.WorkflowMenu(app: AppState) {
 private fun MenuScope.ViewMenu(app: AppState) {
     val editor = app.editorCommands
 
-    val shortcuts = listOf(Key.One, Key.Two, Key.Three, Key.Four)
-    Screen.entries.forEachIndexed { index, screen ->
+    Screen.entries.forEach { screen ->
         RadioButtonItem(
             screen.label,
             selected = app.screen == screen && app.editing == null,
-            shortcut = shortcuts.getOrNull(index)?.let { KeyShortcut(it, meta = true) },
+            shortcut = screen.shortcut,
             enabled = app.editing == null,
         ) { app.screen = screen }
     }
@@ -181,6 +180,15 @@ private fun MenuScope.ViewMenu(app: AppState) {
         enabled = editor != null,
     ) { editor?.relayout?.invoke() }
 }
+
+private val Screen.shortcut: KeyShortcut
+    get() =
+        when (this) {
+            Screen.WORKFLOWS -> KeyShortcut(Key.One, meta = true)
+            Screen.RUNS -> KeyShortcut(Key.Two, meta = true)
+            Screen.CONNECTORS -> KeyShortcut(Key.Three, meta = true)
+            Screen.SETTINGS -> KeyShortcut(Key.Comma, meta = true)
+        }
 
 @Composable
 private fun MenuScope.WorkspaceMenu(app: AppState) {
