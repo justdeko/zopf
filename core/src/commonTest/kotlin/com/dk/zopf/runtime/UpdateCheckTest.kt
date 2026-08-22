@@ -18,13 +18,13 @@ class VersionTest {
     fun `a version is compared by number, not by spelling`() {
         assertTrue(Version.parse("0.10.0")!! > Version.parse("0.9.0")!!)
         assertTrue(Version.parse("1.0.0")!! > Version.parse("0.99.99")!!)
-        assertEquals(Version.parse("0.1.0"), Version.parse("0.1.0"))
+        assertEquals(Version.parse("1.0.0"), Version.parse("1.0.0"))
     }
 
     @Test
     fun `a release tag and a build number are the same version`() {
-        assertEquals(Version.parse("0.2.0"), Version.parse("v0.2.0"))
-        assertEquals(Version(0, 2, 0), Version.parse("0.2.0-rc1"))
+        assertEquals(Version.parse("1.1.0"), Version.parse("v1.1.0"))
+        assertEquals(Version(1, 1, 0), Version.parse("1.1.0-rc1"))
         assertEquals(Version(1, 0, 0), Version.parse("1"))
     }
 
@@ -48,8 +48,8 @@ class UpdateCheckTest {
     private val morning: Instant = Instant.parse("2026-08-15T09:00:00Z")
 
     private fun check(
-        latest: String = "0.2.0",
-        current: String = "0.1.0",
+        latest: String = "1.1.0",
+        current: String = "1.0.0",
         now: Instant = morning,
         source: ReleaseSource = ReleaseSource { Result.success(Release(Version.parse(latest)!!, "https://example.test/$latest")) },
     ) = UpdateCheck(source = source, file = file, current = current, now = { now })
@@ -58,17 +58,17 @@ class UpdateCheckTest {
     fun `a newer release is reported and cached for the next run to read`() {
         val release = check().refresh()
 
-        assertEquals(Version(0, 2, 0), release?.version)
+        assertEquals(Version(1, 1, 0), release?.version)
         assertTrue(file.exists(), "the check has to leave its answer behind")
 
-        val offline = UpdateCheck(source = { Result.failure(UnknownHostException()) }, file = file, current = "0.1.0")
-        assertEquals(Version(0, 2, 0), offline.cached()?.version)
+        val offline = UpdateCheck(source = { Result.failure(UnknownHostException()) }, file = file, current = "1.0.0")
+        assertEquals(Version(1, 1, 0), offline.cached()?.version)
     }
 
     @Test
     fun `the release you are already running is not news`() {
-        assertNull(check(latest = "0.1.0").refresh())
-        assertNull(check(latest = "0.0.9").refresh())
+        assertNull(check(latest = "1.0.0").refresh())
+        assertNull(check(latest = "0.9.9").refresh())
     }
 
     @Test
@@ -82,7 +82,7 @@ class UpdateCheckTest {
         val source =
             ReleaseSource {
                 asked += 1
-                Result.success(Release(Version(0, 2, 0), "https://example.test"))
+                Result.success(Release(Version(1, 1, 0), "https://example.test"))
             }
 
         check(source = source).refresh()
@@ -104,7 +104,7 @@ class UpdateCheckTest {
                 now = morning.plusSeconds(5 * 24 * 3600),
             ).refresh()
 
-        assertEquals(Version(0, 2, 0), release?.version, "a failed check falls back on the last answer")
+        assertEquals(Version(1, 1, 0), release?.version, "a failed check falls back on the last answer")
     }
 
     @Test
@@ -115,7 +115,7 @@ class UpdateCheckTest {
         assertTrue(checker.announceOnce(release))
         assertFalse(checker.announceOnce(release), "the same version must never interrupt twice")
 
-        val next = check(latest = "0.3.0", now = morning.plusSeconds(48 * 3600))
+        val next = check(latest = "1.2.0", now = morning.plusSeconds(48 * 3600))
         assertTrue(next.announceOnce(next.refresh()!!), "but a further release is worth saying once")
     }
 
@@ -124,14 +124,14 @@ class UpdateCheckTest {
         file.writeText("{ this is not json")
 
         assertNull(check(source = { Result.failure(UnknownHostException()) }).cached())
-        assertEquals(Version(0, 2, 0), check().refresh()?.version)
+        assertEquals(Version(1, 1, 0), check().refresh()?.version)
     }
 
     @Test
     fun `fetch answers with the latest release whether or not it is newer`() {
-        val checker = check(latest = "0.1.0")
+        val checker = check(latest = "1.0.0")
 
-        assertEquals(Version(0, 1, 0), checker.fetch().getOrThrow().version)
+        assertEquals(Version(1, 0, 0), checker.fetch().getOrThrow().version)
         assertNull(checker.cached(), "check-update can say \"you are current\"; the notice still must not fire")
     }
 }
@@ -140,12 +140,12 @@ class GitHubReleasesTest {
     private val payload =
         """
         {
-          "tag_name": "v0.2.0",
-          "name": "0.2.0",
+          "tag_name": "v1.1.0",
+          "name": "1.1.0",
           "draft": false,
           "prerelease": false,
-          "html_url": "https://github.com/justdeko/zopf/releases/tag/v0.2.0",
-          "assets": [{ "name": "zopf-0.2.0.dmg" }, { "name": "zopf-cli-0.2.0.tar.gz" }]
+          "html_url": "https://github.com/justdeko/zopf/releases/tag/v1.1.0",
+          "assets": [{ "name": "zopf-1.1.0.dmg" }, { "name": "zopf-cli-1.1.0.tar.gz" }]
         }
         """.trimIndent()
 
@@ -153,8 +153,8 @@ class GitHubReleasesTest {
     fun `the tag is the version and the page is the link`() {
         val release = GitHubReleases().parse(payload).getOrThrow()
 
-        assertEquals(Version(0, 2, 0), release.version)
-        assertEquals("https://github.com/justdeko/zopf/releases/tag/v0.2.0", release.url)
+        assertEquals(Version(1, 1, 0), release.version)
+        assertEquals("https://github.com/justdeko/zopf/releases/tag/v1.1.0", release.url)
     }
 
     @Test
@@ -170,7 +170,7 @@ class GitHubReleasesTest {
 
     @Test
     fun `a link off the network is either https or not a link at all`() {
-        val release = GitHubReleases().parse("""{"tag_name":"v0.3.0","html_url":"file:///etc/passwd"}""").getOrThrow()
+        val release = GitHubReleases().parse("""{"tag_name":"v1.2.0","html_url":"file:///etc/passwd"}""").getOrThrow()
 
         assertEquals("https://github.com/justdeko/zopf/releases/latest", release.url)
         assertEquals(listOf("open", "https://example.test"), Browser.command("https://example.test"))

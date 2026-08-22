@@ -37,7 +37,7 @@ that isn't visible from outside.
 ./gradlew :desktopApp:run                   # the window, off the Gradle daemon
 ./gradlew :desktopApp:hotRun --autoReload   # same, with Compose hot reload
 ./gradlew :desktopApp:runMacApp             # build the .app and open it via LaunchServices
-./gradlew :desktopApp:packageDmg -PpackageVersion=0.1.0
+./gradlew :desktopApp:packageDmg -PpackageVersion=1.0.0
 ./gradlew :desktopApp:suggestRuntimeModules # re-run after touching the runtime layer
 
 ./gradlew :cli:installDist                  # cli/build/install/zopf-cli/bin/zopf
@@ -74,7 +74,10 @@ only force a second declaration there.
 Version: generated, not checked in. `zopfVersion` in `gradle.properties` (overridden by
 `-PpackageVersion` from the release tag) is written to a resource by `:core:writeVersion` and read
 back through `store/BuildInfo.kt`, so a tagged build and a local build can never disagree with the
-jar they came from.
+jar they came from. The number is still written down in a handful of other places — the plugin
+manifest, the examples here and in `install.sh` — so `scripts/bump-version.sh patch|minor|major` moves all
+of them at once and fails rather than skipping one it can no longer find. The major stays at 1 or
+above: macOS refuses a bundle whose `CFBundleShortVersionString` starts at 0.
 
 ## The run model
 
