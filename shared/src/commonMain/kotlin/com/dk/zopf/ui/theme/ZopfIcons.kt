@@ -100,6 +100,13 @@ object ZopfIcons {
         icon("Dropdown", "M7 10l5 5 5-5z")
     }
 
+    val Code: ImageVector by lazy {
+        icon(
+            "Code",
+            "M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0 4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z",
+        )
+    }
+
     val Tune: ImageVector by lazy {
         icon(
             "Tune",

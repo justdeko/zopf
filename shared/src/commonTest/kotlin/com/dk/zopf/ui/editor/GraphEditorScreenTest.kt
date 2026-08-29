@@ -6,19 +6,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.rightClick
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
@@ -31,6 +36,7 @@ import com.dk.zopf.model.RepoRef
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
+import com.dk.zopf.model.blurb
 import com.dk.zopf.runtime.NodeRun
 import com.dk.zopf.runtime.RunStatus
 import com.dk.zopf.runtime.showing
@@ -48,6 +54,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+private const val STEPS = 10
+
 class GraphEditorScreenTest {
     private val twoNodes =
         Workflow(
@@ -61,6 +69,17 @@ class GraphEditorScreenTest {
 
     private val oneNode = Workflow(name = "w", nodes = listOf(WorkflowNode("only", NodeType.GATE)))
 
+    private val threeNodes =
+        Workflow(
+            name = "w",
+            nodes =
+                listOf(
+                    WorkflowNode("alpha", NodeType.AGENT, prompt = "do a thing"),
+                    WorkflowNode("beta", NodeType.SHELL, command = "echo hi"),
+                    WorkflowNode("gamma", NodeType.SHELL, command = "echo bye"),
+                ),
+        )
+
     private val longChain =
         Workflow(
             name = "w",
@@ -69,6 +88,27 @@ class GraphEditorScreenTest {
         )
 
     private fun Workflow.handPlaced() = copy(nodes = nodes.mapIndexed { i, node -> node.copy(position = Position(40f + i * 300f, 120f)) })
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun ComposeUiTest.awaitLayout(canvas: EditorCanvas) =
+        waitUntil(timeoutMillis = 10_000) {
+            canvas.viewer.layoutedKuiver.nodes.values
+                .all { it.dimensions != null }
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun ComposeUiTest.centerOf(text: String): Offset = onNodeWithText(text).fetchSemanticsNode().boundsInRoot.center
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun ComposeUiTest.dragBetween(
+        from: Offset,
+        to: Offset,
+    ) = onRoot().performMouseInput {
+        moveTo(from)
+        press()
+        repeat(STEPS) { step -> moveTo(lerp(from, to, (step + 1) / STEPS.toFloat())) }
+        release()
+    }
 
     @OptIn(ExperimentalTestApi::class)
     private fun ComposeUiTest.editor(
@@ -351,7 +391,8 @@ class GraphEditorScreenTest {
     fun `dragging a node is an edit, and saving writes that node's position and no others`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var written: Workflow? = null
-            val (state, _) = editor(twoNodes, onSave = { written = it })
+            val (state, canvas) = editor(twoNodes, onSave = { written = it })
+            awaitLayout(canvas)
 
             onNodeWithText("Save").assertIsNotEnabled()
 
@@ -363,7 +404,8 @@ class GraphEditorScreenTest {
                     release()
                 }
 
-            dragAlphaDown()
+            val alpha = centerOf("alpha")
+            dragBetween(alpha, alpha + Offset(60f, 0f))
             waitForIdle()
             assertTrue(!state.isDirty, "a node moved with Move Nodes off")
 
@@ -381,6 +423,254 @@ class GraphEditorScreenTest {
             val saved = requireNotNull(written) { "Save wrote nothing" }
             assertTrue(saved.node("alpha")?.position != null, "the dragged node has no position")
             assertNull(saved.node("beta")?.position, "a node nobody touched was given a position")
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `dragging one node onto another connects the two`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(twoNodes)
+            awaitLayout(canvas)
+
+            dragBetween(centerOf("alpha"), centerOf("beta"))
+            waitForIdle()
+
+            assertTrue(
+                state.workflow.edges.any { it.from == "alpha" && it.to == "beta" },
+                "dragging alpha onto beta left them unconnected",
+            )
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a drag that ends back on its own node connects nothing and offers nothing`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(twoNodes)
+            awaitLayout(canvas)
+
+            val alpha = centerOf("alpha")
+            dragBetween(alpha, alpha + Offset(0f, 12f))
+            waitForIdle()
+
+            assertTrue(state.workflow.edges.isEmpty(), "a nudge inside one node made an edge")
+            onNodeWithText(NodeType.SHELL.blurb).assertDoesNotExist()
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `dropping a drag on blank canvas makes the node it is dropped on`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(oneNode)
+            awaitLayout(canvas)
+
+            val only = centerOf("only")
+            dragBetween(only, Offset(only.x + 420f, only.y + 260f))
+            waitForIdle()
+
+            onNodeWithText(NodeType.SHELL.blurb).performClick()
+            waitForIdle()
+
+            val made = state.workflow.nodes.single { it.id != "only" }
+            assertEquals(NodeType.SHELL, made.type)
+            assertTrue(
+                state.workflow.edges.any { it.from == "only" && it.to == made.id },
+                "the node made by the drop was not connected to the node it came from",
+            )
+            assertNotNull(made.position, "the node made by the drop was not placed where it landed")
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `with Move Nodes on, a drag moves instead of connecting`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(twoNodes)
+            awaitLayout(canvas)
+
+            onNodeWithContentDescription("Move nodes").performClick()
+            waitForIdle()
+
+            dragBetween(centerOf("alpha"), centerOf("beta"))
+            waitForIdle()
+
+            assertTrue(state.workflow.edges.isEmpty(), "a drag in Move Nodes mode made an edge")
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `C steps through the nodes a selected node could feed, and Enter connects to one`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(threeNodes)
+            awaitLayout(canvas)
+
+            state.select("alpha")
+            waitForIdle()
+
+            onRoot().performKeyInput { pressKey(Key.C) }
+            waitForIdle()
+            assertEquals("beta", state.connectCandidate, "C did not offer the first node alpha could feed")
+
+            onRoot().performKeyInput { pressKey(Key.C) }
+            waitForIdle()
+            assertEquals("gamma", state.connectCandidate, "C did not step on to the next one")
+
+            onRoot().performKeyInput { pressKey(Key.Enter) }
+            waitForIdle()
+
+            assertTrue(state.workflow.edges.any { it.from == "alpha" && it.to == "gamma" })
+            assertNull(state.connectFrom, "connect mode was left armed after Enter")
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `C wraps back round rather than running out of nodes`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(threeNodes)
+            awaitLayout(canvas)
+
+            state.select("alpha")
+            waitForIdle()
+
+            repeat(3) {
+                onRoot().performKeyInput { pressKey(Key.C) }
+                waitForIdle()
+            }
+
+            assertEquals("beta", state.connectCandidate, "stepping past the last node did not wrap")
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `Escape drops a connection armed from the keyboard`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(threeNodes)
+            awaitLayout(canvas)
+
+            state.select("alpha")
+            waitForIdle()
+            onRoot().performKeyInput { pressKey(Key.C) }
+            waitForIdle()
+
+            onRoot().performKeyInput { pressKey(Key.Escape) }
+            waitForIdle()
+
+            assertNull(state.connectFrom)
+            assertNull(state.connectCandidate)
+            assertTrue(state.workflow.edges.isEmpty())
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `C typed into an inspector field is text, not a connect shortcut`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(threeNodes)
+            awaitLayout(canvas)
+
+            state.select("alpha")
+            waitForIdle()
+
+            val field = onAllNodesWithText("alpha").filterToOne(hasSetTextAction())
+            field.performClick()
+            waitForIdle()
+            field.performKeyInput { pressKey(Key.C) }
+            waitForIdle()
+
+            assertNull(state.connectFrom, "typing in a field armed a connection")
+            assertNull(state.connectCandidate)
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the source pane shows what saving would write, and typing valid YAML redraws the canvas`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(twoNodes)
+            awaitLayout(canvas)
+
+            onNodeWithContentDescription("Edit the YAML").performClick()
+            waitForIdle()
+
+            val source = onAllNodesWithText("name: w", substring = true).filterToOne(hasSetTextAction())
+            source.performTextReplacement(
+                """
+                name: w
+                nodes:
+                  - id: alpha
+                    type: agent
+                    prompt: do a thing
+                  - id: beta
+                    type: shell
+                    command: echo hi
+                edges:
+                  - from: alpha
+                    to: beta
+                """.trimIndent(),
+            )
+            waitUntil(timeoutMillis = 5_000) { state.workflow.edges.isNotEmpty() }
+
+            assertEquals(listOf("alpha" to "beta"), state.workflow.edges.map { it.from to it.to })
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `YAML that does not parse is reported and leaves the workflow alone`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(twoNodes)
+            awaitLayout(canvas)
+
+            onNodeWithContentDescription("Edit the YAML").performClick()
+            waitForIdle()
+
+            onAllNodesWithText("name: w", substring = true)
+                .filterToOne(hasSetTextAction())
+                .performTextReplacement("nodes: [ this isn't yaml")
+
+            waitUntil(timeoutMillis = 5_000) {
+                runCatching {
+                    onNodeWithContentDescription("This YAML doesn't parse").assertIsDisplayed()
+                }.isSuccess
+            }
+
+            assertEquals(2, state.workflow.nodes.size, "unparseable text emptied the workflow")
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a rename in the source pane is refused rather than orphaning the file`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (state, canvas) = editor(twoNodes)
+            awaitLayout(canvas)
+
+            onNodeWithContentDescription("Edit the YAML").performClick()
+            waitForIdle()
+
+            onAllNodesWithText("name: w", substring = true)
+                .filterToOne(hasSetTextAction())
+                .performTextReplacement("name: something-else\nnodes:\n  - id: alpha\n    type: gate\n")
+
+            waitUntil(timeoutMillis = 5_000) {
+                runCatching { onNodeWithText("Rename on the Workflows screen", substring = true).assertIsDisplayed() }.isSuccess
+            }
+
+            assertEquals("w", state.workflow.name)
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the canvas tools go away in the source pane, so nothing can edit behind the text`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            val (_, canvas) = editor(twoNodes)
+            awaitLayout(canvas)
+
+            onNodeWithContentDescription("Show inspector").performClick()
+            onNodeWithContentDescription("Edit the YAML").performClick()
+            waitForIdle()
+
+            onNodeWithContentDescription("Add a Agent node. Run a headless agent session").assertDoesNotExist()
+            onNodeWithContentDescription("Move nodes").assertDoesNotExist()
+
+            onNodeWithContentDescription("Back to the canvas").performClick()
+            waitForIdle()
+
+            onNodeWithContentDescription("Add a Agent node. Run a headless agent session").assertIsDisplayed()
         }
 
     @OptIn(ExperimentalTestApi::class)

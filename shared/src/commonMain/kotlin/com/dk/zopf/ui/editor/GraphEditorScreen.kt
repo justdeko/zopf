@@ -39,6 +39,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,10 +59,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -123,6 +126,8 @@ private fun canvasConfig(nodeDragEnabled: Boolean) =
 
 private const val ReflowSettleMillis = 220L
 
+private const val DiskPollMillis = 1_000L
+
 @Composable
 fun GraphEditorScreen(
     state: EditorState,
@@ -143,6 +148,13 @@ fun GraphEditorScreen(
     }
 
     LaunchedEffect(Unit) { viewerState.applyPositions(workflow) }
+
+    LaunchedEffect(state) {
+        while (true) {
+            delay(DiskPollMillis.milliseconds)
+            runCatching { state.checkFileOnDisk() }
+        }
+    }
 
     LaunchedEffect(Unit) {
         snapshotFlow { viewerState.hasFittedInitially }.first { it }
@@ -177,6 +189,9 @@ fun GraphEditorScreen(
 
     var inspectorVisible by remember { mutableStateOf(false) }
     var nodeDragEnabled by remember { mutableStateOf(false) }
+    var pendingDrop by remember { mutableStateOf<ConnectDrop?>(null) }
+    var canvasHasKeys by remember { mutableStateOf(false) }
+    var sourceVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(state) {
         snapshotFlow { state.selectedNodeId }.first { it != null }
@@ -246,7 +261,29 @@ fun GraphEditorScreen(
                         false
                     }
                 }
-            }.focusable(),
+            }.onKeyEvent { event ->
+                if (!canvasHasKeys || event.type != KeyEventType.KeyDown || event.isMetaPressed) {
+                    return@onKeyEvent false
+                }
+                when (event.key) {
+                    Key.C -> {
+                        val from = state.connectFrom ?: state.selectedNodeId ?: return@onKeyEvent false
+                        if (state.connectFrom == null) state.startConnecting(from)
+                        state.stepConnectCandidate(workflow.connectOrder(from))
+                        true
+                    }
+
+                    Key.Enter if state.connectCandidate != null -> {
+                        state.completeConnectionToCandidate()
+                        true
+                    }
+
+                    else -> {
+                        false
+                    }
+                }
+            }.onFocusChanged { canvasHasKeys = it.isFocused }
+            .focusable(),
     ) {
         EditorTopBar(
             workflow = workflow,
@@ -257,6 +294,8 @@ fun GraphEditorScreen(
                     it.type == NodeType.AGENT || it.type == NodeType.SHELL
                 },
             onBack = { close() },
+            sourceVisible = sourceVisible,
+            onToggleSource = { sourceVisible = !sourceVisible },
             inspectorVisible = inspectorVisible,
             onToggleInspector = { inspectorVisible = !inspectorVisible },
             onSettings = { showSettings = true },
@@ -267,16 +306,54 @@ fun GraphEditorScreen(
         HorizontalDivider()
 
         Row(Modifier.fillMaxSize()) {
-            NodePalette(onAdd = { state.addNode(it) })
-            VerticalDivider()
+            if (!sourceVisible) {
+                NodePalette(onAdd = { state.addNode(it) })
+                VerticalDivider()
+            }
 
             Box(Modifier.weight(1f).fillMaxHeight()) {
-                Canvas(state, canvas, nodeDragEnabled, runningNodes, onRunNode)
+                if (sourceVisible) {
+                    SourcePane(
+                        state = state,
+                        onApplied = {
+                            viewerState.clearManualPositions()
+                            viewerState.applyPositions(state.workflow)
+                        },
+                    )
+                    return@Box
+                }
+                Canvas(
+                    state,
+                    canvas,
+                    nodeDragEnabled,
+                    runningNodes,
+                    onRunNode,
+                    onDropOnCanvas = { pendingDrop = it },
+                    takeKeys = { runCatching { editorFocus.requestFocus() } },
+                )
                 if (workflow.nodes.isEmpty()) EmptyCanvasHint()
+                pendingDrop?.let { drop ->
+                    ConnectDropMenu(
+                        drop = drop,
+                        fromTitle = workflow.node(drop.from)?.displayTitle ?: drop.from,
+                        onPick = { type ->
+                            pendingDrop = null
+                            state.addConnectedNode(drop.from, type, drop.at.toPosition())
+                        },
+                        onDismiss = { pendingDrop = null },
+                    )
+                }
                 state.connectFrom?.let { from ->
                     ConnectBanner(
                         fromTitle = workflow.node(from)?.displayTitle ?: from,
                         onCancel = { state.cancelConnecting() },
+                        modifier = Modifier.align(Alignment.TopCenter).padding(12.dp),
+                    )
+                }
+                if (state.changedOnDisk != null) {
+                    ChangedOnDiskBanner(
+                        onReload = { state.adoptChangeOnDisk() },
+                        onKeepMine = { state.keepMineOverChangeOnDisk() },
                         modifier = Modifier.align(Alignment.TopCenter).padding(12.dp),
                     )
                 }
@@ -295,7 +372,7 @@ fun GraphEditorScreen(
             }
 
             AnimatedVisibility(
-                visible = inspectorVisible,
+                visible = inspectorVisible && !sourceVisible,
                 enter =
                     expandHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) +
                         fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
@@ -372,10 +449,13 @@ private fun Canvas(
     nodeDragEnabled: Boolean,
     runningNodes: List<NodeRun>,
     onRunNode: (WorkflowNode) -> Unit,
+    onDropOnCanvas: (ConnectDrop) -> Unit,
+    takeKeys: () -> Unit = {},
 ) {
     val workflow = state.workflow
     val viewerState = canvas.viewer
     val connectFrom = state.connectFrom
+    val drag = state.connectDrag
 
     val connectable =
         remember(connectFrom, workflow.nodes.map { it.id }, workflow.edges) {
@@ -400,9 +480,11 @@ private fun Canvas(
                 remember(state) {
                     KuiverInteractionCallbacks(
                         onNodeClick = { node ->
+                            takeKeys()
                             if (!state.completeConnection(node.id)) state.select(node.id)
                         },
                         onCanvasClick = {
+                            takeKeys()
                             state.cancelConnecting()
                             state.select(null)
                         },
@@ -415,7 +497,21 @@ private fun Canvas(
                     val isConnectable = node.id in connectable
 
                     val dimmed = connectFrom != null && !isConnectable && !isConnectSource
-                    Box(Modifier.alpha(if (dimmed) 0.35f else 1f)) {
+                    Box(
+                        Modifier
+                            .alpha(if (dimmed) 0.35f else 1f)
+                            .connectRubberBand(
+                                drag = drag?.takeIf { it.from == node.id },
+                                direction = canvas.direction,
+                                color = MaterialTheme.colorScheme.primary,
+                            ).connectDragSource(
+                                nodeId = node.id,
+                                state = state,
+                                viewer = viewerState,
+                                enabled = !nodeDragEnabled,
+                                onDropOnCanvas = onDropOnCanvas,
+                            ),
+                    ) {
                         ContextMenuArea(items = { nodeMenu(state, node, onRunNode) }) {
                             WorkflowNodeCard(
                                 node = node,
@@ -423,6 +519,7 @@ private fun Canvas(
                                 hasIssue = node.id in nodesWithIssues,
                                 isConnectSource = isConnectSource,
                                 isConnectable = isConnectable,
+                                isDropTarget = node.id == state.connectTarget,
                                 connectMode = connectFrom != null,
                                 onConnectClick = { state.startConnecting(node.id) },
                                 runStatus = runningNodes.firstOrNull { it.nodeId == node.id }?.status,
@@ -522,6 +619,8 @@ private fun EditorTopBar(
     issues: List<WorkflowIssue>,
     runnableNode: WorkflowNode?,
     onBack: () -> Unit,
+    sourceVisible: Boolean,
+    onToggleSource: () -> Unit,
     inspectorVisible: Boolean,
     onToggleInspector: () -> Unit,
     onSettings: () -> Unit,
@@ -567,6 +666,19 @@ private fun EditorTopBar(
                                 MaterialTheme.colorScheme.error
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    )
+                }
+                IconButton(onClick = onToggleSource) {
+                    Icon(
+                        ZopfIcons.Code,
+                        contentDescription = if (sourceVisible) "Back to the canvas" else "Edit the YAML",
+                        Modifier.size(18.dp),
+                        tint =
+                            if (sourceVisible) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                LocalContentColor.current
                             },
                     )
                 }
@@ -697,6 +809,33 @@ private fun ConnectBanner(
 }
 
 @Composable
+private fun ChangedOnDiskBanner(
+    onReload: () -> Unit,
+    onKeepMine: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        shadowElevation = 4.dp,
+    ) {
+        Row(
+            Modifier.padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "This file changed on disk.",
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Spacer(Modifier.width(8.dp))
+            TextButton(onClick = onReload) { Text("Load theirs") }
+            TextButton(onClick = onKeepMine) { Text("Keep mine") }
+        }
+    }
+}
+
+@Composable
 private fun CanvasControls(
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
@@ -751,7 +890,14 @@ private fun CanvasPreview() {
     ZopfTheme {
         Surface {
             Box(Modifier.size(760.dp, 420.dp)) {
-                Canvas(state, canvas, nodeDragEnabled = false, runningNodes = runningNodes, onRunNode = {})
+                Canvas(
+                    state,
+                    canvas,
+                    nodeDragEnabled = false,
+                    runningNodes = runningNodes,
+                    onRunNode = {},
+                    onDropOnCanvas = {},
+                )
             }
         }
     }
@@ -769,6 +915,8 @@ private fun EditorTopBarPreview() {
                 issues = workflow.validate(),
                 runnableNode = workflow.node("plan"),
                 onBack = {},
+                sourceVisible = false,
+                onToggleSource = {},
                 inspectorVisible = true,
                 onToggleInspector = {},
                 onSettings = {},

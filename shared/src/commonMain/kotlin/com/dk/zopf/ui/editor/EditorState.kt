@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.DpOffset
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.EdgeTrigger
 import com.dk.zopf.model.NodeDefaults
@@ -25,8 +26,13 @@ import com.dk.zopf.model.withPositions
 import com.dk.zopf.runtime.AgentProviders
 import com.dk.zopf.store.Connector
 import com.dk.zopf.store.DiscoveredSkill
+import com.dk.zopf.store.FileStamp
+import com.dk.zopf.store.WorkflowStore
 import com.dk.zopf.store.Workspace
 import com.dk.zopf.store.availableSkills
+import com.dk.zopf.store.decodeWorkflow
+import com.dk.zopf.store.encodeWorkflow
+import com.dk.zopf.store.fileStamp
 import com.dk.zopf.store.isSkillDir
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -61,6 +67,14 @@ class EditorState(
     var connectFrom by mutableStateOf<String?>(null)
         private set
 
+    var connectDrag by mutableStateOf<ConnectDrag?>(null)
+        private set
+
+    var connectCandidate by mutableStateOf<String?>(null)
+        private set
+
+    val connectTarget: String? get() = connectDrag?.over ?: connectCandidate
+
     var message by mutableStateOf<String?>(null)
 
     private var canvasPositions by mutableStateOf<Map<String, Position>?>(null)
@@ -75,8 +89,51 @@ class EditorState(
 
     private var promptTexts by mutableStateOf<Map<String, String>>(emptyMap())
 
+    private val store: WorkflowStore? get() = workspace?.let(::WorkflowStore)
+
+    private var stamp: FileStamp? = null
+
+    var changedOnDisk by mutableStateOf<Workflow?>(null)
+        private set
+
     init {
 
+        refreshSkills()
+        refreshPromptFiles()
+        stamp = currentStamp()
+    }
+
+    private fun currentStamp(): FileStamp? = store?.let { fileStamp(it.fileFor(saved.name)) }
+
+    fun checkFileOnDisk() {
+        val store = store ?: return
+        val current = fileStamp(store.fileFor(saved.name)) ?: return
+        if (current == stamp) return
+        stamp = current
+
+        val onDisk = runCatching { store.load(saved.name) }.getOrNull() ?: return
+        if (onDisk == saved) {
+            changedOnDisk = null
+            return
+        }
+        if (isDirty) changedOnDisk = onDisk else adopt(onDisk)
+    }
+
+    fun adoptChangeOnDisk() {
+        adopt(changedOnDisk ?: return)
+    }
+
+    fun keepMineOverChangeOnDisk() {
+        changedOnDisk = null
+    }
+
+    private fun adopt(onDisk: Workflow) {
+        workflow = onDisk
+        saved = onDisk
+        changedOnDisk = null
+        canvasPositions = null
+        selectedNodeId = selectedNodeId?.takeIf { onDisk.node(it) != null }
+        clearConnect()
         refreshSkills()
         refreshPromptFiles()
     }
@@ -151,7 +208,7 @@ class EditorState(
     fun select(nodeId: String?) {
         selectedNodeId = nodeId
 
-        connectFrom = null
+        clearConnect()
     }
 
     fun addNode(
@@ -161,7 +218,7 @@ class EditorState(
         val (updated, node) = workflow.addNode(type, position)
         workflow = updated
         selectedNodeId = node.id
-        connectFrom = null
+        clearConnect()
     }
 
     fun updateNode(node: WorkflowNode) {
@@ -172,7 +229,7 @@ class EditorState(
         val (updated, clone) = workflow.duplicateNode(id) ?: return
         workflow = updated
         selectedNodeId = clone.id
-        connectFrom = null
+        clearConnect()
     }
 
     fun renameNode(
@@ -202,33 +259,115 @@ class EditorState(
     fun removeNode(id: String) {
         workflow = workflow.removeNode(id)
         if (selectedNodeId == id) selectedNodeId = null
-        if (connectFrom == id) connectFrom = null
+        if (connectFrom == id) clearConnect()
     }
 
     fun startConnecting(from: String) {
-        connectFrom = if (connectFrom == from) null else from
+        if (connectFrom == from) clearConnect() else connectFrom = from
     }
 
     fun cancelConnecting() {
+        clearConnect()
+    }
+
+    private fun clearConnect() {
         connectFrom = null
+        connectDrag = null
+        connectCandidate = null
+    }
+
+    fun stepConnectCandidate(targets: List<String>) {
+        if (targets.isEmpty()) {
+            connectCandidate = null
+            return
+        }
+        val at = targets.indexOf(connectCandidate)
+        connectCandidate = targets[(at + 1) % targets.size]
+    }
+
+    fun completeConnectionToCandidate(): Boolean = completeConnection(connectCandidate ?: return false)
+
+    fun beginConnectDrag(
+        from: String,
+        start: DpOffset,
+    ) {
+        connectFrom = from
+        connectDrag = ConnectDrag(from, start)
+    }
+
+    fun moveConnectDrag(
+        delta: DpOffset,
+        over: String?,
+    ) {
+        connectDrag = connectDrag?.copy(delta = delta, over = over)
+    }
+
+    fun finishConnectDrag(): Boolean {
+        val over = connectDrag?.over
+        connectDrag = null
+        if (over == null) {
+            connectFrom = null
+            return false
+        }
+        return completeConnection(over)
+    }
+
+    fun cancelConnectDrag() {
+        clearConnect()
     }
 
     fun completeConnection(to: String): Boolean {
         val from = connectFrom ?: return false
-        connectFrom = null
+        clearConnect()
         if (from == to) return true
+        connectNodes(from, to)
+        return true
+    }
+
+    fun connectNodes(
+        from: String,
+        to: String,
+    ) {
         workflow
             .connect(from, to)
             .onSuccess {
                 workflow = it
                 selectedNodeId = to
             }.onFailure { message = it.message }
-        return true
+    }
+
+    fun addConnectedNode(
+        from: String,
+        type: NodeType,
+        position: Position?,
+    ) {
+        val (updated, node) = workflow.addNode(type, position)
+        workflow = updated
+        clearConnect()
+        connectNodes(from, node.id)
+        selectedNodeId = node.id
     }
 
     fun reportCanvasPositions(positions: Map<String, Position>?) {
         canvasPositions = positions
     }
+
+    val sourceText: String
+        get() = encodeWorkflow(canvasPositions?.let { workflow.withPositions(it) } ?: workflow)
+
+    fun applySource(text: String): Result<Unit> =
+        runCatching {
+            val parsed = decodeWorkflow(text)
+            if (parsed.name != saved.name) {
+                error("Rename on the Workflows screen to move the file.")
+            }
+            workflow = parsed
+            canvasPositions = null
+            selectedNodeId = selectedNodeId?.takeIf { parsed.node(it) != null }
+            clearConnect()
+            refreshSkills()
+            refreshPromptFiles()
+        }
 
     fun disconnect(
         from: String,
@@ -258,11 +397,13 @@ class EditorState(
         onSave(toWrite)
         workflow = toWrite
         saved = toWrite
+        changedOnDisk = null
+        stamp = currentStamp()
     }
 
     fun revert() {
         workflow = saved
         selectedNodeId = null
-        connectFrom = null
+        clearConnect()
     }
 }

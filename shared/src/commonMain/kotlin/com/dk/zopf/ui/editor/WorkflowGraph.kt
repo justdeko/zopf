@@ -130,6 +130,11 @@ fun Workflow.setEdgeTrigger(
         edges = edges.map { if (it.from == from && it.to == to) it.copy(on = on) else it },
     )
 
+fun Workflow.connectOrder(from: String): List<String> {
+    val targets = connectableTargets(from)
+    return nodes.map { it.id }.filter { it in targets }
+}
+
 fun Workflow.connectableTargets(from: String): Set<String> {
     val graph = toKuiver()
     return nodes

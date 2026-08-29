@@ -70,6 +70,7 @@ fun KuiverNodeScope.WorkflowNodeCard(
     hasIssue: Boolean,
     isConnectSource: Boolean,
     isConnectable: Boolean,
+    isDropTarget: Boolean = false,
     connectMode: Boolean,
     onConnectClick: () -> Unit,
     runStatus: RunStatus? = null,
@@ -81,6 +82,7 @@ fun KuiverNodeScope.WorkflowNodeCard(
 
     val outline by animateColorAsState(
         when {
+            isDropTarget -> scheme.primary
             isConnectSource -> scheme.primary
             connectMode && isConnectable -> scheme.tertiary
             hasIssue -> scheme.error
@@ -92,7 +94,13 @@ fun KuiverNodeScope.WorkflowNodeCard(
         label = "nodeOutline",
     )
     val outlineWidth by animateDpAsState(
-        if (isSelected || isConnectSource || runStatus?.showsProgress == true) 2.dp else 1.dp,
+        if (isDropTarget) {
+            3.dp
+        } else if (isSelected || isConnectSource || runStatus?.showsProgress == true) {
+            2.dp
+        } else {
+            1.dp
+        },
         label = "nodeOutlineWidth",
     )
 

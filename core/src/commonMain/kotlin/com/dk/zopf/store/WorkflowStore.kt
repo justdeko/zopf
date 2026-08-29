@@ -51,8 +51,7 @@ class WorkflowStore(
 
     fun save(workflow: Workflow) {
         workspace.workflowsDir.createDirectories()
-        fileFor(workflow.name)
-            .writeTextAtomically(encodeYaml(Workflow.serializer(), workflow))
+        fileFor(workflow.name).writeTextAtomically(encodeWorkflow(workflow))
     }
 
     fun create(name: String): Result<Workflow> {
@@ -113,11 +112,8 @@ class WorkflowStore(
     }
 
     private fun decode(file: Path): Workflow {
-        val root = migrateWorkflow(zopfYaml.parseToYamlNode(file.readText()))
-        val parsed = zopfYaml.decodeFromYamlNode(Workflow.serializer(), root)
-
-        val named = if (parsed.name == file.nameWithoutExtension) parsed else parsed.copy(name = file.nameWithoutExtension)
-        return if (named.isFromTheFuture) named else named.copy(version = null)
+        val parsed = decodeWorkflow(file.readText())
+        return if (parsed.name == file.nameWithoutExtension) parsed else parsed.copy(name = file.nameWithoutExtension)
     }
 
     private companion object {

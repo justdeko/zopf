@@ -100,11 +100,10 @@ private fun Readiness(
     val ready = errors == 0
     val headline = if (ready) "Ready to run" else "Not ready to run"
     val detail =
-        when {
-            errors > 0 -> "${count(errors, "error")} would stop this before it starts."
-            warnings > 0 -> "${count(warnings, "warning")}, and none of them stop the run."
-            else -> "Nothing to fix."
-        }
+        listOfNotNull(
+            errors.takeIf { it > 0 }?.let { count(it, "error") },
+            warnings.takeIf { it > 0 }?.let { count(it, "warning") },
+        ).joinToString(", ").ifEmpty { "Nothing to fix." }
 
     Surface(
         Modifier.fillMaxWidth(),

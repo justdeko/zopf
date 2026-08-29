@@ -212,13 +212,24 @@ kuiver (`io.github.justdeko:kuiver`) is a **viewer, not an editor**. zopf owns w
 
 - Selection is `SelectionMode.NONE` in kuiver and driven from `ui/editor/EditorState.kt`, because
   selection also moves on add, rename and inspector actions kuiver cannot see.
-- There is no drag-to-connect gesture, and dragging a node already means "move it", so edge creation
-  is a click-based connect mode in `EditorState`.
+- Dragging a node body pulls an edge, which works because kuiver's own node drag sits on the box
+  *around* `nodeContent`: a gesture inside it that consumes at the touch slop stops kuiver's from
+  ever starting, so `ui/editor/ConnectDrag.kt` needs no fork of the library. Moving nodes is the mode
+  that gives way — it is off by default, and while it is on nothing connects. Dragging onto blank
+  canvas offers a node type and makes the edge with it; releasing back over the node you started
+  from is a cancel. Drag, the card's link button, the context menu and `C` from the keyboard all
+  funnel through `startConnecting`/`completeConnection` in `EditorState`.
 - Saved node positions are seeded through `manualPositions`/`moveNode()` with the default
   `RelayoutPolicy.KEEP_MANUAL`, which reapplies them after every layout pass.
 - kuiver depends on Compose foundation only and themes through `LocalKuiverColors`, not
   `MaterialTheme` — its defaults are black-on-white and look broken in dark mode without
   `ui/theme/KuiverBridge.kt`.
+
+`ui/editor/SourcePane.kt` is a second way into the same workflow, editing it as YAML through
+`store/WorkflowText.kt` — the encode and decode `WorkflowStore` itself uses, so there is one
+serializer path and not two. It replaces the canvas rather than sitting beside it, palette and
+inspector included, because a draft can't be reconciled with something else editing the model. The
+open editor also polls its own file, so an edit made outside it isn't silently overwritten.
 
 When touching the canvas, read kuiver's sources rather than its README:
 
@@ -244,8 +255,11 @@ test name long enough to say what it asserts (`everyWorkflowInTheSkillDocsIsWrit
 A comment restating what's here is a second copy that drifts.
 
 User-facing strings are full sentences that say what to do next, not error codes —
-`"Repo \"app\" isn't at ~/dev/app any more"`, not `"invalid repo"`. Validation messages in
-`model/WorkflowValidation.kt` are the house style; match them.
+`"Repo \"app\" isn't at ~/dev/app any more"`, not `"invalid repo"`. That is a rule against error
+codes, not a licence to explain: one sentence, carrying only what the screen isn't already showing.
+A headline, a button label or the list underneath has usually said the rest, and a second sentence
+restating it is the first thing to cut. Validation messages in `model/WorkflowValidation.kt` are the
+house style; match them.
 
 ktlint runs on every module. `.editorconfig` disables three rules on purpose: PascalCase Composables,
 PascalCase constants (`ArrowSize`, `TitleBarHeight`), and the filename rule on `main.kt`.
@@ -270,8 +284,10 @@ These guard things a normal unit test wouldn't:
 
 These are decisions, not gaps. If a change would undo one, that is a real decision to make:
 
-- **No triggers, no scheduler, no daemon, no `--watch`.** A run starts when someone clicks Run or
-  something calls the CLI. cron, CI and git hooks already do scheduling better than a desktop app.
+- **Nothing starts a run on its own** — no triggers, no scheduler, no daemon, no `--watch`. A run
+  starts when someone clicks Run or something calls the CLI. cron, CI and git hooks already do
+  scheduling better than a desktop app. This bans automatic runs, not background work as such: the
+  editor polling its open file for changes is fine.
 - **No expression language.** `${node.field}` is the entire data-passing mechanism, and a `branch`
   compares strings. The moment this grows an evaluator, workflows stop being reviewable YAML.
 - **A graph of only shell nodes is the wrong shape** and the workflow skill says so to the user's

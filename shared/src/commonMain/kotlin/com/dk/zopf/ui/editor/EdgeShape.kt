@@ -116,7 +116,7 @@ private fun headingAt(
     return if (length > 0f) heading / length else null
 }
 
-private fun DrawScope.drawFlowCurve(
+internal fun DrawScope.drawFlowCurve(
     curve: EdgePath.Orthogonal,
     color: Color,
     dashed: Boolean,
