@@ -119,7 +119,13 @@ class GraphEditorScreenTest {
         runningNodes: List<NodeRun> = emptyList(),
         titleBarInset: Dp? = null,
     ): Pair<EditorState, EditorCanvas> {
-        val state = EditorState(initial = workflow, workspace = null, onSave = onSave)
+        val state =
+            EditorState(
+                initial = workflow,
+                workspace = null,
+                onSave = onSave,
+                executableExists = { true },
+            )
         lateinit var canvas: EditorCanvas
         setContent {
             canvas = rememberEditorCanvas(state.workflow)

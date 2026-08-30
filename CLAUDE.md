@@ -280,6 +280,9 @@ These guard things a normal unit test wouldn't:
 `:shared` tests use `compose-uiTest`, which needs `compose.desktop.currentOs` — declared in
 `jvmTest`, not `commonTest`.
 
+`EditorState` defaults `executableExists` to a real PATH probe, so a test that leaves it out only
+passes on a machine with `claude` installed. Pass `{ true }`.
+
 ## Deliberate non-goals
 
 These are decisions, not gaps. If a change would undo one, that is a real decision to make:
