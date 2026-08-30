@@ -26,6 +26,7 @@ nodes:
   - id: approve
     type: gate
     title: Apply these corrections to CLAUDE.md?
+    prompt: ${audit.result}
   - id: apply
     type: agent
     title: Correct CLAUDE.md

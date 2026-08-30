@@ -226,12 +226,13 @@ class ProcessNodeExecutor(
             .takeIf { it.isNotEmpty() }
             ?.let { run.notice("Optional and not set: ${it.joinToString { s -> s.name }}") }
 
+        val timeoutSeconds = execution.deadline() ?: manifest.timeoutSeconds
         val invocation =
             ConnectorInvocation(
                 script = connectorDef.script,
                 cwd = dir,
                 inputs = inputs,
-                timeoutSeconds = manifest.timeoutSeconds,
+                timeoutSeconds = timeoutSeconds,
                 env = secrets.mapNotNull { s -> s.value?.let { s.name to it } }.toMap(),
             )
         val session = connector.start(invocation)
@@ -240,19 +241,24 @@ class ProcessNodeExecutor(
         run.status = RunStatus.STARTING
         run.notice("${manifest.name} ← ${invocation.stdinJson()}")
 
-        runCatching {
-            session.lines().collect { line ->
-                execution.archive.appendRaw(node.id, line.text)
-                run.consume(line)
-            }
-        }.onFailure { run.notice("Output ended: ${it.message}", isWarning = true) }
-
-        val exit = session.awaitExit()
+        val exit =
+            within(
+                run = run,
+                seconds = timeoutSeconds,
+                stop = session::stop,
+                kill = session::kill,
+                drain = {
+                    runCatching {
+                        session.lines().collect { line ->
+                            execution.archive.appendRaw(node.id, line.text)
+                            run.consume(line)
+                        }
+                    }.onFailure { run.notice("Output ended: ${it.message}", isWarning = true) }
+                },
+                awaitExit = session::awaitExit,
+            )
         val output = session.output()
 
-        if (session.timedOut) {
-            run.notice("Gave up after ${manifest.timeoutSeconds}s. The connector never finished.", isWarning = true)
-        }
         if (!output.sawJson) {
             run.notice(
                 "${manifest.name} printed no JSON object, so its plain output is the result",

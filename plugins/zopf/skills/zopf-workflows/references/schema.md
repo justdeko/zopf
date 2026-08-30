@@ -65,30 +65,39 @@ node → workflow `defaults` → workspace `defaults` → the app's Settings.
 
 ## nodes
 
-| key              | type              | applies to                    | notes                                                                                                                      |
-|------------------|-------------------|-------------------------------|----------------------------------------------------------------------------------------------------------------------------|
-| `id`             | string            | all                           | **Required.** Unique. Must match `[A-Za-z0-9_-]+` to be referenceable as `${id.field}`.                                    |
-| `type`           | enum              | all                           | **Required.** `agent` \| `shell` \| `connector` \| `gate` \| `branch` \| `input`.                                          |
-| `title`          | string            | all                           | Display name. Falls back to `id`. **Not interpolated.**                                                                    |
+| key              | type              | applies to                    | notes                                                                                                                               |
+|------------------|-------------------|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `id`             | string            | all                           | **Required.** Unique. Must match `[A-Za-z0-9_-]+` to be referenceable as `${id.field}`.                                             |
+| `type`           | enum              | all                           | **Required.** `agent` \| `shell` \| `connector` \| `gate` \| `branch` \| `input`.                                                   |
+| `title`          | string            | all                           | Display name. Falls back to `id`. **Not interpolated.**                                                                             |
 | `provider`       | enum              | `agent`                       | `claude` \| `codex` \| `dsh`. Which agent CLI runs the node. Absent means `defaults.provider`, then the app's default, then claude. |
-| `repo`           | string            | `agent`, `shell`              | Repo id to run in. Must be declared.                                                                                       |
-| `timeoutSeconds` | int               | `agent`, `shell`, `connector` | Overrides `defaults`.                                                                                                      |
-| `position`       | `{x, y}`          | all                           | Canvas coordinate. **Do not hand-write** — one manual position turns off auto-layout for the whole graph.                  |
-| `prompt`         | string            | `agent`, `input`              | The prompt, or the question. **Interpolated.**                                                                             |
-| `promptFile`     | string            | `agent`                       | Path to a `.md`, resolved against the workspace. Its contents are interpolated. Wins over `prompt`.                        |
-| `alsoRead`       | list of string    | `agent`                       | Extra declared repo ids the node may access (`--add-dir`). Grants write access too, not just read.                         |
-| `allowedTools`   | list of string    | `agent`                       | e.g. `Read`, `Edit`, `Write`, `Glob`, `Grep`, `Bash`, `WebFetch`. Empty means the CLI's own default. **Not interpolated.** |
-| `skills`         | list of string    | `agent`                       | Skill **names**, not paths. Resolved against the workflow's repos, the workspace `skills/`, and `~/.claude/skills`.        |
-| `model`          | string            | `agent`                       | Overrides `defaults.model`. Not read by `dsh`, which has no flag for one.                                                  |
-| `permissionMode` | enum              | `agent` (claude)              | `acceptEdits` \| `auto` \| `bypassPermissions` \| `manual` \| `dontAsk` \| `plan`.                                         |
-| `sandbox`        | enum              | `agent` (codex)               | `read-only` \| `workspace-write` \| `danger-full-access`. Chosen before launch; codex cannot be asked mid-turn.            |
-| `schema`         | list of field     | `agent`                       | Declares the answer's shape. Each name becomes `${id.name}`. Absent means prose, as before. See [schema](#schema).         |
-| `command`        | string            | `shell`                       | Run through `zsh -lc` in the node's repo. **Interpolated.**                                                                |
-| `connector`      | string            | `connector`                   | The connector's directory name.                                                                                            |
-| `inputs`         | map string→string | `connector`                   | Values are **interpolated**; keys are checked against the manifest.                                                        |
-| `expression`     | string            | `branch`                      | **Interpolated**, then evaluated.                                                                                          |
-| `choices`        | list of string    | `input`                       | Makes the question answerable from the menu bar. **Not interpolated.**                                                     |
-| `default`        | string            | `input`                       | Pre-filled answer, and what `zopf run` uses when nobody is there. Should be one of `choices` if choices are set.           |
+| `repo`           | string            | `agent`, `shell`              | Repo id to run in. Must be declared.                                                                                                |
+| `timeoutSeconds` | int               | `agent`, `shell`, `connector` | Overrides `defaults`.                                                                                                               |
+| `position`       | `{x, y}`          | all                           | Canvas coordinate. **Do not hand-write** — one manual position turns off auto-layout for the whole graph.                           |
+| `prompt`         | string            | `agent`, `input`, `gate`      | The prompt, the question, or what a gate shows you before you approve. **Interpolated.**                                            |
+| `promptFile`     | string            | `agent`                       | Path to a `.md`, resolved against the workspace. Its contents are interpolated. Wins over `prompt`.                                 |
+| `alsoRead`       | list of string    | `agent`                       | Extra declared repo ids the node may access (`--add-dir`). Grants write access too, not just read.                                  |
+| `allowedTools`   | list of string    | `agent`                       | What runs without being asked: `Read`, `Grep`, `Bash(git push *)`. **Grants, never restricts**, see below. **Not interpolated.**    |
+| `skills`         | list of string    | `agent`                       | Skill **names**, not paths. Resolved against the workflow's repos, the workspace `skills/`, and `~/.claude/skills`.                 |
+| `model`          | string            | `agent`                       | Overrides `defaults.model`. Not read by `dsh`, which has no flag for one.                                                           |
+| `permissionMode` | enum              | `agent` (claude)              | `acceptEdits` \| `auto` \| `bypassPermissions` \| `manual` \| `dontAsk` \| `plan`.                                                  |
+| `sandbox`        | enum              | `agent` (codex)               | `read-only` \| `workspace-write` \| `danger-full-access`. Chosen before launch; codex cannot be asked mid-turn.                     |
+| `schema`         | list of field     | `agent`                       | Declares the answer's shape. Each name becomes `${id.name}`. Absent means prose, as before. See [schema](#schema).                  |
+| `command`        | string            | `shell`                       | Run through `zsh -lc` in the node's repo. **Interpolated.**                                                                         |
+| `connector`      | string            | `connector`                   | The connector's directory name.                                                                                                     |
+| `inputs`         | map string→string | `connector`                   | Values are **interpolated**; keys are checked against the manifest.                                                                 |
+| `expression`     | string            | `branch`                      | **Interpolated**, then evaluated.                                                                                                   |
+| `choices`        | list of string    | `input`                       | Makes the question answerable from the menu bar. **Not interpolated.**                                                              |
+| `default`        | string            | `input`                       | Pre-filled answer, and what `zopf run` uses when nobody is there. Should be one of `choices` if choices are set.                    |
+
+### `allowedTools` grants, it does not restrict
+
+It lists what runs **without stopping to ask**. A node with
+`allowedTools: [Read, Glob, Grep]` still has `Bash`, `Write` and `Edit`, and will use them.
+
+What it doesn't name is left to the CLI: read-only commands (`grep`, `find`, `git log`) run, the rest needs an
+answer. Inline approval answers in the app; `zopf run` has no approver, so headless the answer is no. Name what the
+node needs, patterns included, or it works in the window and fails from cron. `Bash(git push *)` is a real entry.
 
 ### Model names belong to a CLI
 
@@ -126,7 +135,7 @@ Fields that don't apply to a type are not errors — they are silently ignored. 
 | `agent`     | `prompt` or `promptFile`    | `provider`, `repo`, `model`, `timeoutSeconds`, and whatever the chosen CLI has (below) |
 | `shell`     | `command`                   | `repo`, `timeoutSeconds`                                                               |
 | `connector` | `connector`                 | `inputs`, `timeoutSeconds`                                                             |
-| `gate`      | — (`title` is the question) | —                                                                                      |
+| `gate`      | — (`title` is the question) | `prompt`, what to show you before you answer it                                        |
 | `branch`    | `expression`                | —                                                                                      |
 | `input`     | `prompt`                    | `choices`, `default`                                                                   |
 

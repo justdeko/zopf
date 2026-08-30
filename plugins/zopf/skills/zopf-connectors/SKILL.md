@@ -215,10 +215,9 @@ Note `text=True` and `timeout=` on every subprocess call, and a named error for 
 binary and a hung network are different problems for the person reading the transcript, and "sometool is not on PATH" is
 the one message that saves them a debugging session.
 
-**Unlike the rest of this repo, connector scripts carry comments.** The Kotlin source is deliberately comment-free;
-these scripts are not. Write a module docstring saying what it does and why it is a connector, and a comment at any line
-whose reason isn't on its face — a magic number, a workaround, a message deliberately passed through unedited. Keep them
-about *why*.
+**Connector scripts carry comments, whatever the surrounding project's convention.** Write a module docstring saying
+what it does and why it is a connector, and a comment at any line whose reason isn't on its face: a magic number, a
+workaround, a message deliberately passed through unedited. Keep them about *why*.
 
 ## More than one file
 

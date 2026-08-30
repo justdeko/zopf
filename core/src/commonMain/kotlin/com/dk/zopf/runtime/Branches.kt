@@ -7,30 +7,26 @@ data class BranchVerdict(
 
 object Branches {
     private val FALSEY = setOf("", "false", "0", "no", "off", "null")
+    private val OPERATORS = listOf("!=", "==")
 
-    fun evaluate(expression: String): BranchVerdict {
+    fun evaluate(
+        expression: String,
+        interpolate: (String) -> String = { it },
+    ): BranchVerdict {
         val text = expression.trim()
 
-        operatorSplit(text, "!=")?.let { (left, right) ->
-            val taken = left != right
-            return BranchVerdict(taken, "\"$left\" != \"$right\" → $taken")
-        }
-        operatorSplit(text, "==")?.let { (left, right) ->
-            val taken = left == right
-            return BranchVerdict(taken, "\"$left\" == \"$right\" → $taken")
+        for (operator in OPERATORS) {
+            val at = text.indexOf(operator)
+            if (at < 0) continue
+            val left = interpolate(unquote(text.substring(0, at)))
+            val right = interpolate(unquote(text.substring(at + operator.length)))
+            val taken = if (operator == "!=") left != right else left == right
+            return BranchVerdict(taken, "\"$left\" $operator \"$right\" → $taken")
         }
 
-        val taken = text.lowercase() !in FALSEY
-        return BranchVerdict(taken, "\"$text\" is ${if (taken) "set" else "empty or false"} → $taken")
-    }
-
-    private fun operatorSplit(
-        text: String,
-        operator: String,
-    ): Pair<String, String>? {
-        val at = text.indexOf(operator)
-        if (at < 0) return null
-        return unquote(text.substring(0, at)) to unquote(text.substring(at + operator.length))
+        val resolved = interpolate(text)
+        val taken = resolved.lowercase() !in FALSEY
+        return BranchVerdict(taken, "\"$resolved\" is ${if (taken) "set" else "empty or false"} → $taken")
     }
 
     private fun unquote(value: String): String {

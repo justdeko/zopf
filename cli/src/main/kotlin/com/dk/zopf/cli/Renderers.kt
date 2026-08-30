@@ -79,6 +79,10 @@ class TextRenderer(
                 say(node, if (entry.isWarning) warn(entry.text) else dim(entry.text))
             }
 
+            is ConsoleEntry.Prompt -> {
+                say(node, entry.text)
+            }
+
             is ConsoleEntry.Summary -> {
                 say(node, dim(summaryOf(entry)))
             }

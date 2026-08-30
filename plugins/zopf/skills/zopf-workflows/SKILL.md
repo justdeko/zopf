@@ -112,7 +112,7 @@ auto-laying-out the graph and the author's arrangement is frozen. Leave it out a
 | `agent`     | `prompt:` or `promptFile:`         | the model's **final message**, nothing earlier | yes       |
 | `shell`     | `command:`                         | **stdout only**, trimmed                       | yes       |
 | `connector` | `connector:`                       | what the connector's JSON returned as `result` | yes       |
-| `gate`      | nothing (`title:` is the question) | `approved` or `rejected`                       | no        |
+| `gate`      | `title:` is the question           | `approved` or `rejected`                       | no        |
 | `branch`    | `expression:`                      | the expression as evaluated                    | no        |
 | `input`     | `prompt:` (the question)           | whatever was answered                          | no        |
 
@@ -120,18 +120,20 @@ Reach for them like this:
 
 - **`shell`** for anything a command can do. It is free, it is fast, and it never needs a permission. A `shell` node
   that gathers context for an `agent` node is the single most useful shape in this format: `git diff` into a prompt
-  makes the reviewing node read-only by construction, where a `Bash`
-  grant would have it stopping for permissions and burning turns.
+  leaves the reviewing node nothing it needs to shell out for, where a `Bash` grant would have it stopping for
+  permissions and burning turns.
 - **`agent`** for judgment: a headless session of the `claude` CLI, or of `codex` or `dsh` when the node names one in
-  `provider:`. Give it the narrowest `allowedTools:` that can do the job — a node that only reads should have
-  `[Read, Glob, Grep]` and no `Bash`. Leave `provider:` out unless the user asks for another CLI by name; a codex or
-  dsh node takes one turn and has no skills, no tool allowlist and no inline approval, and a dsh node has no model
-  either.
+  `provider:`. `allowedTools:` is
+  [what runs without being asked](references/schema.md#allowedtools-grants-it-does-not-restrict). It grants and never
+  restricts, so leaving `Bash` off a list does not take `Bash` away. Name what the node actually needs. Leave
+  `provider:` out unless the user asks for another CLI by name; a codex or dsh node takes one turn and has no skills,
+  no tool allowlist and no inline approval, and a dsh node has no model either.
 - **`connector`** for a side effect with a contract: filing an issue, sending a notification. Call one that exists. A
   `shell` node running the same CLI (`gh issue create`, `curl`) is a fine choice too and often the simpler one — the
   connector earns its place when the call needs a secret, has outputs a later node reads by name, or is used by more
   than one workflow. If the workspace already has a connector for the job, use it rather than reinventing it in shell.
-- **`gate`** to make a person say yes before something irreversible. Its `title:` is the question.
+- **`gate`** to make a person say yes before something irreversible. Its `title:` is the question, and its
+  `prompt:` is what they read before answering. Quote the output being approved into it.
 - **`input`** to get a value from a person. `choices:` makes it answerable from the menu bar with the window closed,
   which free text is not.
 - **`branch`** to take one of two paths. See the grammar below before you write an expression.
@@ -281,9 +283,8 @@ zopf validate <name>     # or bare, for every workflow in the workspace
 zopf run <name> --dry-run
 ```
 
-If `zopf` is not on PATH, it is built from the zopf checkout with `./gradlew :cli:installDist`, which puts it at
-`cli/build/install/zopf-cli/bin/zopf`. If you cannot find it at all, say so and check the file by eye against
-`references/schema.md` rather than claiming it validates.
+If `zopf` is not on PATH, say so and check the file by eye against `references/schema.md` rather than claiming it
+validates.
 
 `validate` exits 3 on an error and 0 on warnings alone — but read the warnings, because the two that matter most are
 warnings: an unknown key (the file parses with unknown keys silently ignored, so a typo'd `promtFile:` is otherwise

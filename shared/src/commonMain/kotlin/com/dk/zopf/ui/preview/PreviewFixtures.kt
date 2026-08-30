@@ -181,6 +181,21 @@ internal object PreviewFixtures {
         return run
     }
 
+    fun gateRun(): NodeRun =
+        NodeRun(
+            id = "run-preview",
+            workflowName = "review-and-fix",
+            nodeId = "approve",
+            nodeTitle = "Apply these fixes?",
+            nodeType = NodeType.GATE,
+            cwd = workspaceRoot,
+            startedAt = Instant.now().minusSeconds(12),
+        ).showing(status = RunStatus.WAITING)
+            .also {
+                it.entries.add(ConsoleEntry.Notice(0, "Apply these fixes?"))
+                it.entries.add(ConsoleEntry.Prompt(1, GATE_FINDINGS))
+            }
+
     fun pendingQuestion(): PendingQuestion =
         PendingQuestion(
             question = "Which environment should this deploy to?",
@@ -188,3 +203,21 @@ internal object PreviewFixtures {
             default = "staging",
         )
 }
+
+private val GATE_FINDINGS =
+    """
+    I read the engine, store, providers and editor, then checked each candidate against its call
+    sites. Four things worth flagging.
+
+    1. A connector that hangs parks the run — its timeoutSeconds never fires.
+       runConnector drains the output flow to completion before calling awaitExit(), and awaitExit
+       is the only place the timeout is enforced, so the watchdog can never run.
+
+    2. Node-level timeoutSeconds is silently ignored on connector nodes.
+       NodeExecution.deadline() is read for agents and shells, never for connectors.
+
+    3. A branch splits on the first != or == anywhere in the string, including inside interpolated
+       agent output, so an operator in a result hijacks the split.
+
+    4. Messages point at ~/zopf/connectors; the directory is ~/.zopf/connectors.
+    """.trimIndent()

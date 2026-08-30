@@ -276,7 +276,7 @@ class WorkflowEngine(
     ) {
         try {
             when (node.type) {
-                NodeType.GATE -> awaitGate(nodeRun, node)
+                NodeType.GATE -> awaitGate(nodeRun, node, outputs)
                 NodeType.INPUT -> awaitInput(nodeRun, node, outputs)
                 NodeType.BRANCH -> evaluateBranch(nodeRun, node, outputs, branches)
 
@@ -312,11 +312,15 @@ class WorkflowEngine(
     private suspend fun awaitGate(
         nodeRun: NodeRun,
         node: WorkflowNode,
+        outputs: RunContext,
     ) {
         val approval = CompletableDeferred<Boolean>()
         nodeRun.approval = approval
         nodeRun.status = RunStatus.WAITING
-        nodeRun.notice(node.title.ifBlank { "Waiting for you" })
+        when (val asked = node.prompt.takeIf { it.isNotBlank() }) {
+            null -> nodeRun.notice(node.title.ifBlank { "Waiting for you" })
+            else -> nodeRun.prompt(outputs.interpolate(asked).also { warnUnresolved(nodeRun, it) }.text)
+        }
         onWaiting(nodeRun)
 
         val approved = approval.await()
@@ -361,8 +365,8 @@ class WorkflowEngine(
         outputs: RunContext,
         branches: MutableMap<String, Boolean>,
     ) {
-        val interpolated = outputs.interpolate(node.expression).also { warnUnresolved(nodeRun, it) }
-        val verdict = Branches.evaluate(interpolated.text)
+        warnUnresolved(nodeRun, outputs.interpolate(node.expression))
+        val verdict = Branches.evaluate(node.expression) { outputs.interpolate(it).text }
         branches[node.id] = verdict.taken
         nodeRun.produce(verdict.taken.toString())
         nodeRun.notice(verdict.explanation)
@@ -405,7 +409,7 @@ class WorkflowEngine(
                     ?: return Result.failure(
                         IllegalStateException(
                             "No connector called \"${node.connector}\" in " +
-                                "${workspace?.name ?: "this workspace"} or ~/zopf/connectors",
+                                "${workspace?.name ?: "this workspace"} or ~/.zopf/connectors",
                         ),
                     )
             return Result.success(found.dir)

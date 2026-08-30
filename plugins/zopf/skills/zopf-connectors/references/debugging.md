@@ -48,8 +48,8 @@ Check the service name is the `-s` value you created it with:
 **It resolves in my terminal but not in the app**
 An app launched from Finder inherits a bare environment — a `.zshrc` `export` is invisible to it. zopf asks the login
 shell for its environment once at startup to compensate, so this usually works, but it is the first thing to suspect
-when a packaged run differs from a `./gradlew :desktopApp:run`
-one. The keychain is the reliable path; prefer it for anything that must work from the menu bar or from cron.
+when a run started from the app differs from one you started in a terminal. The keychain is the reliable path; prefer
+it for anything that must work from the menu bar or from cron.
 
 **"sometool: command not found", or the script runs by hand and not in zopf**
 Same root cause, one step over: PATH. Prefer an absolute path for anything not in `/usr/bin`, or check with

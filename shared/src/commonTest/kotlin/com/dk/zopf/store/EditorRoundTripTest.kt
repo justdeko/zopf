@@ -153,6 +153,43 @@ class EditorRoundTripTest {
     }
 
     @Test
+    fun `a gate keeps the prompt that says what is being approved`() {
+        val (_, store) = newStore()
+        store.save(
+            Workflow(
+                name = "release",
+                nodes =
+                    listOf(
+                        WorkflowNode("review", NodeType.AGENT, prompt = "Look for bugs."),
+                        WorkflowNode(
+                            id = "approve",
+                            type = NodeType.GATE,
+                            title = "Apply these fixes?",
+                            prompt = "\${review.result}",
+                        ),
+                    ),
+            ),
+        )
+
+        val reopened = assertNotNull(store.load("release")).node("approve")
+        assertEquals("\${review.result}", assertNotNull(reopened).prompt)
+    }
+
+    @Test
+    fun `a gate with nothing to show writes no prompt at all`() {
+        val (_, store) = newStore()
+        store.save(
+            Workflow(
+                name = "ship",
+                nodes = listOf(WorkflowNode("approve", NodeType.GATE, title = "Ship it?")),
+            ),
+        )
+
+        val yaml = store.fileFor("ship").readText()
+        assertTrue("prompt" !in yaml, "an empty prompt was written out:\n$yaml")
+    }
+
+    @Test
     fun `a free-text input writes neither of the fields it never set`() {
         val (_, store) = newStore()
         store.save(

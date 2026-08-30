@@ -158,7 +158,7 @@ fun NodeInspector(
             NodeType.SHELL -> ShellFields(state, node, onAddRepo)
             NodeType.CONNECTOR -> ConnectorFields(state, node)
             NodeType.BRANCH -> BranchFields(state, node)
-            NodeType.GATE -> GateFields()
+            NodeType.GATE -> GateFields(state, node)
             NodeType.INPUT -> InputFields(state, node)
         }
 
@@ -620,7 +620,7 @@ private fun ConnectorFields(
         noneLabel = "Choose a connector",
         supportingText =
             connector?.manifest?.summary
-                ?: "A folder under connectors/. Workspace first, then ~/zopf/connectors.",
+                ?: "A folder under connectors/. Workspace first, then ~/.zopf/connectors.",
     )
 
     if (state.connectors.isEmpty()) {
@@ -782,13 +782,28 @@ private fun InputFields(
 }
 
 @Composable
-private fun GateFields() {
+private fun GateFields(
+    state: EditorState,
+    node: WorkflowNode,
+) {
     Gap()
     Text(
         "The run waits here until you approve it, in the app or from the menu bar. The title is " +
             "the question you'll be asked.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    Gap()
+    PromptField(
+        value = node.prompt,
+        references = state.upstreamReferences(node.id),
+        onChange = { state.updateNode(node.copy(prompt = it)) },
+        label = "What to show",
+        minLines = 2,
+        supportingText =
+            "Interpolated, so it can quote what you're approving. A whole result is fine: the " +
+                "run shows the first lines and expands on a click.",
     )
 }
 

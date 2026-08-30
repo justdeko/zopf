@@ -508,6 +508,34 @@ class ConnectorNodeTest {
     }
 
     @Test
+    fun `a connector that never finishes is given up on at the node's timeout rather than parking the run`() {
+        val workspace = workspace()
+        connector(workspace, "sleeper", body = "cat > /dev/null\nexec sleep 30")
+
+        val run =
+            runWorkflow(
+                workspace,
+                Workflow(
+                    name = "w",
+                    nodes =
+                        listOf(
+                            WorkflowNode(
+                                id = "post",
+                                type = NodeType.CONNECTOR,
+                                connector = "sleeper",
+                                timeoutSeconds = 1,
+                            ),
+                        ),
+                ),
+            )
+
+        val post = assertNotNull(run.node("post"))
+        assertEquals(RunStatus.FAILED, post.status)
+        assertEquals(NODE_TIMEOUT_EXIT, post.exitCode)
+        assertTrue(post.entries.any { it is ConsoleEntry.Notice && "Gave up after 1s" in it.text })
+    }
+
+    @Test
     fun `the raw output of a connector is archived like any other node`() {
         val workspace = workspace()
         val archiveRoot = tempDir()

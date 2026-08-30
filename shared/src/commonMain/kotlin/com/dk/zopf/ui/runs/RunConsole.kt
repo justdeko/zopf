@@ -70,6 +70,8 @@ import java.time.Duration
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
+private const val CollapsedPromptLines = 12
+
 @Composable
 fun RunConsole(
     run: NodeRun,
@@ -96,7 +98,7 @@ fun RunConsole(
 
             run.isAwaitingApproval -> {
                 HorizontalDivider()
-                GateBar(onApprove = onApprove)
+                GateBar(title = run.nodeTitle, onApprove = onApprove)
             }
 
             run.isAwaitingInput -> {
@@ -239,6 +241,7 @@ private fun Transcript(
                         is ConsoleEntry.ToolCall -> ToolCallRow(entry)
                         is ConsoleEntry.Output -> OutputRow(entry)
                         is ConsoleEntry.Notice -> NoticeRow(entry)
+                        is ConsoleEntry.Prompt -> PromptRow(entry)
                         is ConsoleEntry.Summary -> SummaryRow(entry)
                     }
                 }
@@ -379,6 +382,40 @@ private fun NoticeRow(entry: ConsoleEntry.Notice) {
 }
 
 @Composable
+private fun PromptRow(entry: ConsoleEntry.Prompt) {
+    var expanded by remember(entry.key) { mutableStateOf(false) }
+    var clipped by remember(entry.key) { mutableStateOf(false) }
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(10.dp)) {
+            Text(
+                entry.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = if (expanded) Int.MAX_VALUE else CollapsedPromptLines,
+                overflow = TextOverflow.Ellipsis,
+                onTextLayout = { if (!expanded) clipped = it.hasVisualOverflow },
+            )
+            if (clipped) {
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                ) {
+                    Text(
+                        if (expanded) "Show less" else "Show all",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SummaryRow(entry: ConsoleEntry.Summary) {
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -491,14 +528,17 @@ private fun PermissionBar(
 }
 
 @Composable
-private fun GateBar(onApprove: (Boolean) -> Unit) {
+private fun GateBar(
+    title: String,
+    onApprove: (Boolean) -> Unit,
+) {
     Surface(color = MaterialTheme.colorScheme.tertiaryContainer) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "This run is waiting for you.",
+                title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                 modifier = Modifier.weight(1f),
@@ -625,6 +665,24 @@ private fun RunHeaderPreview() {
             onClose = {},
             terminalApp = DEFAULT_TERMINAL_APP,
         )
+    }
+}
+
+@Preview
+@Composable
+private fun GateConsolePreview() {
+    ZopfTheme {
+        Surface {
+            Box(Modifier.size(480.dp, 420.dp)) {
+                RunConsole(
+                    run = PreviewFixtures.gateRun(),
+                    onStop = {},
+                    onTakeOver = {},
+                    onSend = {},
+                    onFinish = {},
+                )
+            }
+        }
     }
 }
 

@@ -32,6 +32,7 @@ nodes:
   - id: confirm
     type: gate
     title: Version matches — send the notification?
+    prompt: ${probe.result}
   - id: notify
     type: connector
     title: Say so in Notification Center

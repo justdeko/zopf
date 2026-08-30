@@ -435,6 +435,17 @@ class BranchesTest {
     }
 
     @Test
+    fun `the operator that splits the expression is the one the author wrote, not one interpolation drops in`() {
+        val verdict =
+            Branches.evaluate("\${review.result} == ok") {
+                it.replace("\${review.result}", "assertion failed: a != b")
+            }
+
+        assertFalse(verdict.taken)
+        assertEquals("\"assertion failed: a != b\" == \"ok\" → false", verdict.explanation)
+    }
+
+    @Test
     fun `the verdict explains itself, because a branch is the hardest thing to debug after the fact`() {
         assertEquals("\"0\" == \"0\" → true", Branches.evaluate("0 == 0").explanation)
     }

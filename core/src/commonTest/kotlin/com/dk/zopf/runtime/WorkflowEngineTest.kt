@@ -300,6 +300,59 @@ class WorkflowEngineTest {
         }
 
     @Test
+    fun `a gate shows the upstream output it is asking you to approve`() =
+        runBlocking {
+            val executor = FakeExecutor(output = { "$it-output" })
+            val workflow =
+                workflow(
+                    nodes =
+                        listOf(
+                            claude("review"),
+                            gate().copy(prompt = "Apply these?\n\${review.result}"),
+                            claude("fix"),
+                        ),
+                    edges = listOf("review" to "approve", "approve" to "fix"),
+                )
+            val engine = engine(executor)
+            val run = engine.start(workspace(), workflow).getOrThrow()
+
+            val gate = assertNotNull(run.node("approve"))
+            awaitStatus(gate, RunStatus.WAITING)
+
+            val shown = gate.entries.filterIsInstance<ConsoleEntry.Prompt>().single()
+            assertEquals("Apply these?\nreview-output", shown.text)
+            assertTrue(gate.entries.filterIsInstance<ConsoleEntry.Notice>().isEmpty())
+
+            engine.resolveGate(gate, approved = true)
+            run.job?.join()
+            assertEquals(RunStatus.SUCCEEDED, run.status)
+        }
+
+    @Test
+    fun `a gate with no prompt of its own falls back to its title`() =
+        runBlocking {
+            val executor = FakeExecutor()
+            val workflow = workflow(nodes = listOf(gate()), edges = emptyList())
+            val engine = engine(executor)
+            val run = engine.start(workspace(), workflow).getOrThrow()
+
+            val gate = assertNotNull(run.node("approve"))
+            awaitStatus(gate, RunStatus.WAITING)
+            assertTrue(gate.entries.filterIsInstance<ConsoleEntry.Prompt>().isEmpty())
+            assertEquals(
+                "Waiting for you",
+                gate.entries
+                    .filterIsInstance<ConsoleEntry.Notice>()
+                    .single()
+                    .text,
+            )
+
+            engine.resolveGate(gate, approved = true)
+            run.job?.join()
+            assertEquals(RunStatus.SUCCEEDED, run.status)
+        }
+
+    @Test
     fun `rejecting a gate stops the run rather than failing it`() =
         runBlocking {
             val executor = FakeExecutor()

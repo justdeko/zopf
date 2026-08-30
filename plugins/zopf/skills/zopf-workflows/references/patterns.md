@@ -221,6 +221,7 @@ nodes:
   - id: approve
     type: gate
     title: Apply these corrections to CLAUDE.md?
+    prompt: ${audit.result}
   - id: apply
     type: agent
     title: Correct CLAUDE.md
@@ -246,8 +247,15 @@ edges:
     to: apply
 ```
 
-A gate's `title:` **is** the question, so write it as one. Rejecting stops the run rather than skipping the step, so
-never put a cleanup node behind a gate expecting it to run either way.
+A gate's `title:` **is** the question, so write it as one. Its `prompt:` is what you read before answering, and it is
+interpolated, so quote the output you are approving into it. A gate without one shows nothing but its title.
+
+A whole result is fine there: the run shows the first lines and expands on a click. To keep the gate shorter than what
+the next node needs, give the node before it a `schema:` and split the two. The gate quotes `${audit.headline}` while
+`${audit.result}` goes on to the node that does the work.
+
+Rejecting stops the run rather than skipping the step, so never put a cleanup node behind a gate expecting it to run
+either way.
 
 Headless, `zopf run` refuses a gate by default (exit 2) — `--on-gate approve` is how cron gets past one, which is a
 decision the person setting up the cron job makes explicitly.
@@ -315,6 +323,7 @@ expressions).
 | `title: Fix ${plan.result}`                                  | `title` is not interpolated                                             | put the reference in `prompt`                                                                           |
 | `command: make build` for a node whose output feeds a prompt | `result` is stdout only                                                 | `make build 2>&1`                                                                                       |
 | `allowedTools: [Bash]` so the model can run `git diff`       | costs permissions and turns                                             | a `shell` node upstream, handed over by reference                                                       |
+| `allowedTools` without `Bash`, to keep a node read-only      | the list grants, never takes a tool away                                | feed it from a `shell` node                                                                             |
 | a hand-written `position:`                                   | one manual position freezes auto-layout for the whole graph             | leave it out                                                                                            |
 | `# a comment explaining the graph`                           | the editor rewrites the file on save and eats it                        | `description:` and `title:`                                                                             |
 | a graph of nothing but `shell` nodes                         | no judgment anywhere, so zopf is buying you nothing over CI or a script | say so, and offer the simpler tool                                                                      |

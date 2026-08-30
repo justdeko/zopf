@@ -96,6 +96,11 @@ sealed class ConsoleEntry {
         val isWarning: Boolean = false,
     ) : ConsoleEntry()
 
+    class Prompt(
+        override val key: Long,
+        val text: String,
+    ) : ConsoleEntry()
+
     class Summary(
         override val key: Long,
         val text: String?,
@@ -333,6 +338,11 @@ class NodeRun(
         isWarning: Boolean = false,
     ) {
         add(ConsoleEntry.Notice(nextKey, text, isWarning))
+    }
+
+    @Synchronized
+    fun prompt(text: String) {
+        add(ConsoleEntry.Prompt(nextKey, text))
     }
 
     @Synchronized

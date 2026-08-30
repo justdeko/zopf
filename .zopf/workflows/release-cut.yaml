@@ -171,6 +171,10 @@ nodes:
   - id: approve
     type: gate
     title: Push the tag and let the release build?
+    prompt: |
+      v${version.result} — ${reconcile.because}
+
+      ${notes.result}
   - id: tag
     type: shell
     title: Tag it and push

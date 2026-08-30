@@ -85,6 +85,10 @@ class ConnectorSession internal constructor(
         process.destroy()
     }
 
+    fun kill() {
+        process.destroyForcibly()
+    }
+
     suspend fun awaitExit(): Int =
         withContext(Dispatchers.IO) {
             if (process.waitFor(timeoutSeconds.toLong(), TimeUnit.SECONDS)) {

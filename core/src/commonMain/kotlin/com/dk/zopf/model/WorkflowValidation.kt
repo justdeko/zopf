@@ -298,7 +298,7 @@ private fun connectorIssues(
             ?: return listOf(
                 WorkflowIssue(
                     "${node.displayTitle} calls \"${node.connector}\", which isn't a connector in this " +
-                        "workspace or ~/zopf/connectors",
+                        "workspace or ~/.zopf/connectors",
                     node.id,
                 ),
             )
