@@ -1,0 +1,94 @@
+name: release-notes
+description: |-
+  Read the recent commits three ways at once and write release notes from all three.
+
+  The three middle nodes have no edges between them. They run at the same time. "notes" waits for
+  all three. Change the `git log` range to whatever you ship from.
+nodes:
+  - id: log
+    type: shell
+    title: Recent commits
+    command: git log --oneline -n 50
+  - id: features
+    type: agent
+    title: What is new
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+      - Bash
+    prompt: |
+      Here are the recent commits:
+
+      ${log.result}
+
+      List what a user can do now that they could not do before. Run `git show` on a commit when
+      the subject line is not enough. Skip anything internal. At most eight lines.
+  - id: fixes
+    type: agent
+    title: What is fixed
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+      - Bash
+    prompt: |
+      Here are the recent commits:
+
+      ${log.result}
+
+      List the bugs that got fixed. Say what was broken, not what the patch did. Run `git show` on
+      a commit when you need to. Skip refactors. At most eight lines.
+  - id: breaking
+    type: agent
+    title: What breaks
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+      - Bash
+    prompt: |
+      Here are the recent commits:
+
+      ${log.result}
+
+      List anything that breaks an existing setup: a renamed flag, a new default, a dropped file
+      format. Run `git show` on a commit when you need to. Say "nothing breaks" if that is true.
+      At most eight lines.
+  - id: notes
+    type: agent
+    title: Write the notes
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+    prompt: |
+      Three sessions read the same commits. Turn them into one set of release notes.
+
+      New:
+
+      ${features.result}
+
+      Fixed:
+
+      ${fixes.result}
+
+      Breaking:
+
+      ${breaking.result}
+
+      Write it for someone deciding whether to update. Breaking changes go first. Plain sentences.
+      No marketing. Drop anything two of them disagree about rather than guessing.
+edges:
+  - from: log
+    to: features
+  - from: log
+    to: fixes
+  - from: log
+    to: breaking
+  - from: features
+    to: notes
+  - from: fixes
+    to: notes
+  - from: breaking
+    to: notes

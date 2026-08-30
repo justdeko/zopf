@@ -1,0 +1,48 @@
+name: review-and-fix
+description: |-
+  A strong model looks for bugs. You approve the list. A cheaper model does the fixing.
+
+  The first agent gets no Edit or Write. Nothing in the repo changes until you approve the gate.
+nodes:
+  - id: review
+    type: agent
+    title: Look for bugs
+    model: opus
+    allowedTools:
+      - Read
+      - Glob
+      - Grep
+    prompt: |
+      Look for correctness bugs in this project.
+
+      Read enough of it to know what it is meant to do first. Only report what you can point at a
+      file and line for. Number the list. Say what input makes each one go wrong.
+
+      If there is nothing worth flagging, say so. Do not pad the list.
+  - id: approve
+    type: gate
+    title: Apply these fixes?
+  - id: fix
+    type: agent
+    title: Fix them
+    model: sonnet
+    permissionMode: acceptEdits
+    allowedTools:
+      - Read
+      - Edit
+      - Glob
+      - Grep
+    prompt: |
+      A review found these problems and a person approved the fixes:
+
+      ${review.result}
+
+      Fix them. Check each one against the code first. The review ran in its own session and may
+      have misread something. Skip anything you cannot confirm and say which.
+
+      End with a list of what you changed and what you skipped.
+edges:
+  - from: review
+    to: approve
+  - from: approve
+    to: fix

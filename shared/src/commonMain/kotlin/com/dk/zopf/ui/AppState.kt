@@ -241,10 +241,13 @@ class AppState(
         refreshWorkflows()
     }
 
-    fun createWorkflow(name: String) {
+    fun createWorkflow(
+        name: String,
+        template: String? = null,
+    ) {
         val store = store ?: return
         store
-            .create(name)
+            .create(name, template)
             .onSuccess {
                 refreshWorkflows()
                 selectedWorkflow = it

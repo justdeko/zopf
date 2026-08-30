@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -70,9 +71,9 @@ private val MinimapConfig =
     )
 
 @Composable
-fun WorkflowMinimap(
+fun WorkflowThumbnail(
     workflow: Workflow,
-    onClick: () -> Unit,
+    shape: Shape,
     modifier: Modifier = Modifier,
     viewerState: KuiverViewerState = rememberMinimapViewerState(workflow),
 ) {
@@ -80,9 +81,7 @@ fun WorkflowMinimap(
 
     Box(
         modifier
-            .width(MinimapWidth)
-            .fillMaxHeight()
-            .clip(RoundedCornerShape(topStart = CardCorner, bottomStart = CardCorner))
+            .clip(shape)
             .background(colors.graphSurface)
             .semantics { contentDescription = "${workflow.nodes.size} nodes" },
     ) {
@@ -97,6 +96,23 @@ fun WorkflowMinimap(
                 edgeStyle = { edge -> EdgeStyle.styled(edge, baseColor = colors.graphEdge, strokeWidth = 6.dp) },
             )
         }
+    }
+}
+
+@Composable
+fun WorkflowMinimap(
+    workflow: Workflow,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewerState: KuiverViewerState = rememberMinimapViewerState(workflow),
+) {
+    Box(modifier.width(MinimapWidth).fillMaxHeight()) {
+        WorkflowThumbnail(
+            workflow = workflow,
+            shape = RoundedCornerShape(topStart = CardCorner, bottomStart = CardCorner),
+            modifier = Modifier.fillMaxSize(),
+            viewerState = viewerState,
+        )
 
         Box(
             Modifier

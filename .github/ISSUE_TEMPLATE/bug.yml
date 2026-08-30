@@ -1,0 +1,58 @@
+name: Bug report
+description: Report something that doesn't work
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Run `zopf version`. For the desktop app, check the settings.
+      placeholder: 1.0.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Agent CLI
+      options:
+        - Claude Code
+        - codex
+        - DeepSeek Harness (dsh)
+        - Not applicable
+    validations:
+      required: true
+
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow YAML
+      description: Redact your prompts and paths.
+      render: yaml
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Relevant log output
+      description: From `~/Library/Logs/zopf/zopf.log`. Redact anything private.
+      render: text

@@ -116,6 +116,7 @@ Some things that are crucial to understanding workflow nodes:
 
 - data along edges is implicit, you can embed it in the next node execution using literals: `${tests.result}`
 - some edges have implicit assumptions like true/false from gates or `on: failure` in the example
+- generally, follow the [schema reference](plugins/zopf/skills/zopf-workflows/references/schema.md)
 
 The editor reads and writes to workflow files, so you can hand-edit it or draw it on the canvas. Or you can invoke the
 [claude skills](plugins/zopf/skills) to construct one. To add them:
@@ -129,10 +130,8 @@ The editor reads and writes to workflow files, so you can hand-edit it or draw i
 
 * Fan one migration out over a dozen repos in parallel and collect a diff from each
 * Review with an expensive model, then apply the fixes with a cheap one
-* Run something as a shell step, then do things based on the potential outcomes consistently
-* Send a failure or result to an external platform
 * Summarize a folder of documents in parallel, then have a second agent write the digest
-* Ask for user input after or in between an expensive automated parallelized task
+* Ask for your approval or your input in the middle of an otherwise unattended run
 
 ## Node types
 

@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest something zopf should be able to do
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the task itself.
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: What did you try?
+      description: Which existing feature(s) you used and where you got stuck.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would it look like?
+      description: A high level overview of the feature, optional

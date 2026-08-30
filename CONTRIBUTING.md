@@ -5,12 +5,7 @@ Thanks for taking an interest in contributing to zopf!
 Feel free to open an issue if you have feature suggestions. 
 Or fork the repository directly and implement it.
 
-Bug reports are just as welcome. Please include:
-
-- the version
-- if workflow related, an anonymized version of the workflow
-- if the workflow includes agents, which provider
-- the relevant part of `~/Library/Logs/zopf/zopf.log`
+Bug reports are just as welcome. Use the issue form.
 
 ## House rules
 

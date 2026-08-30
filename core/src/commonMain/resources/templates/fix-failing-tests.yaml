@@ -1,0 +1,35 @@
+name: fix-failing-tests
+description: |-
+  Run your test suite. If it fails, an agent reads the output and fixes it.
+
+  The edge is `on: failure`. The agent only starts on a red run. Change `npm test` to your own
+  command. Pick a repo for both nodes in the inspector.
+nodes:
+  - id: tests
+    type: shell
+    title: Run the tests
+    command: npm test
+  - id: fix
+    type: agent
+    title: Fix what broke
+    permissionMode: acceptEdits
+    allowedTools:
+      - Read
+      - Edit
+      - Write
+      - Glob
+      - Grep
+      - Bash
+    prompt: |
+      The test suite just failed. Here is the output:
+
+      ${tests.result}
+
+      Find the cause and fix it. Then run the suite again and say what passes now.
+
+      If the test is out of date, fix the test. If the code is broken, fix the code. Say which one
+      you picked before you change anything.
+edges:
+  - from: tests
+    to: fix
+    on: failure

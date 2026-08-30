@@ -168,6 +168,23 @@ class EditorRoundTripTest {
     }
 
     @Test
+    fun `creating from a template writes that template's graph under the new name`() {
+        val (_, store) = newStore()
+        val created = store.create("my-checks", "fix-failing-tests").getOrThrow()
+
+        assertEquals("my-checks", created.name)
+        assertEquals(Templates.workflow("fix-failing-tests", "my-checks"), store.load("my-checks"))
+        assertTrue(created.nodes.isNotEmpty(), "a template landed with no nodes")
+    }
+
+    @Test
+    fun `creating without a template still starts on an empty canvas`() {
+        val (_, store) = newStore()
+
+        assertEquals(emptyList(), store.create("blank").getOrThrow().nodes)
+    }
+
+    @Test
     fun `a workflow saved with no positions reopens without inventing any`() {
         val (_, store) = newStore()
         val w = Workflow(name = "plain").addNode(NodeType.GATE).first

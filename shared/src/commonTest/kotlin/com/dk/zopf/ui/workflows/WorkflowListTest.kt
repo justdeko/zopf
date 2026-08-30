@@ -13,11 +13,13 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.dk.kuiver.KuiverViewerState
@@ -26,6 +28,7 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.store.OpenWorkspace
+import com.dk.zopf.store.Templates
 import com.dk.zopf.store.WorkflowListing
 import com.dk.zopf.store.Workspace
 import com.dk.zopf.store.WorkspaceConfig
@@ -54,8 +57,10 @@ class WorkflowListInteractionTest {
     @OptIn(ExperimentalTestApi::class)
     private fun runList(
         onOpen: (Workflow) -> Unit = {},
+        showing: WorkflowListing = listing,
+        onCreate: (String, String?) -> Unit = { _, _ -> },
         body: ComposeUiTest.() -> Unit,
-    ) = runDesktopComposeUiTest(560, 420) {
+    ) = runDesktopComposeUiTest(900, 760) {
         val root = Files.createTempDirectory("ws")
         val ws = OpenWorkspace(root, Workspace(root, WorkspaceConfig(name = "demo")), 0L)
         setContent {
@@ -63,11 +68,11 @@ class WorkflowListInteractionTest {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     WorkflowListScreen(
                         workspace = ws,
-                        listing = listing,
+                        listing = showing,
                         selected = null,
                         onOpen = onOpen,
                         onRun = {},
-                        onCreate = {},
+                        onCreate = onCreate,
                         onRename = { _, _ -> },
                         onDelete = {},
                         onReveal = {},
@@ -102,6 +107,73 @@ class WorkflowListInteractionTest {
         }
 
         assertEquals(listOf("wf-01"), opened)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `an empty workspace picks a template out of the grid and is named after it`() {
+        val created = mutableListOf<Pair<String, String?>>()
+        runList(showing = WorkflowListing(emptyList(), emptyList()), onCreate = { name, t -> created += name to t }) {
+            onNodeWithText("New workflow", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            val wanted = Templates.names.last()
+            onNodeWithText(Templates.label(wanted), useUnmergedTree = true).performClick()
+            waitForIdle()
+            onNodeWithText("Create", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            assertEquals(listOf<Pair<String, String?>>(wanted to wanted), created)
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `every template in the grid shows its graph and its first line`() {
+        runList(showing = WorkflowListing(emptyList(), emptyList())) {
+            onNodeWithText("New workflow", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            Templates.names.forEach { name ->
+                val template = Templates.workflow(name, name)
+                onNodeWithText(Templates.label(name), useUnmergedTree = true).assertExists()
+                onNodeWithText(template.description.substringBefore('\n'), useUnmergedTree = true).assertExists()
+                onAllNodesWithContentDescription("${template.nodes.size} nodes")
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+                    .let { assertTrue(it, "no thumbnail was drawn for $name") }
+            }
+            onNodeWithText("Empty", useUnmergedTree = true).assertExists()
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a name typed by hand survives picking another template`() {
+        val created = mutableListOf<Pair<String, String?>>()
+        runList(showing = WorkflowListing(emptyList(), emptyList()), onCreate = { name, t -> created += name to t }) {
+            onNodeWithText("New workflow", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            onNode(hasSetTextAction()).performTextReplacement("mine")
+            onNodeWithText("Empty", useUnmergedTree = true).performClick()
+            waitForIdle()
+            onNodeWithText("Create", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            assertEquals(listOf<Pair<String, String?>>("mine" to null), created)
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a workspace that already has workflows is only asked for a name`() {
+        runList {
+            onNodeWithText("New workflow", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            onNodeWithText("Empty", useUnmergedTree = true).assertDoesNotExist()
+        }
     }
 }
 

@@ -54,13 +54,18 @@ class WorkflowStore(
         fileFor(workflow.name).writeTextAtomically(encodeWorkflow(workflow))
     }
 
-    fun create(name: String): Result<Workflow> {
+    fun create(
+        name: String,
+        template: String? = null,
+    ): Result<Workflow> {
         val slug = slugify(name)
         if (slug.isBlank()) return Result.failure(IllegalArgumentException("Name cannot be empty"))
         if (fileFor(slug).exists()) {
             return Result.failure(IllegalStateException("A workflow named \"$slug\" already exists"))
         }
-        val workflow = Workflow(name = slug)
+        val workflow =
+            runCatching { template?.let { Templates.workflow(it, slug) } ?: Workflow(name = slug) }
+                .getOrElse { return Result.failure(it) }
         save(workflow)
         return Result.success(workflow)
     }

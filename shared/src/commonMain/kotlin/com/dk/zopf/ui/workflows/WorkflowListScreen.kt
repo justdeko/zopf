@@ -1,7 +1,9 @@
 package com.dk.zopf.ui.workflows
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,12 +39,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.store.BrokenWorkflow
 import com.dk.zopf.store.OpenWorkspace
+import com.dk.zopf.store.Templates
 import com.dk.zopf.store.WorkflowListing
 import com.dk.zopf.store.WorkflowStore
 import com.dk.zopf.ui.preview.PreviewFixtures
@@ -49,6 +56,10 @@ import java.nio.file.Path
 
 private val RowHeight = 92.dp
 
+private val TemplateGridWidth = 512.dp
+
+private val TemplatePreviewHeight = 76.dp
+
 @Composable
 fun WorkflowListScreen(
     workspace: OpenWorkspace?,
@@ -56,7 +67,7 @@ fun WorkflowListScreen(
     selected: Workflow?,
     onOpen: (Workflow) -> Unit,
     onRun: (Workflow) -> Unit,
-    onCreate: (String) -> Unit,
+    onCreate: (String, String?) -> Unit,
     onRename: (Workflow, String) -> Unit,
     onDelete: (Workflow) -> Unit,
     onReveal: (Path) -> Unit,
@@ -67,6 +78,7 @@ fun WorkflowListScreen(
     val fileOf: (Workflow) -> Path? = { workflow ->
         workspace?.workspace?.let { WorkflowStore(it).fileFor(workflow.name) }
     }
+    val isEmpty = listing.workflows.isEmpty() && listing.broken.isEmpty()
     var creating by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<Workflow?>(null) }
     var deleting by remember { mutableStateOf<Workflow?>(null) }
@@ -90,10 +102,10 @@ fun WorkflowListScreen(
                     isError = true,
                 )
 
-            listing.workflows.isEmpty() && listing.broken.isEmpty() ->
+            isEmpty ->
                 EmptyMessage(
                     title = "No workflows yet",
-                    detail = "New workflows go in ${workspace.workspace?.workflowsDir}.",
+                    detail = "New workflow starts you from a template. They live in ${workspace.workspace?.workflowsDir}.",
                 )
 
             else ->
@@ -139,16 +151,26 @@ fun WorkflowListScreen(
     }
 
     if (creating) {
-        NameDialog(
-            title = "New workflow",
-            initial = "",
-            confirmLabel = "Create",
-            onDismiss = { creating = false },
-            onConfirm = {
-                creating = false
-                onCreate(it)
-            },
-        )
+        if (isEmpty) {
+            FirstWorkflowDialog(
+                onDismiss = { creating = false },
+                onConfirm = { name, template ->
+                    creating = false
+                    onCreate(name, template)
+                },
+            )
+        } else {
+            NameDialog(
+                title = "New workflow",
+                initial = "",
+                confirmLabel = "Create",
+                onDismiss = { creating = false },
+                onConfirm = {
+                    creating = false
+                    onCreate(it, null)
+                },
+            )
+        }
     }
 
     renaming?.let { workflow ->
@@ -310,6 +332,135 @@ private fun BrokenRow(
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun FirstWorkflowDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String?) -> Unit,
+) {
+    val templates = remember { Templates.names.map { it to Templates.workflow(it, it) } }
+    var template by remember { mutableStateOf<String?>(Templates.names.first()) }
+    var value by remember { mutableStateOf(Templates.names.first()) }
+    var typed by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Start a workflow") },
+        text = {
+            Column(Modifier.width(TemplateGridWidth).verticalScroll(rememberScrollState())) {
+                Text(
+                    "Pick a starting point. You can change everything in it after.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(16.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (templates + listOf(null)).chunked(2).forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row.forEach { entry ->
+                                TemplateCard(
+                                    title = entry?.let { Templates.label(it.first) } ?: "Empty",
+                                    detail =
+                                        entry?.second?.description?.firstParagraph()
+                                            ?: "Draw your own graph from nothing.",
+                                    workflow = entry?.second,
+                                    isSelected = template == entry?.first,
+                                    onClick = {
+                                        template = entry?.first
+                                        if (!typed) value = entry?.first.orEmpty()
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = {
+                        value = it
+                        typed = true
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Name") },
+                    supportingText = { Text("Becomes the filename: lower-cased and hyphenated.") },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(value, template) }, enabled = value.isNotBlank()) { Text("Create") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun TemplateCard(
+    title: String,
+    detail: String,
+    workflow: Workflow?,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    if (isSelected) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerLow
+                    },
+            ),
+        border =
+            if (isSelected) {
+                BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            } else {
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            },
+    ) {
+        Column(Modifier.padding(10.dp)) {
+            val preview = Modifier.fillMaxWidth().height(TemplatePreviewHeight)
+            if (workflow == null) {
+                Box(
+                    preview
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ZopfTheme.colors.graphSurface),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        ZopfIcons.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                WorkflowThumbnail(workflow, RoundedCornerShape(8.dp), preview)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmallEmphasized,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                minLines = 3,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
