@@ -148,6 +148,79 @@ class WorkflowValidationTest {
     }
 
     @Test
+    fun `a reference to a field the upstream node never produces is an error, and a declared one is not`() {
+        val w =
+            wf(
+                WorkflowNode(
+                    "review",
+                    NodeType.AGENT,
+                    prompt = "look",
+                    schema = listOf(SchemaField("verdict")),
+                ),
+                WorkflowNode(
+                    "act",
+                    NodeType.AGENT,
+                    prompt = "\${review.verdict} and \${review.result} and \${review.brdict}",
+                ),
+                edges = listOf(WorkflowEdge("review", "act")),
+            )
+
+        val issues = w.validate().mentioning("review produces")
+
+        assertEquals(1, issues.size)
+        assertEquals("act", issues.single().nodeId)
+        assertTrue("\${review.brdict}" in issues.single().message)
+        assertTrue("verdict" in issues.single().message)
+    }
+
+    @Test
+    fun `a shell node's exit code is a reference but an agent's cost is not its own`() {
+        val w =
+            wf(
+                shell("build"),
+                WorkflowNode("tell", NodeType.AGENT, prompt = "\${build.exitCode} \${build.costUsd}"),
+                edges = listOf(WorkflowEdge("build", "tell")),
+            )
+
+        assertEquals(1, w.validate().mentioning("build produces").size)
+    }
+
+    @Test
+    fun `a connector's output is only checked when its manifest is there to check against`() {
+        val w =
+            wf(
+                WorkflowNode("post", NodeType.CONNECTOR, connector = "slack-post"),
+                WorkflowNode("tell", NodeType.AGENT, prompt = "\${post.permalink}"),
+                edges = listOf(WorkflowEdge("post", "tell")),
+            )
+
+        assertEquals(emptyList(), w.validate().mentioning("post produces"))
+
+        val manifest =
+            ConnectorManifest(
+                name = "slack-post",
+                outputs = listOf(ConnectorOutputField("permalink")),
+            )
+        assertEquals(emptyList(), w.validate(connector = { manifest }).mentioning("post produces"))
+
+        assertEquals(1, w.validate(connector = { manifest.copy(outputs = emptyList()) }).mentioning("post produces").size)
+    }
+
+    @Test
+    fun `a field on a node that is not upstream is reported once, as the missing edge it really is`() {
+        val w =
+            wf(
+                WorkflowNode("analyze", NodeType.AGENT, prompt = "look"),
+                WorkflowNode("stray", NodeType.AGENT, prompt = "\${analyze.nope}"),
+            )
+
+        val issues = w.validate()
+
+        assertEquals(1, issues.mentioning("nothing connects analyze to it").size)
+        assertEquals(emptyList(), issues.mentioning("analyze produces"))
+    }
+
+    @Test
     fun `each node type is asked for the one field it cannot run without`() {
         val w =
             wf(

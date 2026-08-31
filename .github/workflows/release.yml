@@ -89,8 +89,16 @@ jobs:
           TARBALL=$(find cli/build/distributions -name "*.tar.gz" | head -n1)
           # install.sh verifies the tarball against this before it unpacks anything.
           (cd "$(dirname "$TARBALL")" && shasum -a 256 "$(basename "$TARBALL")" > "$(basename "$TARBALL").sha256")
-          gh release create "$TAG" "$FINAL" "$STABLE" "$TARBALL" "$TARBALL.sha256" \
-            --draft --title "$VERSION" --generate-notes
+          # use notes of the release tag if they exist
+          NOTES=$(git tag -l --format='%(contents)' "$TAG")
+          if [ -n "$NOTES" ]; then
+            printf '%s\n' "$NOTES" > release-notes.md
+            gh release create "$TAG" "$FINAL" "$STABLE" "$TARBALL" "$TARBALL.sha256" \
+              --draft --title "$VERSION" --notes-file release-notes.md --generate-notes
+          else
+            gh release create "$TAG" "$FINAL" "$STABLE" "$TARBALL" "$TARBALL.sha256" \
+              --draft --title "$VERSION" --generate-notes
+          fi
 
       - name: Delete the throwaway keychain
         if: always()

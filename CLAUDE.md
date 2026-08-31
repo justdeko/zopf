@@ -97,8 +97,11 @@ Data passing is `${node.field}` and nothing else — one regex in `model/NodeRef
 `RunContext.interpolate` in `runtime/Interpolation.kt`. There is no expression language, and a
 `branch` expression is a string comparison rather than an evaluator. Unresolved references come back
 in `Interpolated.unresolved` instead of throwing, so the editor can show them while you are still
-typing. Which fields a node offers is `outputFields()`, which is also what the inspector's
-autocomplete and validation read — add a field in one place.
+typing. That is a runtime affordance, not a licence to ship one: `validate` rejects a reference to a
+field its node doesn't produce, so an unresolved `${a.b}` can't reach a tag message or a shell
+command. Which fields a node offers is `outputFields()`, which is what both that check and the
+inspector's autocomplete read — add a field in one place. A connector's fields come from its
+manifest, so the check is skipped when validation has no lookup to resolve one.
 
 `store/RunArchive.kt` writes NDJSON per run under `~/Library/Application Support/zopf/runs/`. It is
 the shared surface between the app and the CLI, and `--format json` is that same NDJSON on stdout.

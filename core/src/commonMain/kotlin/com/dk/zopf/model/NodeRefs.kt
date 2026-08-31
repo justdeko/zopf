@@ -12,6 +12,8 @@ object NodeRefs {
 
     fun referencedNodeIds(text: String): Set<String> = PATTERN.findAll(text).mapTo(mutableSetOf()) { it.groupValues[1] }
 
+    fun references(text: String): Set<Pair<String, String>> = PATTERN.findAll(text).mapTo(mutableSetOf()) { it.groupValues[1] to it.groupValues[2] }
+
     fun isFieldName(name: String): Boolean = Regex("^$IDENT$").matches(name)
 
     fun rename(

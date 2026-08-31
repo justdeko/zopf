@@ -41,10 +41,10 @@ nodes:
     command: |
       log=$(mktemp)
       ./gradlew --console=plain ktlintCheck :core:jvmTest :shared:jvmTest :cli:test > "$log" 2>&1
-      status=$?
+      code=$?
       tail -60 "$log"
       rm -f "$log"
-      echo "exit=$status"
+      echo "exit=$code"
   - id: version
     type: shell
     title: Work out the version to cut
@@ -72,6 +72,9 @@ nodes:
       - Read
       - Glob
       - Grep
+    schema:
+      - name: body
+        description: the entry body itself, at most 200 words
     prompt: |
       Draft the release notes for zopf ${version.result}.
 
@@ -79,13 +82,17 @@ nodes:
 
       ${history.result}
 
-      Read CHANGELOG.md first — its existing entry is the voice to match: prose saying what the
-      release lets someone do, not a list of commit subjects. Open the files behind a commit whose
-      subject doesn't say what actually changed; "cleanup" and "fix encoding" are not release notes.
+      Open the files behind a commit whose subject doesn't say what actually changed; "cleanup" and
+      "fix encoding" are not release notes. Read CHANGELOG.md for the shape of an entry, not for how
+      long one runs — it holds a single release and cannot tell you that.
 
-      Write the entry body only — no version heading, no preamble, nothing about how it was written.
-      Leave out what a user cannot see: refactors, test changes, build wiring. If the release really
-      is only internal work, say that in one line rather than inflating it.
+      Write prose saying what the release lets someone do, not a list of commit subjects. Lead with
+      the two or three changes someone would notice, a short paragraph each; everything else visible
+      gets a line. Leave out what a user cannot see: refactors, test changes, build wiring. If the
+      release really is only internal work, say that in one line rather than inflating it.
+
+      `body` is published as written — it becomes the tag message and the GitHub release. No version
+      heading, no preamble, no closing note about what you left out or how you drafted it.
   - id: impact
     type: agent
     title: Is this the right size of release?
@@ -131,13 +138,15 @@ nodes:
         description: yes or no — whether a person should be asked to approve the tag at all
       - name: because
         description: the one line that decided it
+      - name: summary
+        description: at most six lines on what someone needs to know before they approve
     prompt: |
       Three things ran against the tree that would become v${version.result}. Turn them into one
       answer.
 
       The drafted notes:
 
-      ${notes.result}
+      ${notes.body}
 
       The impact read: the commits justify a ${impact.advises} bump against the ${bump.result} being
       cut, the changelog entry is ${impact.changelog}, and the concern raised was:
@@ -153,8 +162,8 @@ nodes:
       and what's left is a judgment a person can make at the gate; the notes' wording is not one of
       those, it is theirs to edit afterwards.
 
-      Give `because` as one line naming the thing that decided it. Then, in at most six lines, say
-      what someone needs to know before they approve.
+      Give `because` as one line naming the thing that decided it, and `summary` as at most six
+      lines of what someone needs to know before they approve.
   - id: ready
     type: branch
     title: Clean enough to offer?
@@ -174,7 +183,11 @@ nodes:
     prompt: |
       v${version.result} — ${reconcile.because}
 
-      ${notes.result}
+      ${reconcile.summary}
+
+      The notes that will become the tag message and the release body:
+
+      ${notes.body}
   - id: tag
     type: shell
     title: Tag it and push
@@ -182,7 +195,7 @@ nodes:
       set -eu
       body=$(mktemp)
       cat <<'ZOPF_RELEASE_NOTES' > "$body"
-      ${notes.result}
+      ${notes.body}
       ZOPF_RELEASE_NOTES
       git tag -a "v${version.result}" -F "$body"
       rm -f "$body"

@@ -49,26 +49,53 @@ fun Workflow.validate(
 
         val ancestors = ancestorsOf(node.id)
 
+        fun producedFields(upstream: WorkflowNode): List<String>? =
+            when {
+                upstream.type != NodeType.CONNECTOR -> upstream.outputFields()
+                connector == null || upstream.connector.isBlank() -> null
+                else -> connector(upstream.connector)?.let { upstream.outputFields(it) }
+            }
+
         fun checkReferences(
             text: String,
             source: String? = null,
         ) {
             val located = source?.let { " in $it" }.orEmpty()
+            val resolvable = mutableSetOf<String>()
             for (referenced in NodeRefs.referencedNodeIds(text)) {
-                when {
-                    referenced !in nodeIds ->
+                when (referenced) {
+                    !in nodeIds -> {
                         issues +=
                             WorkflowIssue(
                                 "$where reads \${$referenced…}$located, which is no longer a node",
                                 node.id,
                             )
+                    }
 
-                    referenced !in ancestors ->
+                    !in ancestors -> {
                         issues +=
                             WorkflowIssue(
                                 "$where reads \${$referenced…}$located, but nothing connects $referenced to it",
                                 node.id,
                             )
+                    }
+
+                    else -> {
+                        resolvable += referenced
+                    }
+                }
+            }
+
+            for ((referenced, field) in NodeRefs.references(text)) {
+                if (referenced !in resolvable) continue
+                val produced = producedFields(nodes.first { it.id == referenced }) ?: continue
+                if (field !in produced) {
+                    issues +=
+                        WorkflowIssue(
+                            "$referenced produces ${produced.joinToString()}, so $where " +
+                                "can't read \${$referenced.$field}$located",
+                            node.id,
+                        )
                 }
             }
         }
