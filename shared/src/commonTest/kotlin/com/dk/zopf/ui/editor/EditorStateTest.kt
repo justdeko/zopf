@@ -181,7 +181,13 @@ class EditorStateTest {
         val workspace = Workspace.create(tempDir().resolve("ws"))
         workspace.root.resolve("prompts").createDirectories()
         workspace.root.resolve("prompts/review.md").writeText(promptFileText)
+        return editorIn(workspace, connected)
+    }
 
+    private fun editorIn(
+        workspace: Workspace,
+        connected: Boolean = true,
+    ): EditorState {
         val workflow =
             Workflow(
                 name = "w",
@@ -200,6 +206,21 @@ class EditorStateTest {
             executableExists = { true },
             onSave = {},
         )
+    }
+
+    @Test
+    fun `a prompt file edited outside the editor is validated as it now reads`() {
+        val workspace = Workspace.create(tempDir().resolve("ws"))
+        workspace.root.resolve("prompts").createDirectories()
+        val prompt = workspace.root.resolve("prompts/review.md")
+        prompt.writeText("Summarise \${build.result}")
+        val state = editorIn(workspace)
+        assertEquals(emptyList(), state.issues)
+
+        prompt.writeText("Summarise \${gone.result}")
+        state.checkFileOnDisk()
+
+        assertTrue(state.issues.any { "gone" in it.message }, "still reading the copy it took when it opened")
     }
 
     @Test
@@ -234,7 +255,7 @@ class EditorStateTest {
         assertTrue(message != null && "prompts/review.md" in message, "said nothing about the file: $message")
         assertTrue("build" in message, "the message has to name the reference that is now stale")
 
-        state.refreshPromptFiles()
+        state.refreshLookups()
         assertTrue(state.issues.any { "build" in it.message })
     }
 

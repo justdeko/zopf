@@ -2,6 +2,7 @@ package com.dk.zopf.ui
 
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
+import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.runtime.NodeExecution
 import com.dk.zopf.runtime.NodeExecutor
@@ -18,12 +19,15 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.createDirectories
+import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class WorkspaceSwitchTest {
@@ -208,5 +212,33 @@ class RunGateTest {
 
         assertEquals(0, app.runs.runs.size)
         assertNotNull(app.message)
+    }
+
+    @Test
+    fun `the Run button refuses what the CLI would refuse, not what the editor last read`() {
+        val app = app()
+        val workspace = assertNotNull(assertNotNull(app.activeWorkspace).workspace)
+        workspace.root.resolve("prompts").createDirectories()
+        val prompt = workspace.root.resolve("prompts/review.md")
+        prompt.writeText("Look at \${build.result}")
+
+        app.openEditor(
+            Workflow(
+                name = "demo",
+                nodes =
+                    listOf(
+                        WorkflowNode(id = "build", type = NodeType.SHELL, command = "true"),
+                        WorkflowNode(id = "review", type = NodeType.AGENT, promptFile = "prompts/review.md"),
+                    ),
+                edges = listOf(WorkflowEdge("build", "review")),
+            ),
+        )
+        prompt.writeText("Look at \${gone.result}")
+
+        app.runWorkflow()
+
+        assertEquals(0, app.runs.runs.size)
+        val message = assertNotNull(app.message)
+        assertTrue("gone" in message, "the gate read the copy the editor took when it opened: $message")
     }
 }

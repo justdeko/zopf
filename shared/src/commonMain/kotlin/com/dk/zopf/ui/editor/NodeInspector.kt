@@ -213,7 +213,7 @@ private fun AgentFields(
     val provider = state.resolvedWorkflow.providerFor(node, state.fallbackProvider)
     val can = provider.capabilities
 
-    LaunchedEffect(node.id, workflow.repos, workflow.skills) { state.refreshSkills() }
+    LaunchedEffect(node.id, workflow.repos, workflow.skills) { state.refreshLookups() }
 
     Gap()
     InspectorDropdown(
@@ -451,7 +451,7 @@ private fun PromptSection(
     node: WorkflowNode,
     workspace: Workspace?,
 ) {
-    LaunchedEffect(node.id, node.promptFile) { state.refreshPromptFiles() }
+    LaunchedEffect(node.id, node.promptFile) { state.refreshLookups() }
 
     if (node.promptFile.isBlank()) {
         PromptField(

@@ -80,7 +80,7 @@ fun WorkflowSettingsDialog(
                     values = workflow.skills,
                     onChange = { skills ->
                         state.edit { it.copy(skills = skills) }
-                        state.refreshSkills()
+                        state.refreshLookups()
                     },
                     addLabel = "Path to a skill",
                     supportingText =

@@ -106,8 +106,16 @@ inspector's autocomplete read — add a field in one place. A connector's fields
 manifest, so the check is skipped when validation has no lookup to resolve one.
 
 Both front ends gate on that: an error means `zopf run` exits 3 and the Run button says what to fix,
-neither having started a node. `runtime/WorkflowIssues.kt` is the single place that hands `validate`
-the lookups it needs, so the CLI and the app can't disagree about whether a file is runnable.
+neither having started a node. `workflowLookups()` in `runtime/WorkflowIssues.kt` is the single place
+that builds what `validate` reads from disk, so the CLI and the app can't disagree about whether a
+file is runnable. It returns a `WorkflowLookups`, and skills and prompt file texts in it are a
+snapshot rather than a live read, because the editor asks for `issues` on every recomposition and
+can't go to disk each time. **A front end chooses when to rebuild that snapshot, never what goes in
+it.** `AppState` rebuilds before the Run button gates on it, since a snapshot is fresh enough to
+paint a badge and not fresh enough to start a run; the editor's poll watches its prompt files
+alongside its own file for the same reason. The connector lookup is the one part the app supplies,
+resolving against the listing the Connectors screen already refreshes, so a connector installed while
+the editor is open needs no rescan.
 
 `store/RunArchive.kt` writes NDJSON per run under `~/Library/Application Support/zopf/runs/`. It is
 the shared surface between the app and the CLI, and `--format json` is that same NDJSON on stdout.

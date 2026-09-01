@@ -20,25 +20,24 @@ import com.dk.zopf.model.positions
 import com.dk.zopf.model.removeNode
 import com.dk.zopf.model.renameNode
 import com.dk.zopf.model.replaceNode
-import com.dk.zopf.model.validate
 import com.dk.zopf.model.withDefaultsFrom
 import com.dk.zopf.model.withPositions
 import com.dk.zopf.runtime.AgentProviders
+import com.dk.zopf.runtime.WorkflowLookups
+import com.dk.zopf.runtime.issues
+import com.dk.zopf.runtime.promptFiles
+import com.dk.zopf.runtime.workflowLookups
 import com.dk.zopf.store.Connector
 import com.dk.zopf.store.DiscoveredSkill
 import com.dk.zopf.store.FileStamp
 import com.dk.zopf.store.WorkflowStore
 import com.dk.zopf.store.Workspace
-import com.dk.zopf.store.availableSkills
 import com.dk.zopf.store.decodeWorkflow
 import com.dk.zopf.store.encodeWorkflow
 import com.dk.zopf.store.fileStamp
 import com.dk.zopf.store.isSkillDir
 import java.nio.file.Path
-import kotlin.io.path.exists
-import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
-import kotlin.io.path.readText
 
 @Stable
 class EditorState(
@@ -84,10 +83,11 @@ class EditorState(
 
     val selectedNode: WorkflowNode? get() = selectedNodeId?.let { workflow.node(it) }
 
-    var skills by mutableStateOf<List<DiscoveredSkill>>(emptyList())
-        private set
+    val skills: List<DiscoveredSkill> get() = lookups.skills.orEmpty()
 
-    private var promptTexts by mutableStateOf<Map<String, String>>(emptyMap())
+    private var lookups by mutableStateOf(WorkflowLookups())
+
+    private var promptStamps: Map<String, FileStamp?> = emptyMap()
 
     private val store: WorkflowStore? get() = workspace?.let(::WorkflowStore)
 
@@ -97,15 +97,20 @@ class EditorState(
         private set
 
     init {
-
-        refreshSkills()
-        refreshPromptFiles()
+        refreshLookups()
         stamp = currentStamp()
     }
 
     private fun currentStamp(): FileStamp? = store?.let { fileStamp(it.fileFor(saved.name)) }
 
+    private fun currentPromptStamps(): Map<String, FileStamp?> {
+        val ws = workspace ?: return emptyMap()
+        return workflow.promptFiles().associateWith { fileStamp(ws.resolvePath(it)) }
+    }
+
     fun checkFileOnDisk() {
+        if (currentPromptStamps() != promptStamps) refreshLookups()
+
         val store = store ?: return
         val current = fileStamp(store.fileFor(saved.name)) ?: return
         if (current == stamp) return
@@ -134,21 +139,10 @@ class EditorState(
         canvasPositions = null
         selectedNodeId = selectedNodeId?.takeIf { onDisk.node(it) != null }
         clearConnect()
-        refreshSkills()
-        refreshPromptFiles()
+        refreshLookups()
     }
 
-    val issues: List<WorkflowIssue>
-        get() =
-            workflow.validate(
-                repoExists = { repo -> workspace?.resolvePath(repo.path)?.exists() ?: true },
-                fileExists = { raw -> workspace?.resolvePath(raw)?.isRegularFile() ?: true },
-                connector = { name -> connectors.firstOrNull { it.name == name }?.manifest },
-                knownSkills = workspace?.let { skills.mapTo(mutableSetOf(), DiscoveredSkill::name) },
-                promptText = promptTexts::get,
-                defaultProvider = fallbackProvider,
-                executableExists = executableExists,
-            )
+    val issues: List<WorkflowIssue> get() = workflow.issues(lookups)
 
     val connectors: List<Connector> get() = connectorsProvider()
 
@@ -156,19 +150,16 @@ class EditorState(
 
     fun refreshConnectors() = onRefreshConnectors()
 
-    fun refreshPromptFiles() {
-        val ws = workspace ?: return
-        promptTexts =
-            workflow.nodes
-                .map { it.promptFile }
-                .filter { it.isNotBlank() }
-                .distinct()
-                .mapNotNull { raw -> runCatching { raw to ws.resolvePath(raw).readText() }.getOrNull() }
-                .toMap()
-    }
-
-    fun refreshSkills() {
-        skills = workspace?.let { availableSkills(it, workflow) }.orEmpty()
+    fun refreshLookups() {
+        lookups =
+            workflowLookups(
+                workspace = workspace,
+                workflow = workflow,
+                defaultProvider = fallbackProvider,
+                executableExists = executableExists,
+                connector = { name -> connectors.firstOrNull { it.name == name }?.manifest },
+            )
+        promptStamps = currentPromptStamps()
     }
 
     fun addSkillDirectory(
@@ -186,7 +177,7 @@ class EditorState(
                 val node = nodeId?.let(updated::node) ?: return@let updated
                 updated.replaceNode(node.copy(skills = (node.skills + name).distinct()))
             }
-        refreshSkills()
+        refreshLookups()
         return true
     }
 
@@ -250,7 +241,7 @@ class EditorState(
         from: String,
         to: String,
     ) {
-        val stale = promptTexts.filterValues { from in NodeRefs.referencedNodeIds(it) }.keys
+        val stale = lookups.promptTexts.filterValues { from in NodeRefs.referencedNodeIds(it) }.keys
         if (stale.isEmpty()) return
         message = "Renamed to $to. ${stale.joinToString()} still reads \${$from…}. " +
             "zopf doesn't edit prompt files, so fix that one by hand."
@@ -365,8 +356,7 @@ class EditorState(
             canvasPositions = null
             selectedNodeId = selectedNodeId?.takeIf { parsed.node(it) != null }
             clearConnect()
-            refreshSkills()
-            refreshPromptFiles()
+            refreshLookups()
         }
 
     fun disconnect(

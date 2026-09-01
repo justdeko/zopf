@@ -287,8 +287,12 @@ class AppState(
 
     private fun blockers(workflow: Workflow): List<WorkflowIssue> {
         val editor = editing?.takeIf { it.workflow.name == workflow.name }
-        val found = editor?.issues ?: workflow.issues(activeWorkspace?.workspace, settings.current.defaultProvider)
-        return found.errors()
+        if (editor == null) {
+            return workflow.issues(activeWorkspace?.workspace, settings.current.defaultProvider).errors()
+        }
+        refreshConnectors()
+        editor.refreshLookups()
+        return editor.issues.errors()
     }
 
     fun runWorkflow(workflow: Workflow? = null) {
