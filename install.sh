@@ -28,7 +28,7 @@ Installs the zopf command line into ~/.local (override with --prefix or ZOPF_PRE
   --help
 
 Piping into sh takes arguments after -s --, e.g.
-  curl -fsSL <url> | sh -s -- --version 1.0.0
+  curl -fsSL <url> | sh -s -- --version <x.y.z>
 EOF
 }
 

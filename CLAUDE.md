@@ -75,9 +75,11 @@ Version: generated, not checked in. `zopfVersion` in `gradle.properties` (overri
 `-PpackageVersion` from the release tag) is written to a resource by `:core:writeVersion` and read
 back through `store/BuildInfo.kt`, so a tagged build and a local build can never disagree with the
 jar they came from. The number is still written down in a handful of other places — the plugin
-manifest, the examples here and in `install.sh` — so `scripts/bump-version.sh patch|minor|major` moves all
-of them at once and fails rather than skipping one it can no longer find. The major stays at 1 or
-above: macOS refuses a bundle whose `CFBundleShortVersionString` starts at 0.
+manifest and the example here — so `scripts/bump-version.sh patch|minor|major` moves all of them at
+once and fails rather than skipping one it can no longer find. `install.sh` is deliberately not
+among them: its `--version` example is a placeholder, because a literal there is a command that 404s
+between the tag and the release being published. The major stays at 1 or above: macOS refuses a
+bundle whose `CFBundleShortVersionString` starts at 0.
 
 ## The run model
 
@@ -102,6 +104,10 @@ field its node doesn't produce, so an unresolved `${a.b}` can't reach a tag mess
 command. Which fields a node offers is `outputFields()`, which is what both that check and the
 inspector's autocomplete read — add a field in one place. A connector's fields come from its
 manifest, so the check is skipped when validation has no lookup to resolve one.
+
+Both front ends gate on that: an error means `zopf run` exits 3 and the Run button says what to fix,
+neither having started a node. `runtime/WorkflowIssues.kt` is the single place that hands `validate`
+the lookups it needs, so the CLI and the app can't disagree about whether a file is runnable.
 
 `store/RunArchive.kt` writes NDJSON per run under `~/Library/Application Support/zopf/runs/`. It is
 the shared surface between the app and the CLI, and `--format json` is that same NDJSON on stdout.

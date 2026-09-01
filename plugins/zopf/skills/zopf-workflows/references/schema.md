@@ -268,7 +268,7 @@ leaked value is a token to rotate.
 
 | when                          | message                                                                                |
 |-------------------------------|----------------------------------------------------------------------------------------|
-| `version:` is newer than zopf | `This workflow needs workflow format vN. This zopf reads vM, so update zopf`            |
+| `version:` is newer than zopf | `This workflow needs workflow format vN. This zopf reads vM, so update zopf`           |
 | two nodes share an id         | `There are N nodes called "x" — ids have to be unique`                                 |
 | an edge feeds its own source  | `The edge on "x" feeds itself, so it could never run`                                  |
 | an edge names a missing node  | `An edge connects "x", which isn't a node in <workflow>`                               |
@@ -278,6 +278,7 @@ leaked value is a token to rotate.
 | an undeclared `alsoRead`      | `<node> also reads "x", which isn't declared`                                          |
 | a reference to a non-node     | `<node> reads ${x…}, which is no longer a node`                                        |
 | a reference to a non-ancestor | `<node> reads ${x…}, but nothing connects x to it`                                     |
+| a field the node doesn't have | `x produces result, exitCode, so <node> can't read ${x.summary}`                       |
 | a required field is empty     | `<node> needs a prompt` / `a command` / `a connector` / `an expression` / `a question` |
 | `promptFile` doesn't exist    | `<node> reads its prompt from <path>, which isn't there`                               |
 | a branch edge with no `when`  | `<node> has an edge that is neither true nor false`                                    |
@@ -289,6 +290,9 @@ leaked value is a token to rotate.
 | a schema field with no name   | `<node> declares an output field with no name`                                         |
 | a duplicated schema field     | `<node> declares the output field "x" more than once`                                  |
 | a schema field named `result` | `<node> declares an output field named "x", which ${id.x} already means`               |
+
+An error stops a run before it starts. `zopf run` prints them and exits 3 without running a node, and the app
+says what to fix instead of starting.
 
 **Warnings** (exit 0, but read them):
 

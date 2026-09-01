@@ -147,10 +147,6 @@ main() {
         "s/\"version\": \"[0-9][0-9.]*\"/\"version\": \"$NEW\"/" \
         "the plugin manifest's version" \
         '"version": "[0-9]'
-    replace install.sh \
-        "s/-- --version [0-9][0-9.]*/-- --version $NEW/" \
-        "the --version example in the usage text" \
-        '\-\- \-\-version [0-9]'
     replace CLAUDE.md \
         "s/-PpackageVersion=[0-9][0-9.]*/-PpackageVersion=$NEW/" \
         "the packageDmg example" \

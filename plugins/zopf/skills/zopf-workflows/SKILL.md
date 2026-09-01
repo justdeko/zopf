@@ -286,7 +286,8 @@ zopf run <name> --dry-run
 If `zopf` is not on PATH, say so and check the file by eye against `references/schema.md` rather than claiming it
 validates.
 
-`validate` exits 3 on an error and 0 on warnings alone — but read the warnings, because the two that matter most are
+`validate` exits 3 on an error and 0 on warnings alone, and an error is not only a report: `zopf run` refuses to start
+a workflow that has one, and so does the Run button. Read the warnings too, because the two that matter most are
 warnings: an unknown key (the file parses with unknown keys silently ignored, so a typo'd `promtFile:` is otherwise
 invisible) and a node connected to nothing.
 

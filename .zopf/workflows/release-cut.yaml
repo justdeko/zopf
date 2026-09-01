@@ -50,12 +50,7 @@ nodes:
     title: Work out the version to cut
     command: |
       set -eu
-      last=$(git describe --tags --abbrev=0 2>/dev/null || true)
-      if [ -z "$last" ]; then
-        grep '^zopfVersion=' gradle.properties | cut -d= -f2
-        exit 0
-      fi
-      v=${last#v}
+      v=$(grep '^zopfVersion=' gradle.properties | cut -d= -f2)
       major=${v%%.*}
       rest=${v#*.}
       minor=${rest%%.*}
@@ -74,7 +69,7 @@ nodes:
       - Grep
     schema:
       - name: body
-        description: the entry body itself, at most 200 words
+        description: the entry itself, as short bullet points, at most eight of them
     prompt: |
       Draft the release notes for zopf ${version.result}.
 
@@ -83,16 +78,16 @@ nodes:
       ${history.result}
 
       Open the files behind a commit whose subject doesn't say what actually changed; "cleanup" and
-      "fix encoding" are not release notes. Read CHANGELOG.md for the shape of an entry, not for how
-      long one runs — it holds a single release and cannot tell you that.
+      "fix encoding" are not release notes.
 
-      Write prose saying what the release lets someone do, not a list of commit subjects. Lead with
-      the two or three changes someone would notice, a short paragraph each; everything else visible
-      gets a line. Leave out what a user cannot see: refactors, test changes, build wiring. If the
-      release really is only internal work, say that in one line rather than inflating it.
+      Write short bullet points, each starting with `- `, saying what the release lets someone do
+      rather than naming a commit. One line each, and the change someone would notice first at the
+      top. Leave out what a user cannot see: refactors, test changes, build wiring. If the release
+      really is only internal work, say that in one bullet rather than inflating it.
 
-      `body` is published as written — it becomes the tag message and the GitHub release. No version
-      heading, no preamble, no closing note about what you left out or how you drafted it.
+      `body` is published as written — it becomes the tag message and the GitHub release. Bullets and
+      nothing else: no version heading, no preamble, no paragraph before or after them, no closing
+      note about what you left out or how you drafted it.
   - id: impact
     type: agent
     title: Is this the right size of release?
@@ -103,8 +98,6 @@ nodes:
     schema:
       - name: advises
         description: patch, minor or major — the bump these commits actually justify
-      - name: changelog
-        description: present or missing — whether CHANGELOG.md already has an entry for this version
       - name: concern
         description: the one thing that should hold the release, or exactly "none"
     prompt: |
@@ -115,12 +108,11 @@ nodes:
 
       ${history.result}
 
-      Read CHANGELOG.md and CLAUDE.md, then weigh three things:
+      Read CHANGELOG.md and CLAUDE.md, then weigh two things:
 
       - Semantics. A change to what a workflow YAML may say, to what `zopf run` exits, or to where
         files are written is a minor at least — those are contracts other people's files and scripts
         already hold. Internal work is a patch however large the diff.
-      - Whether CHANGELOG.md already carries an entry for ${version.result}.
       - Anything half-landed: a flag added but undocumented, a claim in CLAUDE.md the commits have
         made untrue, a format change with no path for files already written.
 
@@ -149,7 +141,7 @@ nodes:
       ${notes.body}
 
       The impact read: the commits justify a ${impact.advises} bump against the ${bump.result} being
-      cut, the changelog entry is ${impact.changelog}, and the concern raised was:
+      cut, and the concern raised was:
 
       ${impact.concern}
 
@@ -179,7 +171,7 @@ nodes:
       sound: Basso
   - id: approve
     type: gate
-    title: Push the tag and let the release build?
+    title: Commit the bump, push the tag and let the release build?
     prompt: |
       v${version.result} — ${reconcile.because}
 
@@ -188,6 +180,28 @@ nodes:
       The notes that will become the tag message and the release body:
 
       ${notes.body}
+  - id: prepare
+    type: shell
+    title: Bump the version and write the changelog entry
+    command: |
+      set -eu
+      [ -z "$(git status --porcelain)" ] ||
+        { echo "The tree has uncommitted changes. Commit or stash them, then cut again."; exit 1; }
+      ./scripts/bump-version.sh ${bump.result}
+      body=$(mktemp)
+      cat <<'ZOPF_RELEASE_NOTES' > "$body"
+      ${notes.body}
+      ZOPF_RELEASE_NOTES
+      out=$(mktemp)
+      awk -v heading="## ${version.result}" -v file="$body" '
+        { print }
+        $0 == heading { print ""; while ((getline line < file) > 0) print line }
+      ' CHANGELOG.md > "$out"
+      mv "$out" CHANGELOG.md
+      rm -f "$body"
+      git add -A
+      git commit -m "${version.result}"
+      echo "committed ${version.result}"
   - id: tag
     type: shell
     title: Tag it and push
@@ -199,7 +213,7 @@ nodes:
       ZOPF_RELEASE_NOTES
       git tag -a "v${version.result}" -F "$body"
       rm -f "$body"
-      git push origin "v${version.result}"
+      git push origin main "v${version.result}"
       echo "pushed v${version.result}"
   - id: shipped
     type: connector
@@ -208,7 +222,7 @@ nodes:
     inputs:
       title: zopf release
       subtitle: ${version.result} pushed
-      message: The release workflow is building it, and will leave the release as a draft.
+      message: The release build is running. It leaves a draft for you to check and publish.
   - id: failed
     type: connector
     title: Say the push did not go through
@@ -216,7 +230,7 @@ nodes:
     inputs:
       title: zopf release
       subtitle: ${version.result} not pushed
-      message: The tag or the push failed. The run's transcript has what git said.
+      message: A step of the cut failed. The run's transcript has what git said.
       sound: Basso
 edges:
   - from: bump
@@ -244,7 +258,12 @@ edges:
     to: approve
     when: true
   - from: approve
+    to: prepare
+  - from: prepare
     to: tag
+  - from: prepare
+    to: failed
+    on: failure
   - from: tag
     to: shipped
   - from: tag

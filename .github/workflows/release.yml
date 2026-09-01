@@ -28,6 +28,15 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
         run: echo "value=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Version entries must match
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          grep -qx "zopfVersion=$VERSION" gradle.properties ||
+            { echo "gradle.properties isn't at $VERSION."; exit 1; }
+          grep -qx "## $VERSION" CHANGELOG.md ||
+            { echo "CHANGELOG.md has no $VERSION entry."; exit 1; }
+
       - name: Import the Developer ID certificate into a throwaway keychain
         env:
           MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}

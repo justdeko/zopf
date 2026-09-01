@@ -44,7 +44,8 @@ You need **macOS on Apple Silicon** and one of these installed and signed in:
 | [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)                  | `dsh`       | `dsh --profile headless`    |
 
 > [!NOTE]
-> So far, only the Claude Code path was used daily and tested against a real CLI. The codex and dsh paths are built from those
+> So far, only the Claude Code path was used daily and tested against a real CLI. The codex and dsh paths are built from
+those
 > CLIs' documented flags and covered by unit tests, but they haven't been tested end to end here.
 > Please open an issue if you notice a bug in their implementations.
 
@@ -148,9 +149,8 @@ Steps read previous output with `${step.result}`. There's no expression language
 
 ## Workspaces
 
-A workspace is a `.zopf/` folder, the nearest one above you, the way git finds `.git`. Commit one inside a repo and its
-workflows travel with the code; `~/.zopf` is the default for everything else. Nothing machine-specific is written into
-one, so `git status` stays clean.
+A workspace is a `.zopf/` folder, similar to git with `.git`. Use one anywhere, otherwise `~/.zopf` is the default for
+everything else.
 
 ```
 <repo>/.zopf/ or ~/.zopf/                  workflows/, connectors/, optional zopf.yaml
@@ -158,8 +158,8 @@ one, so `git status` stays clean.
 ~/Library/Logs/zopf/zopf.log               what to send with a bug report
 ```
 
-`zopf.yaml` is optional. It names the workspace and sets defaults for every workflow in it, using the same keys a
-workflow's own `defaults` takes:
+`zopf.yaml` is optional. It names the workspace and sets defaults for every workflow in it, using the same keys as the
+workflow's `defaults`:
 
 ```yaml
 name: Payments
@@ -168,7 +168,7 @@ defaults:
   repo: self
 ```
 
-The run archive grows: a chatty build step can run to megabytes. Settings → History caps it, or `zopf prune --keep 50`.
+The run archive grows, so a chatty build step can run quite large. To cap it, go to Settings → History, or do `zopf prune --keep 50`.
 
 ## CLI usage
 
@@ -191,6 +191,8 @@ Exit codes:
 - `2` stopped
 - `3` never started
 
+`zopf run` validates the workflow before it starts anything, so an error in the file means exit 3 and no node runs.
+
 Two things are a bit different in the cli vs. the app:
 
 - no gate, the run just stops there
@@ -211,5 +213,5 @@ you're confident of its contents.
 
 zopf is an independent personal project. It is not affiliated with, sponsored by or endorsed by Anthropic, OpenAI,
 DeepSeek, Apple or GitHub. Claude and Claude Code are trademarks of Anthropic PBC; Codex is a trademark of OpenAI;
-DeepSeek is a trademark of Hangzhou DeepSeek Artificial Intelligence Co., Ltd.; macOS and Finder are trademarks of
-Apple Inc. They're named here only to say which tools zopf uses.
+DeepSeek is a trademark of Hangzhou DeepSeek Artificial Intelligence Co., Ltd.; macOS and Finder are trademarks of Apple
+Inc. They're named here only to say which tools zopf uses.
