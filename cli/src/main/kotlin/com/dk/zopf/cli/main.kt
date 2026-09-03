@@ -81,6 +81,8 @@ private fun dispatch(
 }
 
 fun usage(out: PrintStream) {
+    out.println(braid(colour = System.console() != null))
+    out.println()
     out.println(
         """
         zopf runs agent workflows from a terminal, driving the claude, codex or dsh CLI you already have.
