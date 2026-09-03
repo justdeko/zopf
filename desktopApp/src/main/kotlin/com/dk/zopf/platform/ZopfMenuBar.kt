@@ -6,6 +6,7 @@ import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.MenuScope
+import androidx.compose.ui.window.WindowPlacement
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.label
 import com.dk.zopf.ui.AppState
@@ -15,7 +16,10 @@ import com.dk.zopf.ui.Screen
 @Composable
 fun FrameWindowScope.ZopfMenuBar(
     app: AppState,
+    placement: WindowPlacement,
     onHideWindow: () -> Unit,
+    onMinimize: () -> Unit,
+    onZoom: () -> Unit,
 ) {
     MenuBar {
         Menu("File") {
@@ -30,7 +34,29 @@ fun FrameWindowScope.ZopfMenuBar(
         Menu("Workspace") {
             WorkspaceMenu(app)
         }
+        Menu("Window") {
+            WindowMenu(placement, onMinimize, onZoom)
+        }
     }
+}
+
+@Composable
+private fun MenuScope.WindowMenu(
+    placement: WindowPlacement,
+    onMinimize: () -> Unit,
+    onZoom: () -> Unit,
+) {
+    Item(
+        "Minimize",
+        shortcut = KeyShortcut(Key.M, meta = true),
+        enabled = placement != WindowPlacement.Fullscreen,
+        onClick = onMinimize,
+    )
+    Item(
+        "Zoom",
+        enabled = placement != WindowPlacement.Fullscreen,
+        onClick = onZoom,
+    )
 }
 
 @Composable

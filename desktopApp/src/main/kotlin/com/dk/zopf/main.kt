@@ -9,6 +9,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import com.dk.zopf.platform.WithFullWindowContent
 import com.dk.zopf.platform.ZopfMenuBar
@@ -97,7 +98,20 @@ fun main() {
                 if (showRequests > 0) window.bringToFront()
             }
 
-            ZopfMenuBar(app, onHideWindow = { windowVisible = false })
+            ZopfMenuBar(
+                app,
+                placement = windowState.placement,
+                onHideWindow = { windowVisible = false },
+                onMinimize = { windowState.isMinimized = true },
+                onZoom = {
+                    windowState.placement =
+                        if (windowState.placement == WindowPlacement.Maximized) {
+                            WindowPlacement.Floating
+                        } else {
+                            WindowPlacement.Maximized
+                        }
+                },
+            )
             WithFullWindowContent(windowState.placement) {
                 App(app)
             }
