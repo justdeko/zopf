@@ -13,10 +13,19 @@ import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.Workspace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.milliseconds
+
+private const val ARCHIVE_POLL_MILLIS = 4_000L
+private const val MAX_NOTIFICATION_ACTIONS = 3
+private const val WAITING_DEADLINE_SECONDS = 3_600L
+private const val WAITING_SOUND = "Ping"
+private const val FAILURE_SOUND = "Basso"
+private const val SUCCESS_SOUND = "Glass"
 
 @Stable
 class RunRegistry(
@@ -24,6 +33,9 @@ class RunRegistry(
     private val settings: LiveSettings = LiveSettings(),
     executor: NodeExecutor? = null,
     private val archiveRoot: Path,
+    private val notifier: Notifier = SilentNotifier,
+    private val isForeground: () -> Boolean = { false },
+    private val onActivate: (String) -> Unit = {},
 ) {
     val runs = mutableStateListOf<WorkflowRun>()
 
@@ -32,8 +44,7 @@ class RunRegistry(
     var selectedNodeId by mutableStateOf<String?>(null)
         private set
 
-    private val _notifications = MutableSharedFlow<RunNotification>(extraBufferCapacity = 16)
-    val notifications: SharedFlow<RunNotification> = _notifications
+    private val asked = ConcurrentHashMap<String, NotificationHandle>()
 
     val permissions =
         PermissionBridge(
@@ -127,12 +138,18 @@ class RunRegistry(
     fun approve(
         node: NodeRun,
         approved: Boolean,
-    ) = engine.resolveGate(node, approved)
+    ) {
+        settled(node)
+        engine.resolveGate(node, approved)
+    }
 
     fun answer(
         node: NodeRun,
         text: String?,
-    ) = engine.resolveInput(node, text)
+    ) {
+        settled(node)
+        engine.resolveInput(node, text)
+    }
 
     val awaitingPermission: List<Pair<WorkflowRun, NodeRun>>
         get() = runs.flatMap { run -> run.nodes.filter { it.isAwaitingPermission }.map { run to it } }
@@ -140,12 +157,16 @@ class RunRegistry(
     val awaitingInput: List<Pair<WorkflowRun, NodeRun>>
         get() = runs.flatMap { run -> run.nodes.filter { it.isAwaitingInput }.map { run to it } }
 
+    val awaitingApproval: List<Pair<WorkflowRun, NodeRun>>
+        get() = runs.flatMap { run -> run.nodes.filter { it.isAwaitingApproval }.map { run to it } }
+
     fun decide(
         node: NodeRun,
         allow: Boolean,
         forRestOfRun: Boolean = false,
     ) {
         val pending = node.pendingPermission ?: return
+        settled(node)
         if (allow && forRestOfRun) {
             node.autoAllowed.add(pending.request.toolName)
             node.notice("Won't ask about ${pending.request.toolName} again in this run")
@@ -154,29 +175,100 @@ class RunRegistry(
     }
 
     private fun announceQuestion(node: NodeRun) {
+        when {
+            node.pendingQuestion != null -> announceInput(node)
+            node.isAwaitingApproval -> announceGate(node)
+        }
+    }
+
+    private fun announceInput(node: NodeRun) {
         val question = node.pendingQuestion ?: return
-        _notifications.tryEmit(
-            RunNotification(
-                runId = runs.firstOrNull { run -> run.nodes.any { it.id == node.id } }?.id.orEmpty(),
-                title = "${node.nodeTitle} · needs an answer",
-                body = question.question,
-                isFailure = false,
-            ),
-        )
+        val choices = question.choices.take(MAX_NOTIFICATION_ACTIONS)
+        ask(
+            node = node,
+            notification =
+                RunNotification(
+                    runId = runIdOf(node),
+                    title = "${node.nodeTitle} · needs an answer",
+                    body = question.question,
+                    isFailure = false,
+                    key = "node-${node.id}",
+                    subtitle = workflowNameOf(node),
+                    sound = WAITING_SOUND,
+                    thread = runIdOf(node),
+                    actions = choices.mapIndexed { index, choice -> NotificationAction("choice-$index", choice) },
+                ),
+        ) { answer ->
+            val index = answer.removePrefix("choice-").toIntOrNull()
+            if (index != null && index in choices.indices) answer(node, choices[index]) else activate(node)
+        }
+    }
+
+    private fun announceGate(node: NodeRun) {
+        val asking =
+            node.entries
+                .filterIsInstance<ConsoleEntry.Prompt>()
+                .lastOrNull()
+                ?.text
+        ask(
+            node = node,
+            notification =
+                RunNotification(
+                    runId = runIdOf(node),
+                    title = "${node.nodeTitle} · needs approval",
+                    body = asking ?: "This gate is waiting for you before the run goes on.",
+                    isFailure = false,
+                    key = "node-${node.id}",
+                    subtitle = workflowNameOf(node),
+                    sound = WAITING_SOUND,
+                    thread = runIdOf(node),
+                    actions =
+                        listOf(
+                            NotificationAction("approve", "Approve"),
+                            NotificationAction("reject", "Reject"),
+                        ),
+                ),
+        ) { answer ->
+            when (answer) {
+                "approve" -> approve(node, true)
+                "reject" -> approve(node, false)
+                else -> activate(node)
+            }
+        }
     }
 
     private fun nodeBySession(sessionId: String): NodeRun? = runs.firstNotNullOfOrNull { run -> run.nodes.firstOrNull { it.sessionId == sessionId } }
 
     private fun announcePermission(node: NodeRun) {
         val request = node.pendingPermission?.request ?: return
-        _notifications.tryEmit(
-            RunNotification(
-                runId = runs.firstOrNull { run -> run.nodes.any { it.id == node.id } }?.id.orEmpty(),
-                title = "${node.nodeTitle} · needs you",
-                body = "${request.toolName}: ${request.summary}".trim().trimEnd(':'),
-                isFailure = false,
-            ),
-        )
+        ask(
+            node = node,
+            notification =
+                RunNotification(
+                    runId = runIdOf(node),
+                    title = "${node.nodeTitle} · needs you",
+                    body = "${request.toolName}: ${request.summary}".trim().trimEnd(':'),
+                    isFailure = false,
+                    key = "node-${node.id}",
+                    subtitle = workflowNameOf(node),
+                    sound = WAITING_SOUND,
+                    thread = runIdOf(node),
+                    actions =
+                        listOf(
+                            NotificationAction("allow", "Allow"),
+                            NotificationAction("allow-run", "Allow for this run"),
+                            NotificationAction("deny", "Deny"),
+                        ),
+                ),
+            timeoutSeconds = APPROVAL_DEADLINE_SECONDS,
+        ) { answer ->
+            when (answer) {
+                "allow" -> decide(node, allow = true)
+                "allow-run" -> decide(node, allow = true, forRestOfRun = true)
+                "deny" -> decide(node, allow = false)
+                else -> activate(node)
+            }
+        }
     }
 
     fun send(
@@ -247,6 +339,37 @@ class RunRegistry(
         scope.launch(Dispatchers.IO) { RunHistory.loadTranscript(run) }
     }
 
+    fun watchArchive() {
+        scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                delay(ARCHIVE_POLL_MILLIS.milliseconds)
+                val known = runs.mapTo(mutableSetOf()) { it.id }
+                val arrived = RunHistory.list(archiveRoot).filterNot { it.id in known }
+                if (arrived.isEmpty()) continue
+                runs.addAll(0, arrived)
+                arrived.filterNot { it.isActive }.forEach(::announceElsewhere)
+            }
+        }
+    }
+
+    private fun announceElsewhere(run: WorkflowRun) {
+        val failed = run.status == RunStatus.FAILED
+        val level = settings.current.notify
+        if (!(if (failed) level.notifiesOnFailure else level.notifiesOnSuccess)) return
+        if (isForeground()) return
+        notifier.post(
+            RunNotification(
+                runId = run.id,
+                title = "${run.workflowName} · ${run.status.label.lowercase()}",
+                body = run.summary(),
+                isFailure = failed,
+                key = "run-${run.id}",
+                sound = if (failed) FAILURE_SOUND else SUCCESS_SOUND,
+                thread = run.id,
+            ),
+        )
+    }
+
     fun loadHistory() {
         val known = runs.mapTo(mutableSetOf()) { it.id }
         val archived = RunHistory.list(archiveRoot).filterNot { it.id in known }
@@ -270,7 +393,8 @@ class RunRegistry(
             loadHistory()
 
             if (found.orphans.isEmpty()) return@launch
-            _notifications.tryEmit(
+            if (!settings.current.notify.notifiesWhenWaiting) return@launch
+            notifier.post(
                 RunNotification(
                     runId = found.orphans.first().id,
                     title = "Sessions still running",
@@ -278,6 +402,8 @@ class RunRegistry(
                         "${found.orphans.size} session(s) from a previous launch are still alive. " +
                             "Take them over in Terminal or stop them.",
                     isFailure = false,
+                    key = "orphans",
+                    sound = WAITING_SOUND,
                 ),
             )
         }
@@ -289,14 +415,44 @@ class RunRegistry(
     }
 
     private fun announce(run: WorkflowRun) {
+        run.nodes.forEach { asked.remove(it.id)?.cancel() }
         val failed = run.status == RunStatus.FAILED
-        _notifications.tryEmit(
+        val level = settings.current.notify
+        if (!(if (failed) level.notifiesOnFailure else level.notifiesOnSuccess)) return
+        if (isForeground()) return
+        notifier.post(
             RunNotification(
                 runId = run.id,
                 title = "${run.workflowName} · ${run.status.label.lowercase()}",
                 body = run.summary(),
                 isFailure = failed,
+                key = "run-${run.id}",
+                sound = if (failed) FAILURE_SOUND else SUCCESS_SOUND,
+                thread = run.id,
             ),
         )
     }
+
+    private fun ask(
+        node: NodeRun,
+        notification: RunNotification,
+        timeoutSeconds: Long = WAITING_DEADLINE_SECONDS,
+        onAnswer: (String) -> Unit,
+    ) {
+        if (!settings.current.notify.notifiesWhenWaiting || isForeground()) return
+        asked.remove(node.id)?.cancel()
+        asked[node.id] = notifier.ask(notification, timeoutSeconds) { answer -> scope.launch { onAnswer(answer) } }
+    }
+
+    private fun settled(node: NodeRun) {
+        asked.remove(node.id)?.cancel()
+    }
+
+    private fun activate(node: NodeRun) {
+        onActivate(runIdOf(node))
+    }
+
+    private fun runIdOf(node: NodeRun): String = runs.firstOrNull { run -> run.nodes.any { it.id == node.id } }?.id.orEmpty()
+
+    private fun workflowNameOf(node: NodeRun): String = runs.firstOrNull { run -> run.nodes.any { it.id == node.id } }?.workflowName.orEmpty()
 }

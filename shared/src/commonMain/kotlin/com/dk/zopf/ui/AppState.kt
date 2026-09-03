@@ -12,6 +12,7 @@ import com.dk.zopf.runtime.AgentProviders
 import com.dk.zopf.runtime.Browser
 import com.dk.zopf.runtime.ConnectorScaffold
 import com.dk.zopf.runtime.Finder
+import com.dk.zopf.runtime.MacNotifier
 import com.dk.zopf.runtime.Release
 import com.dk.zopf.runtime.RunRegistry
 import com.dk.zopf.runtime.TerminalLauncher
@@ -83,6 +84,10 @@ class AppState(
 
     var message by mutableStateOf<String?>(null)
 
+    var windowFocused by mutableStateOf(true)
+
+    var onActivateRun: (String) -> Unit = {}
+
     var update by mutableStateOf<Release?>(null)
         private set
 
@@ -94,7 +99,15 @@ class AppState(
 
     val settings = LiveSettings(settingsRead.getOrElse { AppSettings() }, settingsStore)
 
-    val runs = RunRegistry(scope, settings, archiveRoot = AppPaths.runsDir)
+    val runs =
+        RunRegistry(
+            scope,
+            settings,
+            archiveRoot = AppPaths.runsDir,
+            notifier = MacNotifier(),
+            isForeground = { windowFocused },
+            onActivate = { runId -> onActivateRun(runId) },
+        )
 
     var showRunPanel by mutableStateOf(false)
 
@@ -113,6 +126,7 @@ class AppState(
         syncFromRegistry()
 
         runs.reconcile()
+        runs.watchArchive()
         checkAgent()
         checkUpdate()
         housekeep()

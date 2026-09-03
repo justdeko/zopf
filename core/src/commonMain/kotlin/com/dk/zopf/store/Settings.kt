@@ -48,6 +48,52 @@ internal object ThemePreferenceSerializer : KSerializer<ThemePreference> {
     }
 }
 
+@Serializable(with = NotifyLevelSerializer::class)
+enum class NotifyLevel {
+    EVERYTHING,
+    IMPORTANT,
+    NOTHING,
+    ;
+
+    val label: String
+        get() =
+            when (this) {
+                EVERYTHING -> "Everything"
+                IMPORTANT -> "Important"
+                NOTHING -> "Nothing"
+            }
+
+    val hint: String
+        get() =
+            when (this) {
+                EVERYTHING -> "Every run that finishes, and every gate, question and permission prompt."
+                IMPORTANT -> "Runs that fail, and every gate, question and permission prompt."
+                NOTHING -> "No notifications. The menu bar icon still counts what's running and waiting."
+            }
+
+    val notifiesOnSuccess: Boolean get() = this == EVERYTHING
+
+    val notifiesOnFailure: Boolean get() = this != NOTHING
+
+    val notifiesWhenWaiting: Boolean get() = this != NOTHING
+}
+
+internal object NotifyLevelSerializer : KSerializer<NotifyLevel> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("com.dk.zopf.store.NotifyLevel", PrimitiveKind.STRING)
+
+    override fun serialize(
+        encoder: Encoder,
+        value: NotifyLevel,
+    ) = encoder.encodeString(value.name.lowercase())
+
+    override fun deserialize(decoder: Decoder): NotifyLevel {
+        val raw = decoder.decodeString()
+        return NotifyLevel.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+            ?: NotifyLevel.EVERYTHING
+    }
+}
+
 const val KEEP_EVERY_RUN = 0
 
 const val DEFAULT_KEEP_RUNS = KEEP_EVERY_RUN
@@ -69,6 +115,7 @@ data class AppSettings(
     val defaultModel: String? = null,
     val concurrency: Int = DEFAULT_CONCURRENCY,
     val inlineApproval: Boolean = true,
+    val notify: NotifyLevel = NotifyLevel.EVERYTHING,
     val theme: ThemePreference = ThemePreference.SYSTEM,
     val keepRuns: Int = DEFAULT_KEEP_RUNS,
     val checkForUpdates: Boolean = true,
@@ -81,6 +128,7 @@ data class AppSettings(
             defaultModel = defaultModel?.trim()?.takeIf { it.isNotEmpty() },
             concurrency = concurrency.coerceIn(1, MAX_CONCURRENCY),
             inlineApproval = inlineApproval,
+            notify = notify,
             theme = theme,
             keepRuns = keepRuns.coerceIn(0, MAX_KEEP_RUNS),
             checkForUpdates = checkForUpdates,

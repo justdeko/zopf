@@ -177,6 +177,11 @@ data class RunNotification(
     val title: String,
     val body: String,
     val isFailure: Boolean,
+    val key: String = runId,
+    val subtitle: String = "",
+    val sound: String = "",
+    val thread: String = "",
+    val actions: List<NotificationAction> = emptyList(),
 )
 
 internal fun NodeType.needsProcess(): Boolean = this == NodeType.AGENT || this == NodeType.SHELL || this == NodeType.CONNECTOR

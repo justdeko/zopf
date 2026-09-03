@@ -126,9 +126,20 @@ and not just the composition.
 file, hooking Claude Code's tool calls back into the app for inline approval. The three deadlines are
 nested on purpose and must stay ordered: the UI has 540s to answer, the curl in the hook gives up at
 570s, and the hook itself times out at 600s — each layer must fail before the one outside it, or the
-outer layer reports a timeout for a decision that was actually made. This is also why
-`jdk.httpserver` is in `desktopApp`'s jlink module list; without it every agent node fails in the
-packaged `.app` while working perfectly under `:desktopApp:run`.
+outer layer reports a timeout for a decision that was actually made. The banner a prompt raises is
+the innermost layer again: it is asked with the UI's own 540s, so it withdraws itself exactly when
+the thing it was asking about stops being answerable. This is also why `jdk.httpserver` is in
+`desktopApp`'s jlink module list; without it every agent node fails in the packaged `.app` while
+working perfectly under `:desktopApp:run`.
+
+`RunRegistry.watchArchive` polls the run archive so a run started by the CLI shows up on the Runs
+screen, and finishes with a notification, while the app is already open. It reads runs that something
+else wrote; it starts nothing.
+
+Everything zopf posts goes through one generated bundle, `zopf-notify.app`, built by
+`runtime/MacNotifier.kt` because **`UNUserNotificationCenter` refuses a process with no bundle
+identifier**, which `:desktopApp:run` under Gradle is. `runtime/Notifier.kt` is the seam, so a
+headless run and a test get `SilentNotifier` and neither has to have a Mac in it.
 
 ## Providers
 
@@ -180,10 +191,11 @@ workflow file. The editor folds for display only, in `EditorState.resolvedWorkfl
 
 The split is deliberate: **a workspace holds only things worth committing.** Workflow YAML, connector
 manifests and scripts — that's it. Everything machine-local goes to `store/AppPaths.kt`:
-`settings.json`, `workspaces.json`, `update.json` and the run archive under Application Support, logs
-under `~/Library/Logs/zopf`. Nothing writes a machine-specific file into a workspace, so `git status`
-stays clean in a repo that has a `.zopf/` in it. Node positions are the edge case and they do go in
-the YAML — a canvas layout is part of the document, not of this machine.
+`settings.json`, `workspaces.json`, `update.json`, the generated `zopf-notify.app` and the run
+archive under Application Support, logs under `~/Library/Logs/zopf`. Nothing writes a machine-specific
+file into a workspace, so `git status` stays clean in a repo that has a `.zopf/` in it. Node positions
+are the edge case and they do go in the YAML — a canvas layout is part of the document, not of this
+machine.
 
 YAML round-trips through kotaml with `encodeDefaults = false` (`store/Serialization.kt`), so a
 hand-written file that omits everything default comes back byte-identical after the editor saves it.
@@ -307,11 +319,15 @@ These are decisions, not gaps. If a change would undo one, that is a real decisi
 - **Nothing starts a run on its own** — no triggers, no scheduler, no daemon, no `--watch`. A run
   starts when someone clicks Run or something calls the CLI. cron, CI and git hooks already do
   scheduling better than a desktop app. This bans automatic runs, not background work as such: the
-  editor polling its open file for changes is fine.
+  editor polling its open file for changes is fine, and so is `watchArchive` noticing a run the CLI
+  finished.
 - **No expression language.** `${node.field}` is the entire data-passing mechanism, and a `branch`
   compares strings. The moment this grows an evaluator, workflows stop being reviewable YAML.
 - **A graph of only shell nodes is the wrong shape** and the workflow skill says so to the user's
   face. zopf is for graphs with judgment in them — agent, gate, input. The rest belongs in a script.
+- **No notification controls beyond which events get one.** `AppSettings.notify` picks the events.
+  Alert style, sound and Focus already belong to System Settings, and a second set of controls could
+  only disagree with the first. Nothing is posted while the window is focused.
 - **macOS on Apple Silicon only.** `AppPaths` resolves `~/Library`, the runners spawn `zsh`, and
   `:cli`'s `startScripts` deletes the Windows launcher rather than shipping something that can't work.
 - **zopf redistributes none of the CLIs and installs nothing.** It hands you the release page.

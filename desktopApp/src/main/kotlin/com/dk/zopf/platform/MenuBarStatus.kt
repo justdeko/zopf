@@ -1,7 +1,6 @@
 package com.dk.zopf.platform
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -22,10 +21,8 @@ import androidx.compose.ui.text.font.createFontFamilyResolver
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.ApplicationScope
-import androidx.compose.ui.window.Notification
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.isTraySupported
-import androidx.compose.ui.window.rememberTrayState
 import com.dk.zopf.runtime.RunStatus
 import com.dk.zopf.runtime.WorkflowRun
 import com.dk.zopf.ui.AppState
@@ -39,20 +36,7 @@ fun ApplicationScope.ZopfTray(
 ) {
     if (!isTraySupported) return
 
-    val trayState = rememberTrayState()
     val runs = app.runs
-
-    LaunchedEffect(runs) {
-        runs.notifications.collect { notification ->
-            trayState.sendNotification(
-                Notification(
-                    title = notification.title,
-                    message = notification.body,
-                    type = if (notification.isFailure) Notification.Type.Error else Notification.Type.Info,
-                ),
-            )
-        }
-    }
 
     val active = runs.runs.filter { it.isActive }
 
@@ -67,7 +51,6 @@ fun ApplicationScope.ZopfTray(
 
     Tray(
         icon = rememberMenuBarIcon(active.size, runs.waitingCount),
-        state = trayState,
         tooltip = tooltip(active),
         onAction = { show() },
     ) {
@@ -86,6 +69,19 @@ fun ApplicationScope.ZopfTray(
                     Item("Allow", onClick = { runs.decide(node, allow = true) })
                     Item("Allow for this run", onClick = { runs.decide(node, allow = true, forRestOfRun = true) })
                     Item("Deny", onClick = { runs.decide(node, allow = false) })
+                    Separator()
+                    Item("Show", onClick = { show(run) })
+                }
+            }
+            Separator()
+        }
+
+        val gates = runs.awaitingApproval
+        if (gates.isNotEmpty()) {
+            gates.forEach { (run, node) ->
+                Menu("${run.workflowName} · ${node.nodeTitle}") {
+                    Item("Approve", onClick = { runs.approve(node, true) })
+                    Item("Reject", onClick = { runs.approve(node, false) })
                     Separator()
                     Item("Show", onClick = { show(run) })
                 }

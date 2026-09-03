@@ -45,6 +45,7 @@ import com.dk.zopf.store.DEFAULT_KEEP_RUNS
 import com.dk.zopf.store.DEFAULT_TERMINAL_APP
 import com.dk.zopf.store.Log
 import com.dk.zopf.store.MAX_CONCURRENCY
+import com.dk.zopf.store.NotifyLevel
 import com.dk.zopf.store.ThemePreference
 import com.dk.zopf.ui.editor.Gap
 import com.dk.zopf.ui.editor.InspectorField
@@ -113,6 +114,12 @@ fun SettingsScreen(
             SectionLabel("Permissions")
             Gap(4)
             ApprovalField(settings.inlineApproval) { on -> onChange { it.copy(inlineApproval = on) } }
+
+            Gap()
+            HorizontalDivider()
+            Gap(8)
+            SectionLabel("Notifications")
+            NotifyField(settings.notify) { chosen -> onChange { it.copy(notify = chosen) } }
 
             Gap()
             HorizontalDivider()
@@ -320,6 +327,25 @@ private fun ConcurrencyField(
             "Gates and branches never take a slot, since they run nothing.",
     )
     Hint("Applies to the next run you start. Anything already going keeps the limit it began with.")
+}
+
+@Composable
+private fun NotifyField(
+    value: NotifyLevel,
+    onSelect: (NotifyLevel) -> Unit,
+) {
+    Text(
+        "Notify me about",
+        Modifier.padding(top = 8.dp),
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    ConnectedChoices(
+        options = NotifyLevel.entries,
+        selected = value,
+        label = { it.label },
+        onSelect = onSelect,
+    )
+    Hint("${value.hint} Nothing is posted while zopf is the app you're looking at.")
 }
 
 @Composable

@@ -6,6 +6,7 @@ import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.LiveSettings
+import com.dk.zopf.store.NotifyLevel
 import com.dk.zopf.store.RunRecord
 import com.dk.zopf.store.Workspace
 import kotlinx.coroutines.CoroutineScope
@@ -195,9 +196,10 @@ class RunRegistryTest {
     private fun registry(
         executor: NodeExecutor,
         settings: LiveSettings = LiveSettings(),
+        notifier: Notifier = SilentNotifier,
     ): RunRegistry {
         val scope = CoroutineScope(Job() + Dispatchers.Default).also { scopes.add(it) }
-        return RunRegistry(scope, settings, executor, tempDir())
+        return RunRegistry(scope, settings, executor, tempDir(), notifier)
     }
 
     private fun RunRegistry.runToCompletion(workflow: Workflow): WorkflowRun =
@@ -234,6 +236,126 @@ class RunRegistryTest {
         id: String,
         prompt: String = "do $id",
     ) = WorkflowNode(id = id, type = NodeType.AGENT, prompt = prompt)
+
+    @Test
+    fun `a gate that parks asks through a notification, the way an input node does`() {
+        val notifier = RecordingNotifier()
+        val registry = registry(RecordingExecutor(), notifier = notifier)
+        val gated =
+            workflow(
+                listOf(node("analyze"), WorkflowNode(id = "approve", type = NodeType.GATE, prompt = "Ship it?")),
+                listOf("analyze" to "approve"),
+            )
+
+        val run = runBlocking { registry.startWorkflow(workspace(), gated).getOrThrow() }
+        val gate = runBlocking { awaitWaiting(run, "approve") }
+        runBlocking { awaitAsked(notifier) }
+
+        val asked = notifier.asked.single()
+        assertEquals("Ship it?", asked.body)
+        assertTrue(asked.title.contains("needs approval"), asked.title)
+        assertEquals(listOf("approve", "reject"), asked.actions.map { it.id })
+
+        registry.approve(gate, true)
+        runBlocking { withTimeout(10.seconds) { run.job?.join() } }
+        assertEquals(1, notifier.cancelled.size)
+    }
+
+    @Test
+    fun `answering a gate in the window takes its notification back`() {
+        val notifier = RecordingNotifier()
+        val registry = registry(RecordingExecutor(), notifier = notifier)
+        val gated = workflow(listOf(WorkflowNode(id = "approve", type = NodeType.GATE, prompt = "Ship it?")), emptyList())
+
+        val run = runBlocking { registry.startWorkflow(workspace(), gated).getOrThrow() }
+        val gate = runBlocking { awaitWaiting(run, "approve") }
+        runBlocking { awaitAsked(notifier) }
+        assertEquals(1, notifier.asked.size)
+
+        registry.approve(gate, true)
+        runBlocking { withTimeout(10.seconds) { run.job?.join() } }
+        assertEquals(listOf("node-${gate.id}"), notifier.cancelled)
+    }
+
+    @Test
+    fun `nothing is posted while the window is the app you are looking at`() {
+        val notifier = RecordingNotifier()
+        val scope = CoroutineScope(Job() + Dispatchers.Default).also { scopes.add(it) }
+        val registry =
+            RunRegistry(
+                scope,
+                LiveSettings(),
+                RecordingExecutor(),
+                tempDir(),
+                notifier,
+                isForeground = { true },
+            )
+
+        val run = registry.runToCompletion(workflow(listOf(node("analyze")), emptyList()))
+        assertEquals(RunStatus.SUCCEEDED, run.status)
+        assertTrue(notifier.posted.isEmpty(), notifier.posted.toString())
+    }
+
+    @Test
+    fun `a run that only succeeded says nothing when the level is important`() {
+        val notifier = RecordingNotifier()
+        val settings = LiveSettings(AppSettings(notify = NotifyLevel.IMPORTANT))
+        val registry = registry(RecordingExecutor(), settings, notifier)
+
+        registry.runToCompletion(workflow(listOf(node("analyze")), emptyList()))
+        assertTrue(notifier.posted.isEmpty(), notifier.posted.toString())
+
+        val failing = registry(RecordingExecutor(fail = setOf("analyze")), settings, notifier)
+        failing.runToCompletion(workflow(listOf(node("analyze")), emptyList()))
+        assertEquals(1, notifier.posted.size)
+        assertTrue(notifier.posted.single().isFailure)
+    }
+
+    private suspend fun awaitAsked(notifier: RecordingNotifier) {
+        withTimeout(10.seconds) {
+            while (notifier.asked.isEmpty()) delay(20.milliseconds)
+        }
+    }
+
+    private suspend fun awaitWaiting(
+        run: WorkflowRun,
+        nodeId: String,
+    ): NodeRun =
+        withTimeout(10.seconds) {
+            var found = run.nodes.firstOrNull { it.nodeId == nodeId }
+            while (found == null || found.status != RunStatus.WAITING) {
+                delay(20.milliseconds)
+                found = run.nodes.firstOrNull { it.nodeId == nodeId }
+            }
+            found
+        }
+}
+
+private class RecordingNotifier : Notifier {
+    val posted: MutableList<RunNotification> = Collections.synchronizedList(mutableListOf())
+    val asked: MutableList<RunNotification> = Collections.synchronizedList(mutableListOf())
+    val cancelled: MutableList<String> = Collections.synchronizedList(mutableListOf())
+
+    override fun post(notification: RunNotification) {
+        posted.add(notification)
+    }
+
+    override fun ask(
+        notification: RunNotification,
+        timeoutSeconds: Long,
+        onAnswer: (String) -> Unit,
+    ): NotificationHandle {
+        asked.add(notification)
+        return object : NotificationHandle {
+            override fun cancel() {
+                cancelled.add(notification.key)
+            }
+        }
+    }
+
+    override fun withdraw(key: String) {
+        cancelled.add(key)
+    }
 }
 
 private class RecordingExecutor(

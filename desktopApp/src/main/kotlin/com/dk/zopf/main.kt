@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -16,6 +18,7 @@ import com.dk.zopf.platform.toFrame
 import com.dk.zopf.platform.toWindowState
 import com.dk.zopf.store.Log
 import com.dk.zopf.ui.AppState
+import com.dk.zopf.ui.Screen
 import java.awt.Desktop
 import java.awt.Dimension
 
@@ -60,6 +63,17 @@ fun main() {
             showRequests++
         }
 
+        remember {
+            app.onActivateRun = { runId ->
+                app.runs.runs
+                    .firstOrNull { it.id == runId }
+                    ?.let { app.runs.select(it) }
+                app.screen = Screen.RUNS
+                app.showRunPanel = true
+                showWindow()
+            }
+        }
+
         ZopfTray(app, onShowWindow = { showWindow() }, onQuit = { quit() })
 
         @Suppress("DEPRECATION")
@@ -73,6 +87,12 @@ fun main() {
             icon = windowIcon,
         ) {
             LaunchedEffect(window) { window.minimumSize = Dimension(800, 600) }
+
+            val windowInfo = LocalWindowInfo.current
+            LaunchedEffect(windowInfo, windowVisible) {
+                snapshotFlow { windowInfo.isWindowFocused }
+                    .collect { app.windowFocused = it && windowVisible }
+            }
             LaunchedEffect(window, showRequests) {
                 if (showRequests > 0) window.bringToFront()
             }

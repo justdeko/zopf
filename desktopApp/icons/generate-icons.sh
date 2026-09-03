@@ -39,12 +39,12 @@ emit 512  icon_512x512.png
 emit 1024 icon_512x512@2x.png
 iconutil -c icns "$set" -o "$here/icon.icns"
 
-# The macos-notify connector posts from its own bundle
-notifier="$here/../../.zopf/connectors/macos-notify/notifier"
+# zopf-notify is built from these resources at runtime, so it needs the icon too.
+notifier="$here/../../core/src/commonMain/resources/notifier"
 also=""
 if [ -d "$notifier" ]; then
   cp "$here/icon.icns" "$notifier/icon.icns"
-  also=", and refreshed the macos-notify connector's copy"
+  also=", and refreshed the notifier bundle's copy"
 fi
 
 echo "wrote icon.png, icon.ico, icon.icns in $here$also"
