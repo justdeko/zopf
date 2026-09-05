@@ -35,12 +35,12 @@ val AgentProviderId.capabilities: AgentCapabilities
                 AgentCapabilities(
                     followUps = false,
                     inlineApproval = false,
-                    resumeInTerminal = false,
+                    resumeInTerminal = true,
                     reportsCostUsd = false,
                     skills = false,
                     toolPermissions = false,
                     extraDirectories = false,
-                    outputSchema = false,
+                    outputSchema = true,
                     sandbox = true,
                     modelSelection = true,
                 )
@@ -66,7 +66,7 @@ val AgentProviderId.modelOptions: List<String>
     get() =
         when (this) {
             AgentProviderId.CLAUDE -> listOf("opus", "sonnet", "haiku")
-            AgentProviderId.CODEX -> emptyList()
+            AgentProviderId.CODEX -> listOf("gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4-mini")
             AgentProviderId.DSH -> emptyList()
         }
 

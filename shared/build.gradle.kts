@@ -22,6 +22,7 @@ kotlin {
         // into once here rather than at each call site because the theme is app-wide: every screen
         // reads an emphasized style or a motion spec, so per-file annotations would just be noise.
         all {
+            languageSettings.optIn("androidx.compose.material3.ExperimentalMaterial3Api")
             languageSettings.optIn("androidx.compose.material3.ExperimentalMaterial3ExpressiveApi")
         }
 

@@ -37,17 +37,15 @@ instead. There's also a CLI which allows you to run zopf workflows headlessly.
 
 You need **macOS on Apple Silicon** and one of these installed and signed in:
 
-| CLI                                                                                  | `provider:` | What zopf runs              |
-|--------------------------------------------------------------------------------------|-------------|-----------------------------|
-| [Claude Code](https://code.claude.com/docs/en/quickstart#step-1-install-claude-code) | `claude`    | `claude -p`, streaming JSON |
-| [Codex](https://learn.chatgpt.com/docs/codex/cli)                                    | `codex`     | `codex exec --json`         |
-| [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)                  | `dsh`       | `dsh --profile headless`    |
+| CLI                                                                 | `provider:` | What zopf runs              |
+|---------------------------------------------------------------------|-------------|-----------------------------|
+| [Claude Code](https://github.com/anthropics/claude-code)            | `claude`    | `claude -p`, streaming JSON |
+| [Codex](https://github.com/openai/codex)                            | `codex`     | `codex exec --json`         |
+| [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) | `dsh`       | `dsh --profile headless`    |
 
 > [!NOTE]
-> So far, only the Claude Code path was used daily and tested against a real CLI. The codex and dsh paths are built from
-those
-> CLIs' documented flags and covered by unit tests, but they haven't been tested end to end here.
-> Please open an issue if you notice a bug in their implementations.
+> While zopf supports claude code, codex and dsh so far, I've only extensively tested claude code as it is my daily
+driver.
 
 ### The App
 
@@ -168,7 +166,8 @@ defaults:
   repo: self
 ```
 
-The run archive grows, so a chatty build step can run quite large. To cap it, go to Settings → History, or do `zopf prune --keep 50`.
+The run archive grows, so a chatty build step can run quite large. To cap it, go to Settings → History, or do
+`zopf prune --keep 50`.
 
 ## CLI usage
 

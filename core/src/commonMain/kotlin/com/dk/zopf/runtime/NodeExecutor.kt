@@ -123,6 +123,7 @@ class ProcessNodeExecutor(
         run.live = AgentLive(session)
         run.sessionId = session.sessionId
         run.command = session.command
+        run.model = invocation.model
         run.status = RunStatus.STARTING
         if (sandbox != null) run.notice("Sandbox: ${sandbox.cliValue}")
 
@@ -146,6 +147,7 @@ class ProcessNodeExecutor(
                 },
                 awaitExit = session::awaitExit,
             )
+        if (invocation.jsonSchema != null) run.takeFieldsFromJsonResult()
         if (session.stderrText.isNotBlank() && exit != 0) {
             run.notice(session.stderrText, isWarning = true)
         }

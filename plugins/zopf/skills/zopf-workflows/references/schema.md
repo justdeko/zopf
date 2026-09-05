@@ -112,7 +112,10 @@ model only by nodes running the *machine's* default CLI, so `model: opus` in a w
 
 `provider: claude` is the default and has everything: follow-ups, take-over in Terminal, inline approval, `skills:`,
 `allowedTools:`, `alsoRead:`, `schema:` and a dollar cost. `provider: codex` runs `codex exec`, which is **one turn**:
-no follow-up, no take-over, no inline approval, `sandbox:` in place of `permissionMode:`, and tokens instead of dollars.
+no follow-up and no inline approval, `sandbox:` in place of `permissionMode:`, and tokens instead of dollars. `schema:`
+and take-over both work on a codex node. `alsoRead:` is ignored there, because codex reads the whole disk already and
+its own version of the flag hands out writes instead.
+
 `provider: dsh` runs DeepSeek Harness's headless profile, which is one turn and nothing else: `prompt:`, `repo:` and
 `timeoutSeconds:` are the only node keys it reads, and its whole stdout becomes `${id.result}`.
 
@@ -199,7 +202,7 @@ node still answers in prose. Declaring it makes the node fill a shape instead:
 | `name`        | string | **required** | Becomes `${id.name}`. Must match `[A-Za-z0-9_-]+`, and must not be `result`, `sessionId` or `costUsd`. |
 | `type`        | enum   | `string`     | `string` \| `number` \| `boolean` \| `object` \| `array`.                                              |
 | `description` | string | `""`         | Sent to the model as the field's description. This is your only steering.                              |
-| `required`    | bool   | `true`       | A non-required field may come back absent, and then `${id.name}` stays verbatim.                       |
+| `required`    | bool   | `true`       | An optional field may come back null, and then `${id.name}` stays verbatim.                            |
 
 **What you get back.** Each name is a field you can compare — `expression: ${review.audience} == user-facing` works
 directly, which is the whole point of declaring one. `${review.result}` is still there and is the entire object as JSON

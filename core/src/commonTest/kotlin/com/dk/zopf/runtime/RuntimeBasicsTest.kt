@@ -9,9 +9,11 @@ import com.dk.zopf.model.Sandbox
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.ignoredFields
+import com.dk.zopf.model.modelOptions
 import com.dk.zopf.model.withDefaultsFrom
 import com.dk.zopf.store.AppSettings
 import java.nio.file.Paths
+import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -144,6 +146,17 @@ class AgentInvocationTest {
     }
 
     @Test
+    fun `codex takes a schema as a file, since its flag refuses the JSON itself`() {
+        val schema = """{"type":"object","properties":{"severity":{"type":"string"}}}"""
+        val command = codex(invocation.copy(jsonSchema = schema))
+        val file = Paths.get(command[command.indexOf("--output-schema") + 1])
+
+        assertTrue(command.indexOf("--output-schema") > command.indexOf("exec"))
+        assertEquals(schema, file.readText())
+        assertFalse("--output-schema" in codex())
+    }
+
+    @Test
     fun `codex is not asked to check for a git repo, since a node may run in a workspace that isn't one`() {
         assertTrue("--skip-git-repo-check" in codex())
         assertFalse("--skip-git-repo-check" in claude(), "claude never had the check to skip")
@@ -187,7 +200,7 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `only the CLI that can resume one chooses the session id up front`() {
+    fun `only claude lets zopf name the session before the CLI starts`() {
         assertNotNull(ClaudeProvider.newSessionId())
         assertNull(CodexProvider.newSessionId())
         assertNull(DshProvider.newSessionId())
@@ -214,12 +227,30 @@ class AgentCapabilitiesTest {
 
         assertFalse(codex.followUps)
         assertFalse(codex.inlineApproval)
-        assertFalse(codex.resumeInTerminal)
         assertFalse(codex.reportsCostUsd)
         assertFalse(codex.skills)
+        assertFalse(codex.extraDirectories, "codex reads the whole disk already, and --add-dir grants writes")
         assertTrue(codex.sandbox)
+        assertTrue(codex.outputSchema)
+    }
 
-        assertEquals(emptyList(), CodexProvider.terminalArgs("t-1"), "there is no exec session to resume")
+    @Test
+    fun `an exec thread is recorded, so a codex node can be picked up in a terminal`() {
+        assertTrue(CodexProvider.capabilities.resumeInTerminal)
+        assertEquals(listOf("resume", "t-1"), CodexProvider.terminalArgs("t-1"))
+        assertEquals(emptyList(), CodexProvider.terminalArgs(null))
+
+        assertEquals(
+            "exec 'codex' 'resume' 't-1'",
+            TerminalLauncher.script(Paths.get("/tmp"), CodexProvider.terminalArgs("t-1"), CodexProvider.executable).lines().last { it.isNotBlank() },
+        )
+    }
+
+    @Test
+    fun `a CLI that takes a model suggests some, and dsh suggests none because it takes none`() {
+        assertContains(AgentProviderId.CLAUDE.modelOptions, "opus")
+        assertTrue(AgentProviderId.CODEX.modelOptions.isNotEmpty())
+        assertEquals(emptyList(), AgentProviderId.DSH.modelOptions)
     }
 
     @Test

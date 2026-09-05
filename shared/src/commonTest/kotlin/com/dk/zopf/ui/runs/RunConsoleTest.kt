@@ -195,7 +195,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a parked claude turn offers a follow-up, and the same turn under codex offers nothing`() =
+    fun `a parked claude turn offers a follow-up`() =
         runDesktopComposeUiTest {
             console(agent(AgentProviderId.CLAUDE))
             onNodeWithText("Finish").assertIsDisplayed()
@@ -203,12 +203,12 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a codex node is offered neither a follow-up nor a take-over it could not honour`() =
+    fun `a codex node is offered the terminal, but not a follow-up it could not honour`() =
         runDesktopComposeUiTest {
             console(agent(AgentProviderId.CODEX))
 
             assertTrue(isMissing("Finish"), "codex reads no stdin, so there is nowhere to send a follow-up")
-            assertTrue(isMissing("Take over in Terminal"), "there is no exec session to resume")
+            onNodeWithText("Take over in Terminal").assertIsDisplayed()
         }
 
     @OptIn(ExperimentalTestApi::class)

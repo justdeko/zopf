@@ -105,6 +105,10 @@ object CodexEvents {
                 AgentEvent.AssistantMessage(threadId, null, listOf(ContentBlock.Thinking(item.text())), obj)
             }
 
+            itemType == "error" && complete -> {
+                AgentEvent.Notice(threadId, "error", item.string("message"), obj)
+            }
+
             itemType in TOOL_ITEMS && type == "item.started" -> {
                 AgentEvent.AssistantMessage(
                     threadId,
@@ -163,7 +167,13 @@ object CodexEvents {
         return (input ?: 0) + (output ?: 0)
     }
 
-    private fun JsonObject.errorMessage(): String? = string("message") ?: this["error"]?.asObject()?.string("message")
+    private fun JsonObject.errorMessage(): String? = (string("message") ?: this["error"]?.asObject()?.string("message"))?.unwrapped()
+
+    private fun String.unwrapped(): String =
+        runCatching { json.parseToJsonElement(this).jsonObject }
+            .getOrNull()
+            ?.errorMessage()
+            ?: this
 
     private fun JsonObject.intOrNull(key: String): Int? = this[key]?.intOrNull()
 }

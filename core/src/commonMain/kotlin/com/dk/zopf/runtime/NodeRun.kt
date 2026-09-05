@@ -8,6 +8,8 @@ import androidx.compose.runtime.setValue
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
@@ -209,8 +211,8 @@ class NodeRun(
 
         when (event) {
             is AgentEvent.SystemInit -> {
-                model = event.model
-                notice("Session started · ${event.model ?: "default model"} · ${event.cwd ?: cwd}")
+                model = event.model ?: model
+                notice("Session started · ${model ?: "default model"} · ${event.cwd ?: cwd}")
             }
 
             is AgentEvent.TextDelta -> appendDelta(event.text, event.isThinking)
@@ -248,16 +250,18 @@ class NodeRun(
                     outputBuffer.append(it)
                 }
                 if (event.fields.isNotEmpty()) outputFields = event.fields
-                add(
-                    ConsoleEntry.Summary(
-                        key = nextKey,
-                        text = event.text,
-                        costUsd = event.costUsd,
-                        durationMs = event.durationMs,
-                        isError = event.isError,
-                        tokens = event.tokens,
-                    ),
-                )
+                if (!repeatsLastSummary(event)) {
+                    add(
+                        ConsoleEntry.Summary(
+                            key = nextKey,
+                            text = event.text,
+                            costUsd = event.costUsd,
+                            durationMs = event.durationMs,
+                            isError = event.isError,
+                            tokens = event.tokens,
+                        ),
+                    )
+                }
 
                 status =
                     when {
@@ -268,8 +272,14 @@ class NodeRun(
             }
 
             is AgentEvent.Notice ->
-                if (event.kind == "rate_limit" && event.detail != "allowed") {
-                    notice("Rate limit: ${event.detail}", isWarning = true)
+                when {
+                    event.kind == "rate_limit" && event.detail != "allowed" ->
+                        notice("Rate limit: ${event.detail}", isWarning = true)
+
+                    event.kind == "error" ->
+                        event.detail?.takeIf { it.isNotBlank() }?.let { notice(it, isWarning = true) }
+
+                    else -> Unit
                 }
 
             is AgentEvent.NonJson -> notice(event.line, isWarning = true)
@@ -330,6 +340,20 @@ class NodeRun(
             if (allowed) "Allowed ${request.toolName}" else "Denied ${request.toolName}",
             isWarning = !allowed,
         )
+    }
+
+    @Synchronized
+    internal fun takeFieldsFromJsonResult() {
+        if (outputFields.isNotEmpty()) return
+        val answer = outputBuffer.toString().trim()
+        val obj = runCatching { Json.parseToJsonElement(answer).jsonObject }.getOrNull() ?: return
+
+        outputFields = obj.toFields()
+    }
+
+    private fun repeatsLastSummary(event: AgentEvent.Result): Boolean {
+        val last = entries.lastOrNull() as? ConsoleEntry.Summary ?: return false
+        return last.isError && event.isError && last.text == event.text
     }
 
     @Synchronized

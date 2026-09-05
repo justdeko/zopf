@@ -30,6 +30,8 @@ import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dk.kuiver.model.layout.LayoutDirection
+import com.dk.zopf.model.AgentProviderId
+import com.dk.zopf.model.NodeDefaults
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Position
 import com.dk.zopf.model.RepoRef
@@ -37,6 +39,7 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.blurb
+import com.dk.zopf.model.modelOptions
 import com.dk.zopf.runtime.NodeRun
 import com.dk.zopf.runtime.RunStatus
 import com.dk.zopf.runtime.showing
@@ -859,6 +862,9 @@ class NodeInspectorTest {
     }
 
     @OptIn(ExperimentalTestApi::class)
+    private fun ComposeUiTest.modelField() = onAllNodesWithText("Model", substring = true).filterToOne(hasSetTextAction())
+
+    @OptIn(ExperimentalTestApi::class)
     private fun ComposeUiTest.inspector(
         workflow: Workflow,
         workspace: Workspace,
@@ -943,6 +949,67 @@ class NodeInspectorTest {
         val bare = EditorState(initial = Workflow(name = "w"), workspace = workspace, onSave = {})
         assertEquals(workspace.root, bare.startIn(null, workspace))
     }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a model the list has never heard of can still be typed`() =
+        runDesktopComposeUiTest(width = 500, height = 900) {
+            val state =
+                inspector(
+                    Workflow(
+                        name = "w",
+                        nodes = listOf(WorkflowNode("review", NodeType.AGENT, prompt = "hi", provider = AgentProviderId.CLAUDE)),
+                    ),
+                    workspaceWith(),
+                )
+
+            modelField().performTextReplacement("claude-sonnet-4-5-20250929")
+
+            assertEquals("claude-sonnet-4-5-20250929", state.workflow.node("review")?.model)
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `emptying the field is how a node goes back to the model it inherits`() =
+        runDesktopComposeUiTest(width = 500, height = 900) {
+            val state =
+                inspector(
+                    Workflow(
+                        name = "w",
+                        defaults = NodeDefaults(model = "haiku"),
+                        nodes = listOf(WorkflowNode("review", NodeType.AGENT, prompt = "hi", model = "opus")),
+                    ),
+                    workspaceWith(),
+                )
+
+            modelField().performTextReplacement("  ")
+            waitForIdle()
+
+            assertNull(state.workflow.node("review")?.model)
+            onNodeWithText("Inherited (haiku)").assertIsDisplayed()
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the models a CLI is known for are a suggestion, not the whole choice`() =
+        runDesktopComposeUiTest(width = 500, height = 900) {
+            val state =
+                inspector(
+                    Workflow(
+                        name = "w",
+                        nodes = listOf(WorkflowNode("review", NodeType.AGENT, prompt = "hi", provider = AgentProviderId.CODEX)),
+                    ),
+                    workspaceWith(),
+                )
+            val suggested = AgentProviderId.CODEX.modelOptions.first()
+
+            modelField().performTextReplacement(suggested.take(3))
+            waitForIdle()
+
+            onNodeWithText(suggested).performClick()
+
+            assertEquals(suggested, state.workflow.node("review")?.model)
+        }
 
     @OptIn(ExperimentalTestApi::class)
     @Test

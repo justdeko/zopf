@@ -720,7 +720,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `the declared fields become a strict JSON schema, and only the required ones are required`() {
+    fun `an optional field is declared nullable, since a partial required list is not a strict schema`() {
         val schema =
             listOf(
                 SchemaField("severity", description = "low, medium or high"),
@@ -729,7 +729,7 @@ class WorkflowEditsTest {
 
         assertEquals(
             """{"type":"object","properties":{"severity":{"type":"string","description":"low, medium or high"},""" +
-                """"notes":{"type":"array"}},"required":["severity"],"additionalProperties":false}""",
+                """"notes":{"type":["array","null"]}},"required":["severity","notes"],"additionalProperties":false}""",
             schema.toString(),
         )
     }

@@ -77,27 +77,16 @@ fun ModelField(
     noneLabel: String,
     supportingText: String? = null,
 ) {
-    val options = provider.modelOptions
-    if (options.isEmpty()) {
-        InspectorField(
-            value = selected.orEmpty(),
-            onValueChange = { onSelect(it.trim().ifBlank { null }) },
-            label = "Model",
-            monospace = true,
-            supportingText =
-                supportingText
-                    ?: "Passed to ${provider.cliValue} as --model. Blank leaves it to ${provider.cliValue}'s own setting.",
-        )
-        return
-    }
-    InspectorDropdown(
+    SuggestingField(
         label = "Model",
-        selected = selected,
-        options = options,
-        optionLabel = { it },
-        onSelect = onSelect,
+        value = selected,
+        suggestions = provider.modelOptions,
+        onChange = onSelect,
         noneLabel = noneLabel,
-        supportingText = supportingText,
+        monospace = true,
+        supportingText =
+            supportingText
+                ?: "Passed to ${provider.cliValue} as --model. Anything the CLI takes works, not just the listed ones.",
     )
 }
 
@@ -211,6 +200,7 @@ private fun AgentFields(
 ) {
     val workflow = state.workflow
     val provider = state.resolvedWorkflow.providerFor(node, state.fallbackProvider)
+    val inherited = state.resolvedWorkflow.defaults.provider ?: state.fallbackProvider
     val can = provider.capabilities
 
     LaunchedEffect(node.id, workflow.repos, workflow.skills) { state.refreshLookups() }
@@ -222,7 +212,7 @@ private fun AgentFields(
         options = AgentProviderId.entries,
         optionLabel = { it.label },
         onSelect = { state.updateNode(node.copy(provider = it)) },
-        noneLabel = "Default (${provider.label})",
+        noneLabel = "Default (${inherited.label})",
         supportingText = "Which agent CLI runs this node. Absent everywhere means Claude Code.",
     )
 

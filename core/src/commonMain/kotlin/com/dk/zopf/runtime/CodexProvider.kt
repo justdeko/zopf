@@ -1,6 +1,9 @@
 package com.dk.zopf.runtime
 
 import com.dk.zopf.model.AgentProviderId
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.writeText
 
 object CodexProvider : AgentProvider {
     override val id = AgentProviderId.CODEX
@@ -30,10 +33,20 @@ object CodexProvider : AgentProvider {
             add("exec")
             add("--json")
             add("--skip-git-repo-check")
+            invocation.jsonSchema?.let {
+                add("--output-schema")
+                add(schemaFile(it).toString())
+            }
             add(invocation.prompt)
+        }
+
+    internal fun schemaFile(schema: String): Path =
+        Files.createTempFile("zopf-schema-", ".json").also {
+            it.writeText(schema)
+            it.toFile().deleteOnExit()
         }
 
     override fun parse(line: String): AgentEvent? = CodexEvents.parse(line)
 
-    override fun terminalArgs(sessionId: String?): List<String> = emptyList()
+    override fun terminalArgs(sessionId: String?): List<String> = sessionId?.let { listOf("resume", it) }.orEmpty()
 }

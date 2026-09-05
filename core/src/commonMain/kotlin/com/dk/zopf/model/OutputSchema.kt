@@ -46,13 +46,20 @@ fun List<SchemaField>.toJsonSchema(): JsonObject {
         putJsonObject("properties") {
             fields.forEach { field ->
                 putJsonObject(field.name) {
-                    put("type", field.type.jsonType)
+                    if (field.required) {
+                        put("type", field.type.jsonType)
+                    } else {
+                        putJsonArray("type") {
+                            add(field.type.jsonType)
+                            add("null")
+                        }
+                    }
                     if (field.description.isNotBlank()) put("description", field.description)
                 }
             }
         }
         putJsonArray("required") {
-            fields.filter { it.required }.forEach { add(it.name) }
+            fields.forEach { add(it.name) }
         }
         put("additionalProperties", false)
     }

@@ -266,8 +266,8 @@ When touching the canvas, read kuiver's sources rather than its README:
 unzip ~/.gradle/caches/modules-2/files-2.1/io.github.justdeko/kuiver-jvm/*/*/core-jvm-*-sources.jar
 ```
 
-Material 3's expressive APIs are opted into once for the whole `:shared` source set in its
-`build.gradle.kts`, not per file — the theme is app-wide.
+Material 3's experimental and expressive APIs are opted into once for the whole `:shared` source set
+in its `build.gradle.kts`, not per file — the theme is app-wide.
 
 `.mcp.json` wires up `:desktopApp:hotMcpServer`, which drives a running hot-reload instance —
 screenshots, the semantic tree, clicks. That is how to check a UI change actually looks right rather

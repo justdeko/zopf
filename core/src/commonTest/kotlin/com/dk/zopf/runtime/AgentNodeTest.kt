@@ -245,6 +245,28 @@ class CodexEventsTest {
     }
 
     @Test
+    fun `an item that names its type the older way still parses`() {
+        val event = CodexEvents.parse("""{"type":"item.completed","item":{"id":"i","item_type":"agent_message","text":"done"}}""")
+        assertEquals("done", assertIs<AgentEvent.AssistantMessage>(event).text)
+    }
+
+    @Test
+    fun `an error the CLI reports mid-turn is a warning rather than the end of the node`() {
+        val event = CodexEvents.parse("""{"type":"item.completed","item":{"id":"i","type":"error","message":"Model metadata not found."}}""")
+        val notice = assertIs<AgentEvent.Notice>(event)
+
+        assertEquals("error", notice.kind)
+        assertEquals("Model metadata not found.", notice.detail)
+    }
+
+    @Test
+    fun `an error message that is itself JSON is unwrapped to the sentence inside it`() {
+        val line = """{"type":"turn.failed","error":{"message":"{\"type\":\"error\",\"status\":400,\"error\":{\"message\":\"That model is not supported on this account.\"}}"}}"""
+
+        assertEquals("That model is not supported on this account.", assertIs<AgentEvent.Result>(CodexEvents.parse(line)).text)
+    }
+
+    @Test
     fun `an item type this version has never seen survives rather than throwing`() {
         val event = CodexEvents.parse("""{"type":"item.completed","item":{"id":"i","item_type":"invented_later"}}""")
         assertIs<AgentEvent.Unknown>(event)
@@ -330,11 +352,78 @@ class NodeRunTest {
 
         assertEquals(RunStatus.RUNNING, run.status)
         assertFalse(run.canFollowUp)
-        assertFalse(run.canTakeOver, "an exec session cannot be resumed, so there is nothing to hand over")
+        assertTrue(run.canTakeOver, "the thread id codex reported is enough to reopen it in a terminal")
 
         assertEquals("It printed `hello`.", run.output().result)
         assertNull(run.costUsd)
         assertEquals(2634, run.tokens)
+    }
+
+    @Test
+    fun `a codex answer that fills a schema becomes fields, and stays the result`() {
+        val line = """{"type":"item.completed","item":{"id":"i","type":"agent_message","text":"{\"severity\":\"low\",\"count\":2}"}}"""
+        val run =
+            NodeRun("r", "demo", "ask", "Ask", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.CODEX)
+                .apply {
+                    CodexEvents.parseAll(line).forEach(::consume)
+                    takeFieldsFromJsonResult()
+                }
+
+        val output = run.output()
+
+        assertEquals("low", output.field("severity"))
+        assertEquals("2", output.field("count"))
+        assertEquals("""{"severity":"low","count":2}""", output.result)
+    }
+
+    @Test
+    fun `an answer in prose is left as prose, however the node was asked`() {
+        val run =
+            NodeRun("r", "demo", "ask", "Ask", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.CODEX)
+                .apply {
+                    CodexEvents
+                        .parseAll("""{"type":"item.completed","item":{"id":"i","type":"agent_message","text":"Nothing looked wrong."}}""")
+                        .forEach(::consume)
+                    takeFieldsFromJsonResult()
+                }
+
+        assertEquals(emptyMap(), run.output().extras)
+        assertEquals("Nothing looked wrong.", run.output().result)
+    }
+
+    @Test
+    fun `a codex failure that arrives as both an error and a failed turn is reported once`() {
+        val stream =
+            """
+            {"type":"error","message":"That model is not supported on this account."}
+            {"type":"turn.failed","error":{"message":"That model is not supported on this account."}}
+            """.trimIndent()
+        val run =
+            NodeRun("r", "demo", "ask", "Ask", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.CODEX)
+                .apply { CodexEvents.parseAll(stream).forEach(::consume) }
+
+        val summary = run.entries.filterIsInstance<ConsoleEntry.Summary>().single()
+
+        assertEquals("That model is not supported on this account.", summary.text)
+        assertTrue(summary.isError)
+        assertEquals(RunStatus.FAILED, run.status)
+    }
+
+    @Test
+    fun `an error codex reports mid-turn shows as a warning and leaves the node running`() {
+        val run =
+            NodeRun("r", "demo", "ask", "Ask", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.CODEX)
+                .apply {
+                    CodexEvents
+                        .parseAll("""{"type":"item.completed","item":{"id":"i","type":"error","message":"Model metadata not found."}}""")
+                        .forEach(::consume)
+                }
+
+        val notice = run.entries.filterIsInstance<ConsoleEntry.Notice>().single()
+
+        assertEquals("Model metadata not found.", notice.text)
+        assertTrue(notice.isWarning)
+        assertEquals(RunStatus.RUNNING, run.status)
     }
 
     @Test

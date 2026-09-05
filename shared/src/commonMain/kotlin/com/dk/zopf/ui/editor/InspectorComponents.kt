@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -84,6 +86,79 @@ fun InspectorField(
             },
         supportingText = supportingText?.let { { Text(it) } },
     )
+}
+
+@Composable
+fun SuggestingField(
+    label: String,
+    value: String?,
+    suggestions: List<String>,
+    onChange: (String?) -> Unit,
+    noneLabel: String,
+    modifier: Modifier = Modifier,
+    monospace: Boolean = false,
+    supportingText: String? = null,
+) {
+    var typing by remember { mutableStateOf(false) }
+    var text by remember(value) { mutableStateOf(value.orEmpty()) }
+
+    val matches = suggestions.filter { it.contains(text.trim(), ignoreCase = true) }
+    val open = typing && (matches.isNotEmpty() || text.isNotBlank())
+
+    ExposedDropdownMenuBox(
+        expanded = open,
+        onExpandedChange = { typing = it },
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = {
+                text = it
+                typing = true
+                onChange(it.trim().ifBlank { null })
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            label = { Text(label) },
+            singleLine = true,
+            textStyle =
+                if (monospace) {
+                    MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
+                } else {
+                    MaterialTheme.typography.bodyMedium
+                },
+            supportingText = { Text(if (text.isBlank()) noneLabel else supportingText.orEmpty()) },
+            trailingIcon = {
+                IconButton(onClick = { typing = !typing }) {
+                    Icon(ZopfIcons.List, contentDescription = "Choose", Modifier.size(18.dp))
+                }
+            },
+        )
+        ExposedDropdownMenu(expanded = open, onDismissRequest = { typing = false }) {
+            if (text.isNotBlank()) {
+                DropdownMenuItem(
+                    text = { Text(noneLabel) },
+                    onClick = {
+                        text = ""
+                        typing = false
+                        onChange(null)
+                    },
+                )
+            }
+            matches.forEach { suggestion ->
+                DropdownMenuItem(
+                    text = { Text(suggestion) },
+                    onClick = {
+                        text = suggestion
+                        typing = false
+                        onChange(suggestion)
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable
