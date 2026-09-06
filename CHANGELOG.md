@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0
+
+- Runs started from the CLI now show up on the Runs screen while they run, update as they go, and notify you when they finish.
+- A run another process is driving is left alone in the app, so it can't be stopped, cleared, deleted or taken over by mistake.
+- Settings has a Notifications choice: everything, only failures and prompts, or nothing.
+- Gates waiting for an answer sit in the menu bar, so you can approve or reject one without opening the window.
+- codex nodes can pick a model, return a declared output schema, and be taken over in a terminal.
+- The model field on an agent node takes any name its CLI accepts, with the known ones offered as suggestions.
+- An optional field in an output schema comes back as null instead of going missing.
+- The Window menu adds Minimize (⌘M) and Zoom.
+
 ## 1.1.0
 
 - Drag from one node onto another to connect them, or onto empty canvas to pick a node type and get the edge with it.
