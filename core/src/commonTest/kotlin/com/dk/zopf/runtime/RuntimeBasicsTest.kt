@@ -247,7 +247,7 @@ class AgentCapabilitiesTest {
     }
 
     @Test
-    fun `a CLI that takes a model suggests some, and dsh suggests none because it takes none`() {
+    fun `a CLI that takes a model suggests some, and dsh suggests none because its model is the profile's`() {
         assertContains(AgentProviderId.CLAUDE.modelOptions, "opus")
         assertTrue(AgentProviderId.CODEX.modelOptions.isNotEmpty())
         assertEquals(emptyList(), AgentProviderId.DSH.modelOptions)

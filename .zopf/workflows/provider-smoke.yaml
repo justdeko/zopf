@@ -1,0 +1,65 @@
+name: provider-smoke
+description: |-
+  Run one turn through every provider at once, to check the AgentProvider seam rather than any model.
+
+  This is the workflow to run after touching AgentProvider, a provider's argv or its event parsing,
+  and after any of the three CLIs ships a release. Each arm builds a different command and parses a
+  different output shape: claude and codex stream JSON, dsh prints plain text. Asking each one to
+  name itself means the gate shows three different answers, so an arm wired to the wrong CLI is
+  visible rather than merely green.
+
+  It fans out so the arms share the concurrency semaphore, and joins on a gate because a gate reads
+  the results without a shell touching them. Unlike `smoke`, this one costs money, on three vendors,
+  and needs all three CLIs installed and signed in.
+repos:
+  - id: self
+    path: ..
+defaults:
+  repo: self
+nodes:
+  - id: reachable
+    type: shell
+    title: Which CLIs are on the login PATH?
+    command: for c in claude codex dsh; do printf '%s = ' "$c"; command -v "$c" >/dev/null 2>&1 && "$c" --version 2>&1 | head -1 || echo "not on PATH"; done
+  - id: viaClaude
+    type: agent
+    provider: claude
+    title: One turn through claude
+    timeoutSeconds: 300
+    prompt: Reply with exactly one short sentence naming the model you are. Do not read or write any files.
+  - id: viaCodex
+    type: agent
+    provider: codex
+    title: One turn through codex
+    timeoutSeconds: 300
+    prompt: Reply with exactly one short sentence naming the model you are. Do not read or write any files.
+  - id: viaDsh
+    type: agent
+    provider: dsh
+    title: One turn through dsh
+    timeoutSeconds: 300
+    prompt: Reply with exactly one short sentence naming the model you are. Do not read or write any files.
+  - id: compare
+    type: gate
+    title: Did all three answer, each as itself?
+    prompt: |-
+      ${reachable.result}
+
+      claude: ${viaClaude.result}
+
+      codex: ${viaCodex.result}
+
+      dsh: ${viaDsh.result}
+edges:
+  - from: reachable
+    to: viaClaude
+  - from: reachable
+    to: viaCodex
+  - from: reachable
+    to: viaDsh
+  - from: viaClaude
+    to: compare
+  - from: viaCodex
+    to: compare
+  - from: viaDsh
+    to: compare

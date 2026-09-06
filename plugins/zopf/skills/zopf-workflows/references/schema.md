@@ -32,8 +32,8 @@ nothing until `zopf validate` reports it as a stray key.
 
 ### version
 
-Leave it out. Absent means the current format, and the editor never adds the key. An older number is
-carried forward on load; a newer one is an error and the run is refused.
+Leave it out. Absent means the current format, and the editor never adds the key. An older number is carried forward on
+load; a newer one is an error and the run is refused.
 
 ## repos
 
@@ -79,7 +79,7 @@ node → workflow `defaults` → workspace `defaults` → the app's Settings.
 | `alsoRead`       | list of string    | `agent`                       | Extra declared repo ids the node may access (`--add-dir`). Grants write access too, not just read.                                  |
 | `allowedTools`   | list of string    | `agent`                       | What runs without being asked: `Read`, `Grep`, `Bash(git push *)`. **Grants, never restricts**, see below. **Not interpolated.**    |
 | `skills`         | list of string    | `agent`                       | Skill **names**, not paths. Resolved against the workflow's repos, the workspace `skills/`, and `~/.claude/skills`.                 |
-| `model`          | string            | `agent`                       | Overrides `defaults.model`. Not read by `dsh`, which has no flag for one.                                                           |
+| `model`          | string            | `agent`                       | Overrides `defaults.model`. Not read by `dsh`; its model lives in the profile.                                                      |
 | `permissionMode` | enum              | `agent` (claude)              | `acceptEdits` \| `auto` \| `bypassPermissions` \| `manual` \| `dontAsk` \| `plan`.                                                  |
 | `sandbox`        | enum              | `agent` (codex)               | `read-only` \| `workspace-write` \| `danger-full-access`. Chosen before launch; codex cannot be asked mid-turn.                     |
 | `schema`         | list of field     | `agent`                       | Declares the answer's shape. Each name becomes `${id.name}`. Absent means prose, as before. See [schema](#schema).                  |
@@ -95,17 +95,18 @@ node → workflow `defaults` → workspace `defaults` → the app's Settings.
 It lists what runs **without stopping to ask**. A node with
 `allowedTools: [Read, Glob, Grep]` still has `Bash`, `Write` and `Edit`, and will use them.
 
-What it doesn't name is left to the CLI: read-only commands (`grep`, `find`, `git log`) run, the rest needs an
-answer. Inline approval answers in the app; `zopf run` has no approver, so headless the answer is no. Name what the
-node needs, patterns included, or it works in the window and fails from cron. `Bash(git push *)` is a real entry.
+What it doesn't name is left to the CLI: read-only commands (`grep`, `find`, `git log`) run, the rest needs an answer.
+Inline approval answers in the app; `zopf run` has no approver, so headless the answer is no. Name what the node needs,
+patterns included, or it works in the window and fails from cron. `Bash(git push *)` is a real entry.
 
 ### Model names belong to a CLI
 
 `opus`, `sonnet` and `haiku` are Claude Code's. codex takes its own names, and zopf ships no list of them — write one
-into the node's `model:` or leave it out and let codex use whatever it is configured for. `dsh` takes none at all: its
-headless profile has no `--model`, so a `model:` on a dsh node is a validation warning. This is enforced rather than
-merely documented: `defaults.model` is read only by nodes running the *workflow's* default CLI, and the app's default
-model only by nodes running the *machine's* default CLI, so `model: opus` in a workflow's defaults never reaches
+into the node's `model:` or leave it out and let codex use whatever it is configured for. `dsh` chooses its model in the
+profile rather than on the command line, because everything in it is a plugin and the model is one of them. There is no
+`--model` for zopf to pass, so a `model:` on a dsh node is a validation warning. This is enforced rather than merely
+documented: `defaults.model` is read only by nodes running the *workflow's* default CLI, and the app's default model
+only by nodes running the *machine's* default CLI, so `model: opus` in a workflow's defaults never reaches
 `codex --model opus`. A node's own `model:` is always honoured, because it was written next to its `provider:`.
 
 ### Which CLI, and what it can do
@@ -117,7 +118,9 @@ and take-over both work on a codex node. `alsoRead:` is ignored there, because c
 its own version of the flag hands out writes instead.
 
 `provider: dsh` runs DeepSeek Harness's headless profile, which is one turn and nothing else: `prompt:`, `repo:` and
-`timeoutSeconds:` are the only node keys it reads, and its whole stdout becomes `${id.result}`.
+`timeoutSeconds:` are the only node keys it reads, and its whole stdout becomes `${id.result}`. Which vendor answers is
+the profile's decision: dsh is provider-agnostic, so a dsh node may be talking to DeepSeek, Anthropic, OpenAI or
+anything else it has a model plugin for.
 
 A field the chosen CLI has no version of is left out of the command and `zopf validate` warns, naming it — so `skills:`
 on a codex node is a warning rather than a silent no-op.
@@ -294,8 +297,8 @@ leaked value is a token to rotate.
 | a duplicated schema field     | `<node> declares the output field "x" more than once`                                  |
 | a schema field named `result` | `<node> declares an output field named "x", which ${id.x} already means`               |
 
-An error stops a run before it starts. `zopf run` prints them and exits 3 without running a node, and the app
-says what to fix instead of starting.
+An error stops a run before it starts. `zopf run` prints them and exits 3 without running a node, and the app says what
+to fix instead of starting.
 
 **Warnings** (exit 0, but read them):
 
@@ -306,7 +309,7 @@ says what to fix instead of starting.
 | `on: failure` from a gate/branch/input   | `<node> is a gate, which never fails, so the edge to <y> can never be taken`                         |
 | both `prompt` and `promptFile`           | `<node> sends <file>, so its inline prompt is ignored`                                               |
 | a `default` outside `choices`            | `<node> offers a, b, so its default "c" can't be picked`                                             |
-| a field the node's CLI has no version of | `<node> runs codex, which has no permissionMode, skills`                                             |
+| a field the node's CLI has no version of | `<node> runs codex, which ignores permissionMode, skills`                                            |
 | a CLI that isn't installed               | `<node> runs codex, which isn't on your PATH. The node will fail when it starts`                     |
 | an unknown skill name                    | `<node> uses the "x" skill, which isn't in this workflow's repos, the workspace or ~/.claude/skills` |
 | a schema field `${...}` can't name       | `<node> declares the output field "x", which ${id.…} can't name`                                     |

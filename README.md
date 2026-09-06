@@ -8,7 +8,7 @@
   <b>A macOS app for running agent workflows as a graph.</b>
 </p>
 
-zopf allows you to connect several claude, codex or deepseek sessions into a graph and run them together instead of one
+zopf allows you to connect several claude, codex or DeepSeek Harness sessions into a graph and run them together instead of one
 terminal session at a time. You can also span this across multiple directories and invoke skills and other context on
 the side.
 
@@ -46,6 +46,11 @@ You need **macOS on Apple Silicon** and one of these installed and signed in:
 > [!NOTE]
 > While zopf supports claude code, codex and dsh so far, I've only extensively tested claude code as it is my daily
 driver.
+
+`claude` and `codex` installs can just follow the official instructions. `dsh` needs one extra step: install it
+globally, because zopf looks for a `dsh` binary on your login PATH. After
+that, follow [their guide](https://deepseek-harness.github.io/deepseek-harness/en/guide/providers) to add a provider,
+since dsh ships no model of its own. Note that dsh itself is still a 0.1.x developer preview.
 
 ### The App
 

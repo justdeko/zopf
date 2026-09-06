@@ -4,22 +4,16 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-// One version for every surface. Generated rather than checked in so a tagged release and a local
-// build can never disagree with the jar they came from; read back through store/BuildInfo.kt.
 val zopfVersion = (findProperty("packageVersion") ?: findProperty("zopfVersion") ?: "0.0.0").toString()
 
-// The workflow file format, bumped by hand when a change alters what an existing file means. Not
-// the app's version and never overridden by the release tag: the two move independently.
 val workflowVersion = (findProperty("workflowVersion") ?: "1").toString()
 
 val writeVersion =
     tasks.register("writeVersion") {
         description = "Writes the build's version and the workflow format version into resources read back by store/BuildInfo.kt."
-        // Locals, not the script's properties: the configuration cache can't serialize a reference
-        // back into the build script from a task action.
+        // locals: config cache can't serialize script props into task actions
         val version = zopfVersion
         val format = workflowVersion
-        // A directory, because this is wired in as a resources srcDir rather than a single file.
         val output = layout.buildDirectory.dir("generated/zopf")
         inputs.property("version", version)
         inputs.property("workflowVersion", format)
@@ -38,9 +32,6 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // Snapshot state, not the compiler: NodeRun and RunRegistry are observable by a
-            // composition when there is one, and ordinary objects when there isn't. It is api()
-            // because those objects hand a SnapshotStateList back to whoever reads them.
             api(libs.compose.runtime)
 
             implementation(libs.kotlinx.coroutinesCore)
@@ -50,9 +41,20 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
-        // Fixtures :shared's tests compile too — see ExampleWorkflow.kt for why.
         commonTest { kotlin.srcDir("src/testFixtures/kotlin") }
 
         commonMain { resources.srcDir(writeVersion) }
     }
+}
+
+// non-jvm dirs read by unit tests so tests don't go stale
+tasks.named<Test>("jvmTest") {
+    inputs
+        .dir(rootProject.layout.projectDirectory.dir(".zopf"))
+        .withPropertyName("dogfoodWorkspace")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs
+        .dir(rootProject.layout.projectDirectory.dir("plugins/zopf/skills"))
+        .withPropertyName("skillDocs")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

@@ -283,6 +283,12 @@ Gradle build scripts, which are not Kotlin source sets. Explanation belongs in t
 test name long enough to say what it asserts (`everyWorkflowInTheSkillDocsIsWrittenTheWayTheEditorWouldWriteIt`).
 A comment restating what's here is a second copy that drifts.
 
+Everything that is not a Kotlin source set may comment: the Gradle scripts, the connector scripts,
+`main.swift`, the shell scripts. Comments there earn their place or go. One lowercase fragment on the
+line someone would otherwise break, like `// non-jvm dirs read by unit tests so tests don't go stale`.
+Not a sentence, not a restatement of the line under it, and never a second copy of a paragraph from
+this file. The older scripts predate this and still carry prose; trim them as you touch them.
+
 User-facing strings are full sentences that say what to do next, not error codes —
 `"Repo \"app\" isn't at ~/dev/app any more"`, not `"invalid repo"`. That is a rule against error
 codes, not a licence to explain: one sentence, carrying only what the screen isn't already showing.

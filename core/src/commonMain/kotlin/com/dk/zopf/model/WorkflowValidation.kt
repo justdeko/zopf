@@ -306,7 +306,7 @@ private fun WorkflowNode.providerIssues(
     provider.ignoredFields(this).takeIf { it.isNotEmpty() }?.let {
         issues +=
             WorkflowIssue(
-                "$displayTitle runs ${provider.label}, which has no ${it.joinToString()}",
+                "$displayTitle runs ${provider.label}, which ignores ${it.joinToString()}",
                 id,
                 WorkflowIssue.Severity.WARNING,
             )
