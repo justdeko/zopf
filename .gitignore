@@ -22,3 +22,7 @@ node_modules/
 
 # compose hot reload writes a wrapper copy into the subproject it recompiles from
 /desktopApp/gradle/
+
+# python
+__pycache__/
+*.pyc
