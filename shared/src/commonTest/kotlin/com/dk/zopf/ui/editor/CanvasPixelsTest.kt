@@ -90,7 +90,7 @@ class CanvasPixelsTest {
     }
 
     @Test
-    fun `a node icon stays sharp when the canvas is zoomed in`() {
+    fun `a node icon stays sharp when zoomed in`() {
         val cached =
             softEdgesUnder4xZoom {
                 Icon(ZopfIcons.NodeConnector, null, Modifier.size(18.dp), tint = Color.White)
@@ -109,7 +109,7 @@ class CanvasPixelsTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `hovering the connect handle highlights a circle, not the square around it`() =
+    fun `hovering the connect handle highlights a circle`() =
         runDesktopComposeUiTest(width = 400, height = 200) {
             setContent {
                 ZopfTheme(darkTheme = false) {
@@ -187,7 +187,7 @@ class CanvasPixelsTest {
     }
 
     @Test
-    fun `the round arrow head reaches the endpoint and the default one stops short of it`() {
+    fun `the round arrow head reaches the endpoint and the default stops short`() {
         val from = Offset(EdgeStart, EdgeCross)
         val to = Offset(EdgeEnd, EdgeCross)
         val round = paintedEdge(from, to, LayoutDirection.HORIZONTAL).maxOf { it.first }
@@ -206,7 +206,7 @@ class CanvasPixelsTest {
     }
 
     @Test
-    fun `a vertical edge arrives with its head pointing down`() {
+    fun `a vertical edge arrives pointing down`() {
         val to = Offset(EdgeCross + 80f, EdgeEnd)
         val painted = paintedEdge(Offset(EdgeCross, EdgeStart), to, LayoutDirection.VERTICAL)
 
@@ -279,7 +279,7 @@ class NodeCardTextTest {
     }
 
     @Test
-    fun `a command title fits the card on one line`() {
+    fun `a command title fits on one line`() {
         val oneLine = titleHeight("tests")
         val command = titleHeight("./gradlew :shared:jvmTest")
         assertEquals(
@@ -290,7 +290,7 @@ class NodeCardTextTest {
     }
 
     @Test
-    fun `a title that is a sentence keeps two lines`() {
+    fun `a sentence title keeps two lines`() {
         val oneLine = titleHeight("tests")
         val sentence = titleHeight("Version matches — send the notification to the team channel?")
         assertTrue(

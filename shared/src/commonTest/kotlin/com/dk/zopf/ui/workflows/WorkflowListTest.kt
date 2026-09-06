@@ -111,7 +111,7 @@ class WorkflowListInteractionTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `an empty workspace picks a template out of the grid and is named after it`() {
+    fun `an empty workspace picks a template and takes its name`() {
         val created = mutableListOf<Pair<String, String?>>()
         runList(showing = WorkflowListing(emptyList(), emptyList()), onCreate = { name, t -> created += name to t }) {
             onNodeWithText("New workflow", useUnmergedTree = true).performClick()
@@ -129,7 +129,7 @@ class WorkflowListInteractionTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `every template in the grid shows its graph and its first line`() {
+    fun `every template shows its graph and first line`() {
         runList(showing = WorkflowListing(emptyList(), emptyList())) {
             onNodeWithText("New workflow", useUnmergedTree = true).performClick()
             waitForIdle()
@@ -149,7 +149,7 @@ class WorkflowListInteractionTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a name typed by hand survives picking another template`() {
+    fun `a typed name survives picking another template`() {
         val created = mutableListOf<Pair<String, String?>>()
         runList(showing = WorkflowListing(emptyList(), emptyList()), onCreate = { name, t -> created += name to t }) {
             onNodeWithText("New workflow", useUnmergedTree = true).performClick()
@@ -167,7 +167,7 @@ class WorkflowListInteractionTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a workspace that already has workflows is only asked for a name`() {
+    fun `a workspace with workflows is only asked for a name`() {
         runList {
             onNodeWithText("New workflow", useUnmergedTree = true).performClick()
             waitForIdle()
@@ -232,7 +232,7 @@ class WorkflowMinimapTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `gestures over the strip leave the graph where it was`() =
+    fun `a gesture over the strip leaves the graph in place`() =
         runDesktopComposeUiTest(200, 200) {
             val (strip, _) = minimap(chain(listOf(NodeType.AGENT, NodeType.SHELL, NodeType.GATE)), boxed = true)
             val before = strip.pixels()

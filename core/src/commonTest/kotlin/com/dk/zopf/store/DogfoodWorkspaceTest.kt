@@ -9,9 +9,12 @@ import com.dk.zopf.model.validate
 import com.dk.zopf.runtime.Branches
 import com.dk.zopf.runtime.NodeOutput
 import com.dk.zopf.runtime.RunContext
+import java.nio.file.Path
 import java.nio.file.Paths
+import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
+import kotlin.io.path.walk
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -23,6 +26,8 @@ class DogfoodWorkspaceTest {
             "No .zopf workspace at the repo root"
         }
 
+    private val skills: Path = Paths.get("../plugins/zopf/skills").toAbsolutePath().normalize()
+
     private fun connectorStore() = ConnectorStore(workspace, sharedRoot = workspace.root.resolve("no-shared-root"))
 
     private fun answerAs(
@@ -31,14 +36,14 @@ class DogfoodWorkspaceTest {
     ) = if (field == "result") NodeOutput(result = answer) else NodeOutput(extras = mapOf(field to answer))
 
     @Test
-    fun everyWorkflowParses() {
+    fun `every workflow parses`() {
         val listing = WorkflowStore(workspace).list()
         assertEquals(emptyList(), listing.broken.map { "${it.file.fileName}: ${it.message}" })
         assertTrue(listing.workflows.isNotEmpty(), "no workflows in ${workspace.root}")
     }
 
     @Test
-    fun everyWorkflowValidatesClean() {
+    fun `every workflow validates clean`() {
         val connectors = connectorStore().list()
         assertEquals(emptyList(), connectors.broken.map { "${it.name}: ${it.message}" })
 
@@ -58,7 +63,7 @@ class DogfoodWorkspaceTest {
     }
 
     @Test
-    fun everyWorkflowSurvivesBeingSaved() {
+    fun `every workflow survives being saved`() {
         WorkflowStore(workspace).list().workflows.forEach { workflow ->
             val yaml = encodeYaml(Workflow.serializer(), workflow)
             assertEquals(workflow, zopfYaml.decodeFromString(Workflow.serializer(), yaml), workflow.name)
@@ -66,7 +71,7 @@ class DogfoodWorkspaceTest {
     }
 
     @Test
-    fun everyWorkflowIsAlreadyWrittenTheWayTheEditorWouldWriteIt() {
+    fun `every workflow matches the editor's output`() {
         val store = WorkflowStore(workspace)
         store.list().workflows.forEach { workflow ->
             assertEquals(
@@ -78,7 +83,7 @@ class DogfoodWorkspaceTest {
     }
 
     @Test
-    fun everyBranchCanGoBothWays() {
+    fun `every branch can go both ways`() {
         val cases =
             mapOf(
                 "smoke" to "2.9.0 (Claude Code)",
@@ -125,7 +130,7 @@ class DogfoodWorkspaceTest {
     }
 
     @Test
-    fun theRecoveryEdgesHangOffNodesThatCanFail() {
+    fun `every recovery edge hangs off a node that can fail`() {
         val workflows = WorkflowStore(workspace).list().workflows
         val recovery = workflows.flatMap { w -> w.edges.filter { it.on == EdgeTrigger.FAILURE }.map { w to it } }
         assertTrue(recovery.isNotEmpty(), "nothing here demonstrates on: failure any more")
@@ -140,7 +145,7 @@ class DogfoodWorkspaceTest {
     }
 
     @Test
-    fun everyConnectorScriptIsRunnable() {
+    fun `every connector script is runnable`() {
         val connectors = connectorStore().list().connectors
         assertTrue(connectors.isNotEmpty(), "no connectors in ${workspace.root}")
         connectors.forEach {
@@ -148,4 +153,29 @@ class DogfoodWorkspaceTest {
             assertTrue(it.script.toFile().canExecute(), "${it.name}'s ${it.manifest.run} is not +x")
         }
     }
+
+    @Test
+    fun `every workflow in the skill docs matches the editor's output`() {
+        val examples =
+            skills
+                .walk()
+                .filter { it.isRegularFile() && it.extension == "md" }
+                .sorted()
+                .flatMap { file ->
+                    fencedYaml(file.readText())
+                        .filter { it.startsWith("name:") && "\nnodes:" in it }
+                        .mapIndexed { index, yaml -> "${skills.relativize(file)} block ${index + 1}" to yaml }
+                }.toList()
+
+        assertTrue(examples.isNotEmpty(), "no yaml workflow examples under $skills")
+        examples.forEach { (where, yaml) ->
+            assertEquals(encodeYaml(Workflow.serializer(), zopfYaml.decodeFromString(Workflow.serializer(), yaml)), yaml, where)
+        }
+    }
+
+    private fun fencedYaml(markdown: String): List<String> =
+        Regex("```yaml\\n(.*?)```", RegexOption.DOT_MATCHES_ALL)
+            .findAll(markdown)
+            .map { it.groupValues[1] }
+            .toList()
 }

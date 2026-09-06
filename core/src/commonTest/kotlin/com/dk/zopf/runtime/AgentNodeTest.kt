@@ -46,7 +46,7 @@ class ClaudeEventsTest {
     }
 
     @Test
-    fun `assistant text arrives as deltas and then as a complete block`() {
+    fun `assistant text arrives as deltas then a block`() {
         val deltas = events.filterIsInstance<AgentEvent.TextDelta>()
         assertTrue(deltas.isNotEmpty())
         assertFalse(deltas.any { it.isThinking })
@@ -60,7 +60,7 @@ class ClaudeEventsTest {
     }
 
     @Test
-    fun `a tool call carries what is worth showing, and its result comes back keyed to it`() {
+    fun `a tool call and its result come back keyed together`() {
         val call =
             events
                 .filterIsInstance<AgentEvent.AssistantMessage>()
@@ -84,7 +84,7 @@ class ClaudeEventsTest {
     }
 
     @Test
-    fun `the result event carries the answer, the cost and the duration`() {
+    fun `the result event carries the answer cost and duration`() {
         val result = events.last() as AgentEvent.Result
         assertEquals("success", result.subtype)
         assertFalse(result.isError)
@@ -95,7 +95,7 @@ class ClaudeEventsTest {
     }
 
     @Test
-    fun `an event type this version has never seen survives as Unknown`() {
+    fun `an unknown event type survives as Unknown`() {
         val event =
             ClaudeEvents.parse(
                 """{"type":"something_new_in_2_2","session_id":"abc","payload":{"n":1}}""",
@@ -107,14 +107,14 @@ class ClaudeEventsTest {
     }
 
     @Test
-    fun `a line that is not JSON is kept rather than dropped`() {
+    fun `a line that is not JSON is kept`() {
         val event = ClaudeEvents.parse("Error: something went wrong before the stream started")
         assertIs<AgentEvent.NonJson>(event)
         assertNull(ClaudeEvents.parse("   "))
     }
 
     @Test
-    fun `a denied tool call is named rather than folded into a generic failure`() {
+    fun `a denied tool call is named`() {
         val line =
             """
             {"type":"result","subtype":"success","is_error":false,
@@ -135,13 +135,13 @@ class ClaudeEventsTest {
     }
 
     @Test
-    fun `a turn that denied nothing has an empty list rather than a surprise`() {
+    fun `a turn that denied nothing has an empty list`() {
         val line = """{"type":"result","subtype":"success","is_error":false,"result":"fine"}"""
         assertEquals(emptyList(), (ClaudeEvents.parse(line) as AgentEvent.Result).permissionDenials)
     }
 
     @Test
-    fun `a hook lifecycle event says which hook, since it carries no status`() {
+    fun `a hook lifecycle event names its hook`() {
         val line =
             """
             {"type":"system","subtype":"hook_started","hook_name":"PreToolUse:Bash",
@@ -155,7 +155,7 @@ class ClaudeEventsTest {
     }
 
     @Test
-    fun `a malformed event does not take the stream down`() {
+    fun `a malformed event does not fail the stream`() {
         val event = ClaudeEvents.parse("""{"type":"result","is_error":"yes","total_cost_usd":"free"}""")
         val result = assertIs<AgentEvent.Result>(event)
         assertFalse(result.isError)
@@ -173,7 +173,7 @@ class CodexEventsTest {
     }
 
     @Test
-    fun `every line of the stream parses into something the console already knows`() {
+    fun `every line of the stream parses into a known event`() {
         assertEquals(7, events.size)
         assertTrue(events.none { it is AgentEvent.NonJson }, "a line failed to parse as JSON")
 
@@ -182,7 +182,7 @@ class CodexEventsTest {
     }
 
     @Test
-    fun `the thread id is the session id, and it arrives before any output`() {
+    fun `the thread id is the session id and arrives first`() {
         val init = assertIs<AgentEvent.SystemInit>(events.first())
         assertEquals("0199a4c2-6f11-7a3e-9d64-2f0b1c8ee551", init.sessionId)
     }
@@ -202,7 +202,7 @@ class CodexEventsTest {
     }
 
     @Test
-    fun `a command execution is a tool call, and its output comes back keyed to it`() {
+    fun `a command execution is a tool call keyed to its output`() {
         val call =
             events
                 .filterIsInstance<AgentEvent.AssistantMessage>()
@@ -226,7 +226,7 @@ class CodexEventsTest {
     }
 
     @Test
-    fun `the turn ends in tokens, and never in a dollar figure it was not given`() {
+    fun `the turn ends in tokens and never in a cost`() {
         val result = assertIs<AgentEvent.Result>(events.last())
 
         assertFalse(result.isError)
@@ -235,7 +235,7 @@ class CodexEventsTest {
     }
 
     @Test
-    fun `a failed turn and a bare error are both a failed node`() {
+    fun `a failed turn and a bare error both fail the node`() {
         val failed = assertIs<AgentEvent.Result>(CodexEvents.parse("""{"type":"turn.failed","error":{"message":"model stream ended"}}"""))
         assertTrue(failed.isError)
         assertEquals("model stream ended", failed.text)
@@ -245,13 +245,13 @@ class CodexEventsTest {
     }
 
     @Test
-    fun `an item that names its type the older way still parses`() {
+    fun `an item naming its type the older way still parses`() {
         val event = CodexEvents.parse("""{"type":"item.completed","item":{"id":"i","item_type":"agent_message","text":"done"}}""")
         assertEquals("done", assertIs<AgentEvent.AssistantMessage>(event).text)
     }
 
     @Test
-    fun `an error the CLI reports mid-turn is a warning rather than the end of the node`() {
+    fun `an error mid-turn is a warning not the end of the node`() {
         val event = CodexEvents.parse("""{"type":"item.completed","item":{"id":"i","type":"error","message":"Model metadata not found."}}""")
         val notice = assertIs<AgentEvent.Notice>(event)
 
@@ -260,14 +260,14 @@ class CodexEventsTest {
     }
 
     @Test
-    fun `an error message that is itself JSON is unwrapped to the sentence inside it`() {
+    fun `an error message that is JSON is unwrapped`() {
         val line = """{"type":"turn.failed","error":{"message":"{\"type\":\"error\",\"status\":400,\"error\":{\"message\":\"That model is not supported on this account.\"}}"}}"""
 
         assertEquals("That model is not supported on this account.", assertIs<AgentEvent.Result>(CodexEvents.parse(line)).text)
     }
 
     @Test
-    fun `an item type this version has never seen survives rather than throwing`() {
+    fun `an unknown item type survives`() {
         val event = CodexEvents.parse("""{"type":"item.completed","item":{"id":"i","item_type":"invented_later"}}""")
         assertIs<AgentEvent.Unknown>(event)
 
@@ -294,7 +294,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `a schema'd turn answers in fields, and the whole object is still the result`() {
+    fun `a schema'd turn answers in fields and keeps the object`() {
         val output = replayFixture("/claude-structured-stream.jsonl").output()
 
         assertEquals("low", output.field("severity"))
@@ -344,7 +344,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `a codex turn ends the node rather than parking it for a follow-up`() {
+    fun `a codex turn ends the node without parking it`() {
         val text = checkNotNull(javaClass.getResourceAsStream("/codex-stream.jsonl")).bufferedReader().readText()
         val run =
             NodeRun("r", "demo", "analyze", "Analyze", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.CODEX)
@@ -360,7 +360,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `a codex answer that fills a schema becomes fields, and stays the result`() {
+    fun `a codex answer filling a schema becomes fields and stays the result`() {
         val line = """{"type":"item.completed","item":{"id":"i","type":"agent_message","text":"{\"severity\":\"low\",\"count\":2}"}}"""
         val run =
             NodeRun("r", "demo", "ask", "Ask", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.CODEX)
@@ -377,7 +377,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `an answer in prose is left as prose, however the node was asked`() {
+    fun `an answer in prose is left as prose`() {
         val run =
             NodeRun("r", "demo", "ask", "Ask", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.CODEX)
                 .apply {
@@ -392,7 +392,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `a codex failure that arrives as both an error and a failed turn is reported once`() {
+    fun `a codex failure arriving twice is reported once`() {
         val stream =
             """
             {"type":"error","message":"That model is not supported on this account."}
@@ -410,7 +410,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `an error codex reports mid-turn shows as a warning and leaves the node running`() {
+    fun `a codex error mid-turn is a warning and the node runs on`() {
         val run =
             NodeRun("r", "demo", "ask", "Ask", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.CODEX)
                 .apply {
@@ -427,7 +427,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `a dsh run has no stream, so its stdout is the answer and the whole answer`() {
+    fun `a dsh run's stdout is the whole answer`() {
         val text = "Both tests pass.\n\nThe flake was the clock, not the parser.\n"
         val run =
             NodeRun("r", "demo", "analyze", "Analyze", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.DSH)
@@ -445,7 +445,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `deltas accumulate into one row until the block is complete`() {
+    fun `deltas accumulate into one row until the block completes`() {
         val run = run()
         run.consume(AgentEvent.TextDelta("s1", "Hel", isThinking = false))
         run.consume(AgentEvent.TextDelta("s1", "lo", isThinking = false))
@@ -469,7 +469,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `a watcher is handed each entry once, and a message only once it stops growing`() {
+    fun `a watcher gets each entry once and a message when complete`() {
         val settled = mutableListOf<ConsoleEntry>()
         val run = run()
         run.onEntrySettled = { settled.add(it) }
@@ -492,7 +492,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `a watcher sees the whole of a real stream, in order, with nothing repeated`() {
+    fun `a watcher sees a real stream in order without repeats`() {
         val text = checkNotNull(javaClass.getResourceAsStream("/claude-stream.jsonl")).bufferedReader().readText()
         val settled = mutableListOf<ConsoleEntry>()
         val run = run().apply { onEntrySettled = { settled.add(it) } }
@@ -522,7 +522,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `an unknown event is ignored without disturbing the transcript`() {
+    fun `an unknown event is ignored`() {
         val run = run()
         run.consume(ClaudeEvents.parse("""{"type":"invented_later","session_id":"s1"}""")!!)
         assertTrue(run.entries.isEmpty())
@@ -536,7 +536,7 @@ class NodeRunTest {
         )
 
     @Test
-    fun `a node blocked on a tool call is waiting for you, and still active`() {
+    fun `a node blocked on a tool call is waiting and still active`() {
         val run = run().apply { status = RunStatus.RUNNING }
         run.beginPermission(pending())
 
@@ -560,7 +560,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `a finished node cannot be left holding a question nobody can answer`() {
+    fun `a finished node holds no pending question`() {
         val run = run()
         run.beginPermission(pending())
         run.finish(RunStatus.STOPPED)
@@ -569,7 +569,7 @@ class NodeRunTest {
     }
 
     @Test
-    fun `a denial from the result event is spelled out`() {
+    fun `a denial from the result event is reported`() {
         val run = run()
         run.consume(
             ClaudeEvents.parse(
@@ -603,7 +603,7 @@ class AgentPromptTest {
     ) = WorkflowNode(id = "review", type = NodeType.AGENT, prompt = prompt, promptFile = promptFile)
 
     @Test
-    fun `without a prompt file the node's own prompt is sent`() {
+    fun `without a prompt file the node's prompt is sent`() {
         val workspace = Workspace.create(tempDir().resolve("ws"))
         assertEquals("inline", agentPromptText(node(prompt = "inline"), workspace, workspace.root).getOrThrow())
     }
@@ -636,7 +636,7 @@ class AgentPromptTest {
     }
 
     @Test
-    fun `without a workspace a relative path resolves against the node's own directory`() {
+    fun `without a workspace a relative path resolves against the node's directory`() {
         val dir = tempDir()
         dir.resolve("brief.md").writeText("Write the connector.")
 
@@ -647,7 +647,7 @@ class AgentPromptTest {
     }
 
     @Test
-    fun `a prompt file that isn't there fails, naming the path it looked for`() {
+    fun `a missing prompt file fails and names the path`() {
         val workspace = Workspace.create(tempDir().resolve("ws"))
 
         val failure =

@@ -9,7 +9,9 @@ import com.dk.zopf.model.SchemaField
 import com.dk.zopf.model.SchemaFieldType
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
+import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.model.WorkflowNode
+import com.dk.zopf.model.validate
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.readText
@@ -82,14 +84,14 @@ class WorkflowStoreTest {
         )
 
     @Test
-    fun `round trips through yaml without losing anything`() {
+    fun `a workflow round trips through yaml`() {
         val (_, store) = newStore()
         store.save(sample)
         assertEquals(sample, store.load("refactor-api"))
     }
 
     @Test
-    fun `multi-line prompts are written as block scalars`() {
+    fun `a multi-line prompt is written as a block scalar`() {
         val (_, store) = newStore()
         store.save(sample)
         val text = store.fileFor("refactor-api").readText()
@@ -99,7 +101,7 @@ class WorkflowStoreTest {
     }
 
     @Test
-    fun `a schema field writes only what it says, and comes back the same`() {
+    fun `a schema field writes and reads back the same`() {
         val (_, store) = newStore()
         val node =
             WorkflowNode(
@@ -121,7 +123,7 @@ class WorkflowStoreTest {
     }
 
     @Test
-    fun `defaults are omitted so files stay minimal`() {
+    fun `defaults are omitted from the file`() {
         val (_, store) = newStore()
         store.save(Workflow(name = "bare"))
         val text = store.fileFor("bare").readText()
@@ -129,7 +131,7 @@ class WorkflowStoreTest {
     }
 
     @Test
-    fun `unknown keys are ignored rather than failing the file`() {
+    fun `an unknown key is ignored`() {
         val (workspace, store) = newStore()
         workspace.workflowsDir.resolve("future.yaml").writeText(
             """
@@ -148,7 +150,7 @@ class WorkflowStoreTest {
     }
 
     @Test
-    fun `a file written before codex existed still parses, and is rewritten as an agent node`() {
+    fun `a legacy claude node parses as an agent node`() {
         val (workspace, store) = newStore()
         workspace.workflowsDir.resolve("old.yaml").writeText(
             """
@@ -169,7 +171,7 @@ class WorkflowStoreTest {
     }
 
     @Test
-    fun `a node type nothing knows is refused rather than guessed at`() {
+    fun `an unknown node type is refused`() {
         val (workspace, store) = newStore()
         workspace.workflowsDir.resolve("odd.yaml").writeText(
             """
@@ -186,7 +188,7 @@ class WorkflowStoreTest {
     }
 
     @Test
-    fun `a broken file is listed as broken instead of hiding the whole workspace`() {
+    fun `a broken file is listed as broken`() {
         val (workspace, store) = newStore()
         store.save(sample)
         workspace.workflowsDir.resolve("broken.yaml").writeText("nodes: [oh no\n")
@@ -204,14 +206,14 @@ class WorkflowStoreTest {
     }
 
     @Test
-    fun `the filename wins over a stale name field`() {
+    fun `the filename wins over the name field`() {
         val (workspace, store) = newStore()
         workspace.workflowsDir.resolve("renamed-in-finder.yaml").writeText("name: \"old-name\"\n")
         assertEquals("renamed-in-finder", store.load("renamed-in-finder")?.name)
     }
 
     @Test
-    fun `create refuses to clobber and slugifies the name`() {
+    fun `create slugifies the name and refuses to clobber`() {
         val (_, store) = newStore()
         val created = store.create("My Cool Workflow!").getOrThrow()
         assertEquals("my-cool-workflow", created.name)
@@ -247,7 +249,7 @@ class WorkflowStoreTest {
 
 class UnknownKeyTest {
     @Test
-    fun `a misspelled node key is named, with the node it is on`() {
+    fun `an unknown node key is named with its node`() {
         val stray =
             unknownKeysIn(
                 """
@@ -263,14 +265,14 @@ class UnknownKeyTest {
     }
 
     @Test
-    fun `a misspelled top-level key is named`() {
+    fun `an unknown top-level key is named`() {
         val stray = unknownKeysIn("name: w\nreposs: []\n")
 
         assertEquals(listOf(UnknownKey("reposs", "the workflow")), stray)
     }
 
     @Test
-    fun `a misspelled edge key is named`() {
+    fun `an unknown edge key is named`() {
         val stray =
             unknownKeysIn(
                 """
@@ -284,7 +286,7 @@ class UnknownKeyTest {
     }
 
     @Test
-    fun `a file zopf wrote itself has nothing to report`() {
+    fun `a file zopf wrote reports nothing`() {
         val yaml =
             """
             name: w
@@ -306,8 +308,46 @@ class UnknownKeyTest {
     }
 
     @Test
-    fun `something that isn't a workflow at all is not worth complaining about`() {
+    fun `a file that is not a workflow reports nothing`() {
         assertTrue(unknownKeysIn("- just\n- a list\n").isEmpty())
         assertTrue(unknownKeysIn("{{{ not yaml").isEmpty())
+    }
+}
+
+class TemplatesTest {
+    @Test
+    fun `every offered template is packaged`() {
+        assertTrue(Templates.names.isNotEmpty(), "no templates declared")
+        Templates.names.forEach { assertTrue(Templates.read(it).isNotBlank(), "$it read back blank") }
+    }
+
+    @Test
+    fun `every template matches the editor's output`() {
+        Templates.names.forEach { name ->
+            val yaml = Templates.read(name)
+            assertEquals(encodeWorkflow(decodeWorkflow(yaml)), yaml, name)
+        }
+    }
+
+    @Test
+    fun `every template validates in a bare workspace`() {
+        Templates.names.forEach { name ->
+            val errors =
+                Templates
+                    .workflow(name, name)
+                    .validate(connector = { null })
+                    .filter { it.severity == WorkflowIssue.Severity.ERROR }
+            assertTrue(errors.isEmpty(), "$name: ${errors.joinToString { it.message }}")
+        }
+    }
+
+    @Test
+    fun `a template's label is its title cased name`() {
+        assertEquals("Fix failing tests", Templates.label("fix-failing-tests"))
+    }
+
+    @Test
+    fun `a template becomes a workflow under the given name`() {
+        assertEquals("my-checks", Templates.workflow("fix-failing-tests", "my-checks").name)
     }
 }

@@ -30,7 +30,7 @@ class InterpolationTest {
         }
 
     @Test
-    fun `references are replaced with the output they name`() {
+    fun `a reference is replaced with its node's output`() {
         val interpolated = context.interpolate("Fix these:\n\${analyze.result}\nexit=\${build.exitCode}")
         assertEquals("Fix these:\ntwo findings\nexit=0", interpolated.text)
         assertTrue(interpolated.isComplete)
@@ -71,7 +71,7 @@ class AgentInvocationTest {
     private fun dsh(invocation: AgentInvocation = this.invocation) = DshProvider.command(invocation, "dsh")
 
     @Test
-    fun `the claude command streams both ways and pins the session id`() {
+    fun `the claude command streams and pins the session id`() {
         val command = claude()
 
         assertEquals(listOf("claude", "-p"), command.take(2))
@@ -91,7 +91,7 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `a schema is passed inline, since the flag refuses a path`() {
+    fun `claude takes a schema inline`() {
         val schema = """{"type":"object","properties":{"severity":{"type":"string"}}}"""
 
         assertTrue(claude(invocation.copy(jsonSchema = schema)).containsInOrder("--json-schema", schema))
@@ -106,7 +106,7 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `nothing unset is passed`() {
+    fun `an unset field is not passed`() {
         val bare = claude(AgentInvocation(prompt = "hi", cwd = Paths.get("/repo")))
         assertFalse("--model" in bare)
         assertFalse("--permission-mode" in bare)
@@ -119,7 +119,7 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `the approval hook arrives as --settings, with the hook events it explains`() {
+    fun `the approval hook is passed as --settings`() {
         val command = claude(invocation.copy(settingsFile = Paths.get("/support/zopf-hooks-bash.json")))
 
         assertTrue(command.containsInOrder("--settings", "/support/zopf-hooks-bash.json"))
@@ -134,7 +134,7 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `codex takes its global flags before the subcommand, and the prompt after it`() {
+    fun `codex takes global flags before the subcommand`() {
         val command = codex()
         val exec = command.indexOf("exec")
 
@@ -146,7 +146,7 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `codex takes a schema as a file, since its flag refuses the JSON itself`() {
+    fun `codex takes a schema as a file`() {
         val schema = """{"type":"object","properties":{"severity":{"type":"string"}}}"""
         val command = codex(invocation.copy(jsonSchema = schema))
         val file = Paths.get(command[command.indexOf("--output-schema") + 1])
@@ -157,19 +157,19 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `codex is not asked to check for a git repo, since a node may run in a workspace that isn't one`() {
+    fun `codex skips the git repo check`() {
         assertTrue("--skip-git-repo-check" in codex())
         assertFalse("--skip-git-repo-check" in claude(), "claude never had the check to skip")
     }
 
     @Test
-    fun `codex is never left able to pause for an approval nobody can answer`() {
+    fun `codex never pauses for an approval`() {
         assertTrue(codex().containsInOrder("--ask-for-approval", "never"))
         assertTrue(codex(AgentInvocation(prompt = "hi", cwd = Paths.get("/repo"))).containsInOrder("--ask-for-approval", "never"))
     }
 
     @Test
-    fun `codex is passed nothing claude-shaped, and no sandbox it wasn't given`() {
+    fun `codex is passed no claude-only flags`() {
         val command = codex(invocation.copy(sandbox = null, jsonSchema = "{}", settingsFile = Paths.get("/s.json")))
 
         assertFalse("--sandbox" in command)
@@ -181,7 +181,7 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `codex takes the prompt on the command line, claude on stdin`() {
+    fun `codex takes the prompt on the command line`() {
         assertEquals(PromptChannel.ARGUMENT, CodexProvider.promptChannel)
         assertEquals(PromptChannel.STDIN, ClaudeProvider.promptChannel)
 
@@ -190,7 +190,7 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `dsh is the profile name and the prompt, and nothing either other CLI takes`() {
+    fun `dsh takes only the profile and the prompt`() {
         val command = dsh()
 
         assertEquals(listOf("dsh", "--profile", "headless", "hi"), command)
@@ -200,7 +200,7 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `only claude lets zopf name the session before the CLI starts`() {
+    fun `only claude accepts a session id up front`() {
         assertNotNull(ClaudeProvider.newSessionId())
         assertNull(CodexProvider.newSessionId())
         assertNull(DshProvider.newSessionId())
@@ -214,7 +214,7 @@ class AgentInvocationTest {
 
 class AgentCapabilitiesTest {
     @Test
-    fun `every provider answers every question, and no two claim the same shape`() {
+    fun `every provider declares a distinct capability set`() {
         val answers = AgentProviders.all.associate { it.id to it.capabilities }
 
         assertEquals(AgentProviderId.entries.toSet(), answers.keys)
@@ -222,7 +222,7 @@ class AgentCapabilitiesTest {
     }
 
     @Test
-    fun `what a codex node has no version of is what the console must stop offering`() {
+    fun `the console offers only what codex supports`() {
         val codex = CodexProvider.capabilities
 
         assertFalse(codex.followUps)
@@ -235,7 +235,7 @@ class AgentCapabilitiesTest {
     }
 
     @Test
-    fun `an exec thread is recorded, so a codex node can be picked up in a terminal`() {
+    fun `a codex node records its exec thread`() {
         assertTrue(CodexProvider.capabilities.resumeInTerminal)
         assertEquals(listOf("resume", "t-1"), CodexProvider.terminalArgs("t-1"))
         assertEquals(emptyList(), CodexProvider.terminalArgs(null))
@@ -247,14 +247,14 @@ class AgentCapabilitiesTest {
     }
 
     @Test
-    fun `a CLI that takes a model suggests some, and dsh suggests none because its model is the profile's`() {
+    fun `a provider that takes a model suggests models`() {
         assertContains(AgentProviderId.CLAUDE.modelOptions, "opus")
         assertTrue(AgentProviderId.CODEX.modelOptions.isNotEmpty())
         assertEquals(emptyList(), AgentProviderId.DSH.modelOptions)
     }
 
     @Test
-    fun `a dsh node offers no model, because the headless profile has no flag to carry one`() {
+    fun `a dsh node offers no model`() {
         val dsh = DshProvider.capabilities
 
         assertFalse(dsh.modelSelection)
@@ -270,7 +270,7 @@ class AgentCapabilitiesTest {
     }
 
     @Test
-    fun `a field the chosen CLI has no version of is named rather than silently dropped`() {
+    fun `an unsupported field is named as ignored`() {
         val node =
             WorkflowNode(
                 id = "review",
@@ -290,38 +290,36 @@ class ProviderResolutionTest {
     private val node = WorkflowNode(id = "n", type = NodeType.AGENT)
     private val workflow = Workflow(name = "w")
 
-    @Test
-    fun `the node wins over the workflow, which wins over the machine`() {
-        val codexEverywhere = AppSettings(defaultProvider = AgentProviderId.CODEX)
-        val workflowSaysClaude = workflow.copy(defaults = workflow.defaults.copy(provider = AgentProviderId.CLAUDE))
+    private fun Workflow.saying(provider: AgentProviderId?) = copy(defaults = defaults.copy(provider = provider))
 
-        assertEquals(
-            AgentProviderId.CODEX,
-            resolveProvider(node.copy(provider = AgentProviderId.CODEX), workflowSaysClaude, AppSettings()),
-        )
-        assertEquals(AgentProviderId.CLAUDE, resolveProvider(node, workflowSaysClaude, codexEverywhere))
-        assertEquals(AgentProviderId.CODEX, resolveProvider(node, workflow, codexEverywhere))
+    @Test
+    fun `the nearest provider wins and absent means claude`() {
+        val machineSaysCodex = AppSettings(defaultProvider = AgentProviderId.CODEX)
+
+        listOf(
+            Triple("node over workflow and machine", node.copy(provider = AgentProviderId.CLAUDE) to workflow.saying(AgentProviderId.CODEX), AgentProviderId.CLAUDE),
+            Triple("workflow over machine", node to workflow.saying(AgentProviderId.CLAUDE), AgentProviderId.CLAUDE),
+            Triple("machine when nobody names one", node to workflow, AgentProviderId.CODEX),
+        ).forEach { (case, given, expected) ->
+            val (n, w) = given
+            assertEquals(expected, resolveProvider(n, w, machineSaysCodex), case)
+        }
+
+        assertEquals(AgentProviderId.CLAUDE, resolveProvider(node, workflow, AppSettings()), "absent everywhere")
     }
 
     @Test
-    fun `absent everywhere means claude`() {
-        assertEquals(AgentProviderId.CLAUDE, resolveProvider(node, workflow, AppSettings()))
-    }
-
-    @Test
-    fun `the workspace wins over the machine, and the workflow wins over the workspace`() {
-        val machineSaysClaude = AppSettings(defaultProvider = AgentProviderId.CLAUDE)
+    fun `a workflow provider wins over the workspace`() {
         val workspaceSaysCodex = NodeDefaults(provider = AgentProviderId.CODEX)
+        val machineSaysClaude = AppSettings(defaultProvider = AgentProviderId.CLAUDE)
 
         assertEquals(
             AgentProviderId.CODEX,
             resolveProvider(node, workflow.withDefaultsFrom(workspaceSaysCodex), machineSaysClaude),
         )
-
-        val workflowSaysClaude = workflow.copy(defaults = workflow.defaults.copy(provider = AgentProviderId.CLAUDE))
         assertEquals(
             AgentProviderId.CLAUDE,
-            resolveProvider(node, workflowSaysClaude.withDefaultsFrom(workspaceSaysCodex), machineSaysClaude),
+            resolveProvider(node, workflow.saying(AgentProviderId.CLAUDE).withDefaultsFrom(workspaceSaysCodex), machineSaysClaude),
         )
     }
 }
@@ -331,71 +329,59 @@ class ModelResolutionTest {
     private val workflow = Workflow(name = "w")
     private val settings = AppSettings(defaultModel = "haiku")
 
-    @Test
-    fun `the node wins over the workflow, which wins over the machine`() {
-        assertEquals("opus", resolveModel(node.copy(model = "opus"), workflow.withDefaultModel("sonnet"), settings))
-        assertEquals("sonnet", resolveModel(node, workflow.withDefaultModel("sonnet"), settings))
-        assertEquals("haiku", resolveModel(node, workflow, settings))
-    }
+    private fun Workflow.withDefaultModel(model: String) = copy(defaults = defaults.copy(model = model))
 
     @Test
-    fun `nobody naming one is not the same as naming a default`() {
-        assertNull(resolveModel(node, workflow, AppSettings()))
-    }
-
-    @Test
-    fun `the workspace wins over the machine, and the workflow wins over the workspace`() {
+    fun `the nearest model wins and absent stays unset`() {
         val workspaceSaysSonnet = NodeDefaults(model = "sonnet")
 
-        assertEquals("sonnet", resolveModel(node, workflow.withDefaultsFrom(workspaceSaysSonnet), settings))
-        assertEquals(
-            "opus",
-            resolveModel(node, workflow.withDefaultModel("opus").withDefaultsFrom(workspaceSaysSonnet), settings),
-        )
-        assertEquals("haiku", resolveModel(node, workflow.withDefaultsFrom(NodeDefaults()), settings))
+        listOf(
+            Triple("node over workflow", node.copy(model = "opus") to workflow.withDefaultModel("sonnet"), "opus"),
+            Triple("workflow over machine", node to workflow.withDefaultModel("sonnet"), "sonnet"),
+            Triple("machine when nobody names one", node to workflow, "haiku"),
+            Triple("workspace over machine", node to workflow.withDefaultsFrom(workspaceSaysSonnet), "sonnet"),
+            Triple("workflow over workspace", node to workflow.withDefaultModel("opus").withDefaultsFrom(workspaceSaysSonnet), "opus"),
+            Triple("an empty workspace default falls through", node to workflow.withDefaultsFrom(NodeDefaults()), "haiku"),
+        ).forEach { (case, given, expected) ->
+            val (n, w) = given
+            assertEquals(expected, resolveModel(n, w, settings), case)
+        }
+
+        assertNull(resolveModel(node, workflow, AppSettings()), "absent everywhere")
     }
 
     @Test
-    fun `a model name belongs to the CLI it was written for, and never crosses to the other one`() {
+    fun `a model is not carried across providers`() {
         val codexNode = node.copy(provider = AgentProviderId.CODEX)
-
-        assertNull(resolveModel(codexNode, workflow.withDefaultModel("sonnet"), settings))
-
-        assertEquals("gpt-5-codex", resolveModel(codexNode.copy(model = "gpt-5-codex"), workflow, settings))
-    }
-
-    @Test
-    fun `a workflow whose default CLI is codex hands its default model to codex, not to claude`() {
         val codexWorkflow = workflow.copy(defaults = workflow.defaults.copy(provider = AgentProviderId.CODEX))
 
+        assertNull(resolveModel(codexNode, workflow.withDefaultModel("sonnet"), settings))
+        assertEquals("gpt-5-codex", resolveModel(codexNode.copy(model = "gpt-5-codex"), workflow, settings))
         assertEquals("gpt-5-codex", resolveModel(node, codexWorkflow.withDefaultModel("gpt-5-codex"), settings))
-
         assertEquals(
             "haiku",
             resolveModel(node.copy(provider = AgentProviderId.CLAUDE), codexWorkflow.withDefaultModel("gpt-5-codex"), settings),
         )
     }
-
-    private fun Workflow.withDefaultModel(model: String) = copy(defaults = defaults.copy(model = model))
 }
 
 class TerminalLauncherTest {
     @Test
-    fun `the handoff script cds to the node's directory first`() {
+    fun `the handoff script cds to the node's directory`() {
         val script = TerminalLauncher.script(Paths.get("/Users/someone/dev/my repo"), listOf("-r", "abc-123"))
         assertTrue("cd '/Users/someone/dev/my repo'" in script, script)
         assertTrue("exec 'claude' '-r' 'abc-123'" in script, script)
     }
 
     @Test
-    fun `with no arguments it starts a fresh conversation in the directory`() {
+    fun `with no arguments it starts a fresh session`() {
         val script = TerminalLauncher.script(Paths.get("/Users/someone/zopf/connectors/slack-post"))
         assertTrue("cd '/Users/someone/zopf/connectors/slack-post'" in script, script)
         assertTrue(script.trimEnd().endsWith("exec 'claude'"), script)
     }
 
     @Test
-    fun `an opening prompt is one argument, however it is written`() {
+    fun `an opening prompt is passed as one argument`() {
         val script =
             TerminalLauncher.script(
                 Paths.get("/tmp/c"),
@@ -407,7 +393,7 @@ class TerminalLauncherTest {
     }
 
     @Test
-    fun `a quote in a path cannot break out of the script`() {
+    fun `a quote in a path is escaped`() {
         val script = TerminalLauncher.script(Paths.get("/tmp/it's here"), listOf("-r", "s"))
         assertTrue("""cd '/tmp/it'\''s here'""" in script, script)
     }
@@ -415,7 +401,7 @@ class TerminalLauncherTest {
 
 class FinderTest {
     @Test
-    fun `reveal selects the item rather than opening it`() {
+    fun `reveal selects the item`() {
         assertEquals(
             listOf("open", "-R", "/w/workflows/ship.yaml"),
             Finder.command(Paths.get("/w/workflows/ship.yaml")),
@@ -423,7 +409,7 @@ class FinderTest {
     }
 
     @Test
-    fun `revealing something that has gone says which path`() {
+    fun `revealing a missing path names it`() {
         val missing = Paths.get("/nowhere/at/all/ship.yaml")
         val failure = Finder.reveal(missing).exceptionOrNull()
         assertContains(failure?.message.orEmpty(), missing.toString())
@@ -432,41 +418,29 @@ class FinderTest {
 
 class BranchesTest {
     @Test
-    fun `an exit code compares as text, because that is all interpolation produces`() {
-        assertTrue(Branches.evaluate("0 == 0").taken)
-        assertFalse(Branches.evaluate("1 == 0").taken)
+    fun `an expression is taken or not on a text comparison`() {
+        listOf(
+            "0 == 0" to true,
+            "1 == 0" to false,
+            "1 != 0" to true,
+            "ok != ok" to false,
+            "\"ship it\" == \"ship it\"" to true,
+            "'ship it' == ship it" to true,
+            "\${build.exitCode} == 0" to false,
+            "" to false,
+            "  " to false,
+            "false" to false,
+            "FALSE" to false,
+            "0" to false,
+            "true" to true,
+            "anything at all" to true,
+        ).forEach { (expression, taken) ->
+            assertEquals(taken, Branches.evaluate(expression).taken, expression)
+        }
     }
 
     @Test
-    fun `not-equals is checked before equals, so it isn't read as the tail of one`() {
-        assertTrue(Branches.evaluate("1 != 0").taken)
-        assertFalse(Branches.evaluate("ok != ok").taken)
-    }
-
-    @Test
-    fun `quotes are optional and stripped either way`() {
-        assertTrue(Branches.evaluate("\"ship it\" == \"ship it\"").taken)
-        assertTrue(Branches.evaluate("'ship it' == ship it").taken)
-    }
-
-    @Test
-    fun `with no operator, an empty or falsey value is false and anything else is true`() {
-        assertFalse(Branches.evaluate("").taken)
-        assertFalse(Branches.evaluate("  ").taken)
-        assertFalse(Branches.evaluate("false").taken)
-        assertFalse(Branches.evaluate("FALSE").taken)
-        assertFalse(Branches.evaluate("0").taken)
-        assertTrue(Branches.evaluate("true").taken)
-        assertTrue(Branches.evaluate("anything at all").taken)
-    }
-
-    @Test
-    fun `an unresolved reference compares as the literal it still is, rather than as nothing`() {
-        assertFalse(Branches.evaluate("\${build.exitCode} == 0").taken)
-    }
-
-    @Test
-    fun `the operator that splits the expression is the one the author wrote, not one interpolation drops in`() {
+    fun `the operator is taken from the expression not the value`() {
         val verdict =
             Branches.evaluate("\${review.result} == ok") {
                 it.replace("\${review.result}", "assertion failed: a != b")
@@ -477,7 +451,7 @@ class BranchesTest {
     }
 
     @Test
-    fun `the verdict explains itself, because a branch is the hardest thing to debug after the fact`() {
+    fun `the verdict reports what was compared`() {
         assertEquals("\"0\" == \"0\" → true", Branches.evaluate("0 == 0").explanation)
     }
 }
@@ -502,7 +476,7 @@ class SecretsTest {
     }
 
     @Test
-    fun `the keychain fills in what the environment doesn't have`() {
+    fun `the keychain fills in what the environment lacks`() {
         val secret = ConnectorSecret("SLACK_TOKEN", keychain = "slack-post")
         val resolved = resolver(keychain = mapOf("slack-post" to "from-keychain")).resolve(listOf(secret)).single()
 
@@ -522,7 +496,7 @@ class SecretsTest {
     }
 
     @Test
-    fun `an empty value counts as not set`() {
+    fun `an empty value counts as unset`() {
         val secret = ConnectorSecret("SLACK_TOKEN", keychain = "slack-post")
         val resolved =
             resolver(
@@ -562,7 +536,7 @@ class RunSummaryTest {
         }
 
     @Test
-    fun `the count is the step being run, so it agrees with the title beside it`() {
+    fun `the count is the step being run`() {
         val run = run("one", "two", "three", "four")
         run.nodes[0].status = RunStatus.RUNNING
 
@@ -570,7 +544,7 @@ class RunSummaryTest {
     }
 
     @Test
-    fun `a fan out counts both arms, and names the first of them`() {
+    fun `a fan out counts both arms and names the first`() {
         val run = run("a", "b", "c", "d")
         run.nodes[0].status = RunStatus.SUCCEEDED
         run.nodes[1].status = RunStatus.RUNNING

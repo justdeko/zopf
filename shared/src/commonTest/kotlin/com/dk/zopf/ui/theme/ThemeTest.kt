@@ -53,7 +53,7 @@ class NodeColorsTest {
     }
 
     @Test
-    fun `every accent holds contrast on the surfaces nodes are drawn on`() {
+    fun `every accent holds contrast on node surfaces`() {
         listOf(false, true).forEach { dark ->
             val (nodes, scheme) = palette(dark).let { it.zopf to it.scheme }
             NodeType.entries.forEach { type ->
@@ -68,7 +68,7 @@ class NodeColorsTest {
     }
 
     @Test
-    fun `what sits on a container can be read against it`() {
+    fun `container content holds contrast against it`() {
         listOf(false, true).forEach { dark ->
             val nodes = palette(dark).zopf
             NodeType.entries.forEach { type ->
@@ -80,7 +80,7 @@ class NodeColorsTest {
     }
 
     @Test
-    fun `no two types read as the same colour`() {
+    fun `no two node types share a colour`() {
         listOf(false, true).forEach { dark ->
             val nodes = palette(dark).zopf
             val types = NodeType.entries
@@ -97,7 +97,7 @@ class NodeColorsTest {
     }
 
     @Test
-    fun `a container is the theme's own surface, tinted`() {
+    fun `a container is the theme surface tinted`() {
         listOf(false, true).forEach { dark ->
             val (nodes, scheme) = palette(dark).let { it.zopf to it.scheme }
             NodeType.entries.forEach { type ->
@@ -110,7 +110,7 @@ class NodeColorsTest {
     }
 
     @Test
-    fun `the Claude node tracks the theme's primary`() {
+    fun `the claude node tracks the theme primary`() {
         listOf(false, true).forEach { dark ->
             val (nodes, scheme) = palette(dark).let { it.zopf to it.scheme }
             assertEquals(scheme.primary, nodes.node(NodeType.AGENT).accent, "dark=$dark")
@@ -137,19 +137,19 @@ class ThemePreferenceTest {
     }
 
     @Test
-    fun `the default follows the system, whichever way it is set`() {
+    fun `the default theme follows the system`() {
         assertEquals(true, resolve(ThemePreference.SYSTEM, SystemTheme.Dark))
         assertEquals(false, resolve(ThemePreference.SYSTEM, SystemTheme.Light))
     }
 
     @Test
-    fun `an override wins over the system, which is the whole point of having one`() {
+    fun `an override wins over the system`() {
         assertEquals(true, resolve(ThemePreference.DARK, SystemTheme.Light))
         assertEquals(false, resolve(ThemePreference.LIGHT, SystemTheme.Dark))
     }
 
     @Test
-    fun `every preference has a button label that isn't shouted`() {
+    fun `every preference has a readable button label`() {
         assertEquals(listOf("System", "Light", "Dark"), ThemePreference.entries.map { it.label })
     }
 }

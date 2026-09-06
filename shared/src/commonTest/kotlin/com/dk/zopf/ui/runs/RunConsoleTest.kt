@@ -93,7 +93,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a free-text question is prefilled with the default, and sends whatever replaces it`() =
+    fun `a free-text question is prefilled with its default`() =
         runDesktopComposeUiTest {
             var answered: String? = null
             console(asking(default = "main"), onAnswer = { answered = it })
@@ -109,7 +109,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a question with choices offers them instead of a text field`() =
+    fun `a question with choices offers them instead of a field`() =
         runDesktopComposeUiTest {
             var answered: String? = null
             val node = asking(question = "Deploy where?", choices = listOf("staging", "prod", "skip"), default = "staging")
@@ -124,7 +124,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `cancelling sends no answer at all`() =
+    fun `cancelling sends no answer`() =
         runDesktopComposeUiTest {
             var answered: String? = "untouched"
             var called = false
@@ -141,7 +141,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `an empty answer can't be sent, and the follow-up bar does not appear in its place`() =
+    fun `an empty answer cannot be sent`() =
         runDesktopComposeUiTest {
             console(asking())
 
@@ -152,7 +152,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the pending tool call is shown with what it would run, and takes the follow-up bar's place`() =
+    fun `a pending tool call is shown with what it would run`() =
         runDesktopComposeUiTest {
             val (node, _) = blocked()
             console(node)
@@ -164,7 +164,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `Allow and Deny each answer the call that is holding the process open`() {
+    fun `Allow and Deny each answer the pending call`() {
         fun clicking(button: String): Boolean? {
             var decided: Boolean? = null
             runDesktopComposeUiTest {
@@ -182,7 +182,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `allowing for the whole run says so distinctly`() =
+    fun `allowing for the whole run is labelled distinctly`() =
         runDesktopComposeUiTest {
             val (node, _) = blocked()
             var rest: Boolean? = null
@@ -203,7 +203,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a codex node is offered the terminal, but not a follow-up it could not honour`() =
+    fun `a codex node is offered the terminal but no follow-up`() =
         runDesktopComposeUiTest {
             console(agent(AgentProviderId.CODEX))
 
@@ -213,7 +213,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a finished run opens at its tail, and the jumps go to either end`() =
+    fun `a finished run opens at its tail`() =
         runDesktopComposeUiTest(width = 800, height = 600) {
             console(printing(200))
 
@@ -231,7 +231,7 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a transcript that fits shows no controls at all`() =
+    fun `a transcript that fits shows no controls`() =
         runDesktopComposeUiTest(width = 800, height = 600) {
             console(printing(3))
 

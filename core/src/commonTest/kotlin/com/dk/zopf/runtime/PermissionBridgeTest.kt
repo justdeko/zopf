@@ -120,7 +120,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `stopping the runs lets the parked question go without ending inline approval`() {
+    fun `stopping the runs releases the parked question`() {
         val dir = tempDir()
         val bridge = bridge(node(), dir)
         assertNotNull(bridge.settingsFile(ASKABLE_TOOLS))
@@ -134,7 +134,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `quitting does end it, and nothing is installed afterwards`() {
+    fun `quitting ends inline approval and installs nothing`() {
         val bridge = bridge(node(), tempDir())
         assertNotNull(bridge.settingsFile(ASKABLE_TOOLS))
 
@@ -144,7 +144,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `a mode that never asks gets no settings file at all`() {
+    fun `a mode that never asks writes no settings file`() {
         assertNull(bridge(node()).settingsFile(askableTools(PermissionMode.BYPASS_PERMISSIONS)))
     }
 
@@ -164,7 +164,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `an answered request comes back as the answer that was given`() {
+    fun `an answered request returns that answer`() {
         val node = node()
         val dir = tempDir()
         val bridge = bridge(node, dir, onRequest = { it.pendingPermission!!.decide(true) })
@@ -180,7 +180,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `a denial is a denial`() {
+    fun `a denial comes back as a denial`() {
         val node = node()
         val dir = tempDir()
         val bridge = bridge(node, dir, onRequest = { it.pendingPermission!!.decide(false) })
@@ -192,7 +192,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `the request carries what the tool is about to do`() {
+    fun `the request carries the tool's input`() {
         val node = node()
         val dir = tempDir()
         var seen: PermissionRequest? = null
@@ -211,7 +211,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `allowing a tool for the rest of the run stops it asking again`() {
+    fun `allowing a tool for the run stops further asking`() {
         val node = node()
         val dir = tempDir()
         var asked = 0
@@ -234,7 +234,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `another process on this machine cannot answer for you`() {
+    fun `another process cannot answer a request`() {
         val node = node()
         val dir = tempDir()
         bridge(node, dir, onRequest = { it.pendingPermission!!.decide(true) }).settingsFile(ASKABLE_TOOLS)
@@ -245,7 +245,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `a session nothing knows about is denied rather than allowed`() {
+    fun `an unknown session is denied`() {
         val dir = tempDir()
         bridge(node = null, dir = dir).settingsFile(ASKABLE_TOOLS)
 
@@ -255,7 +255,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `a request nobody answers is denied when the deadline passes`() {
+    fun `an unanswered request is denied at the deadline`() {
         val node = node()
         val dir = tempDir()
 
@@ -271,7 +271,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `quitting lets every waiting child go with a no`() {
+    fun `quitting denies every waiting request`() {
         val node = node()
         val dir = tempDir()
 
@@ -314,7 +314,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `the script prints valid JSON, so a stray apostrophe cannot break the deny`() {
+    fun `the script prints valid JSON around a quote`() {
         val dir = tempDir()
         bridge(node(), dir).settingsFile(ASKABLE_TOOLS)
         val text = scriptIn(dir).readText()
@@ -324,7 +324,7 @@ class PermissionBridgeTest {
     }
 
     @Test
-    fun `the script and settings are written where a workspace will never see them`() {
+    fun `the script and settings are written outside the workspace`() {
         val dir = tempDir()
         val file = bridge(node(), dir).settingsFile(ASKABLE_TOOLS)!!
 

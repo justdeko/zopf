@@ -51,7 +51,7 @@ class SettingsChoicesTest {
     }
 
     @Test
-    fun `a narrow window overflows instead of crashing`() {
+    fun `a narrow window overflows without crashing`() {
         runSettings(width = 360) {
             onNodeWithText("1").assertExists()
         }
@@ -66,7 +66,7 @@ class SettingsChoicesTest {
     }
 
     @Test
-    fun `the runs-to-keep row survives a narrow window and picks what was clicked`() {
+    fun `the runs-to-keep row survives a narrow window`() {
         runSettings(width = 360) {
             onNodeWithText("None").assertExists()
         }
@@ -79,7 +79,7 @@ class SettingsChoicesTest {
     }
 
     @Test
-    fun `holding a button does not wrap its neighbours' labels`() {
+    fun `holding a button does not wrap neighbouring labels`() {
         runSettings(width = 900) {
             fun labelHeights() =
                 ThemePreference.entries.associate {

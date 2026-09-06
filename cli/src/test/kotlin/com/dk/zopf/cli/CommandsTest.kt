@@ -32,7 +32,7 @@ class CommandsTest {
     private fun options(vararg args: String) = Options.parse(args.toList() + listOf("--workspace", sandbox.workspace.root.toString()), LIST_OPTIONS)
 
     @Test
-    fun `list names every workflow and every file that didn't parse`() {
+    fun `list names every workflow and every broken file`() {
         sandbox.save(workflow(nodes = listOf(shell("build")), name = "smoke").copy(description = "A first line\n\nand more"))
         sandbox.workspace.workflowsDir
             .resolve("bent.yaml")
@@ -48,7 +48,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `validate is quiet about a clean workflow and exits zero`() {
+    fun `validate on a clean workflow exits zero`() {
         sandbox.save(workflow(nodes = listOf(shell("build"))))
         val streams = Streams()
 
@@ -59,7 +59,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `validate refuses a workflow the editor would paint red`() {
+    fun `validate on a workflow with errors exits three`() {
         sandbox.save(
             workflow(nodes = listOf(shell("build").copy(repo = "app"))),
         )
@@ -73,7 +73,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `a warning is worth saying and not worth failing over`() {
+    fun `validate on a workflow with warnings exits zero`() {
         sandbox.save(
             workflow(nodes = listOf(shell("build"), shell("stray")), edges = emptyList()),
         )
@@ -87,7 +87,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `a repo that has moved is what validate is for in CI`() {
+    fun `validate on a moved repo reports the path`() {
         sandbox.save(
             workflow(nodes = listOf(shell("build").copy(repo = "app")))
                 .copy(repos = listOf(RepoRef("app", "/nowhere/at/all"))),
@@ -99,14 +99,28 @@ class CommandsTest {
     }
 
     @Test
-    fun `validate on a name that isn't there is a usage error`() {
+    fun `validate on a malformed file reports the parse error`() {
+        sandbox.workspace.workflowsDir
+            .resolve("bent.yaml")
+            .writeText("nodes: [")
+        val streams = Streams()
+
+        val code = zopfIn(listOf("validate", "bent"), streams)
+
+        assertEquals(EXIT_USAGE, code)
+        assertContains(streams.output(), "bent.yaml: doesn't parse")
+        assertFalse(streams.errors().contains("More in"), "a broken file is a verdict, not a crash:\n${streams.errors()}")
+    }
+
+    @Test
+    fun `validate on an unknown name is a usage error`() {
         val streams = Streams()
         assertEquals(EXIT_USAGE, zopfIn(listOf("validate", "nope"), streams))
         assertContains(streams.errors(), "No workflow called \"nope\"")
     }
 
     @Test
-    fun `runs reads the archive the app writes, newest first`() {
+    fun `runs lists the archive newest first`() {
         val first = archive("older", "SUCCEEDED", cost = 0.25)
         Thread.sleep(1100)
         val second = archive("newer", "FAILED", cost = null)
@@ -122,7 +136,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `--last says how far back to look`() {
+    fun `runs --last limits the list`() {
         repeat(3) { archive("run$it", "SUCCEEDED", cost = null) }
         val streams = Streams()
 
@@ -171,7 +185,7 @@ class CommandsTest {
     ): Int = zopf(args + listOf("--workspace", sandbox.workspace.root.toString()), streams.out, streams.err)
 
     @Test
-    fun `prune keeps the newest and deletes the rest`() {
+    fun `prune keeps the newest runs`() {
         repeat(5) { index ->
             archive("run-$index", "SUCCEEDED", null)
             Thread.sleep(5)
@@ -196,7 +210,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `prune leaves a run that isn't old enough`() {
+    fun `prune --older-than skips younger runs`() {
         repeat(3) { archive("run-$it", "SUCCEEDED", null) }
 
         pruneRuns(
@@ -209,7 +223,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `a dry run prints the order and starts nothing`() {
+    fun `run --dry-run prints the order and starts nothing`() {
         sandbox.save(
             Workflow(
                 name = "shape",
@@ -233,7 +247,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `version prints the build it came from`() {
+    fun `version prints the build version`() {
         val streams = Streams()
 
         assertEquals(EXIT_OK, zopf(listOf("--version"), streams.out, streams.err))
@@ -241,7 +255,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `version mentions a newer release on stderr, so stdout stays greppable`() {
+    fun `version reports a newer release on stderr`() {
         val cache = sandbox.dir().resolve("update.json")
         updateCheck("9.9.9", cache).fetch()
         val streams = Streams()
@@ -255,7 +269,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `version says nothing extra when no check has ever run`() {
+    fun `version is quiet with no cached check`() {
         val streams = Streams()
 
         printVersion(streams.out, streams.err, check = updateCheck(latest = null), notify = true)
@@ -264,7 +278,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `a redirect or a CI job gets the version and no notice`() {
+    fun `version omits the notice outside a terminal`() {
         val streams = Streams()
 
         printVersion(streams.out, streams.err, check = updateCheck("9.9.9"), notify = false)
@@ -273,7 +287,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `check-update names the newer release and where to get it`() {
+    fun `check-update reports a newer release and its url`() {
         val streams = Streams()
 
         val code = checkForUpdate(streams.out, streams.err, updateCheck("9.9.9"))
@@ -284,7 +298,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `check-update on the latest build says so and still exits zero`() {
+    fun `check-update on the latest build exits zero`() {
         val streams = Streams()
 
         assertEquals(EXIT_OK, checkForUpdate(streams.out, streams.err, updateCheck("0.0.1")))
@@ -292,7 +306,7 @@ class CommandsTest {
     }
 
     @Test
-    fun `a check that cannot reach GitHub is a failure, not a verdict about zopf`() {
+    fun `check-update without network exits one`() {
         val streams = Streams()
 
         val code = checkForUpdate(streams.out, streams.err, updateCheck(latest = null))
@@ -322,7 +336,7 @@ class RunCommandTest {
     fun cleanup() = sandbox.cleanup()
 
     @Test
-    fun `a workflow that runs through exits zero`() {
+    fun `run on a passing workflow exits zero`() {
         sandbox.save(workflow(nodes = listOf(shell("build"), shell("test")), edges = listOf("build" to "test")))
         val executor = FakeExecutor()
 
@@ -334,7 +348,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `run refuses what validate refuses, instead of failing halfway through the graph`() {
+    fun `run refuses a workflow with errors`() {
         sandbox.save(workflow(nodes = listOf(shell("build").copy(repo = "app"), shell("test")), edges = listOf("build" to "test")))
         val executor = FakeExecutor()
 
@@ -347,7 +361,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `the refusal goes to stderr, so --format json stays parseable`() {
+    fun `run writes its refusal to stderr`() {
         sandbox.save(workflow(nodes = listOf(shell("build").copy(repo = "app"))))
 
         val (_, streams) = sandbox.run(listOf("demo", "--format", "json"))
@@ -357,7 +371,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `a warning is not a reason to refuse a run`() {
+    fun `run proceeds on a workflow with warnings`() {
         sandbox.save(workflow(nodes = listOf(shell("build"), shell("stray"))))
         val executor = FakeExecutor()
 
@@ -368,7 +382,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `a failed node exits one, and says which`() {
+    fun `run on a failed node exits one and names it`() {
         sandbox.save(workflow(nodes = listOf(shell("build"), shell("ship")), edges = listOf("build" to "ship")))
 
         val (code, streams) = sandbox.run(listOf("demo"), FakeExecutor(fail = setOf("build")))
@@ -379,7 +393,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `a gate with nobody to answer it stops the run, and names the flag that would decide`() {
+    fun `run on an unanswered gate stops and names --on-gate`() {
         sandbox.save(workflow(nodes = listOf(gate("approve"), shell("ship")), edges = listOf("approve" to "ship")))
         val executor = FakeExecutor()
 
@@ -391,7 +405,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `--on-gate approve lets the rest through`() {
+    fun `run --on-gate approve continues the run`() {
         sandbox.save(workflow(nodes = listOf(gate("approve"), shell("ship")), edges = listOf("approve" to "ship")))
         val executor = FakeExecutor()
 
@@ -402,7 +416,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `--on-gate reject is a decision, not a fault`() {
+    fun `run --on-gate reject stops without failing`() {
         sandbox.save(workflow(nodes = listOf(gate("approve"), shell("ship")), edges = listOf("approve" to "ship")))
 
         val (code, streams) = sandbox.run(listOf("demo", "--on-gate", "reject"))
@@ -412,7 +426,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `--answer feeds an input node, and what it says reaches the next one`() {
+    fun `run --answer feeds an input node downstream`() {
         sandbox.save(
             workflow(
                 nodes = listOf(input("ask"), agent("review").copy(prompt = "review \${ask.result}")),
@@ -428,7 +442,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `an input with a default takes it when nothing answers`() {
+    fun `run on an unanswered input uses its default`() {
         sandbox.save(workflow(nodes = listOf(input("ask", default = "main"), shell("build")), edges = listOf("ask" to "build")))
         val executor = FakeExecutor()
 
@@ -439,7 +453,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `an unanswered input with no default stops the run rather than guessing`() {
+    fun `run on an unanswered input with no default stops`() {
         sandbox.save(workflow(nodes = listOf(input("ask"), shell("build")), edges = listOf("ask" to "build")))
         val executor = FakeExecutor()
 
@@ -451,7 +465,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `an answer the node could never have offered is refused before anything runs`() {
+    fun `run --answer outside the choices is refused`() {
         sandbox.save(workflow(nodes = listOf(input("ask", choices = listOf("staging", "prod")))))
         val executor = FakeExecutor()
 
@@ -462,7 +476,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `an answer for a node that isn't an input is refused too`() {
+    fun `run --answer for a non-input node is refused`() {
         sandbox.save(workflow(nodes = listOf(shell("build"))))
 
         val failure = assertFailsWith<UsageError> { sandbox.run(listOf("demo", "--answer", "build=yes")) }
@@ -473,7 +487,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `--repo points a declared repo somewhere else for this run`() {
+    fun `run --repo redirects a declared repo`() {
         val elsewhere = sandbox.dir()
         sandbox.save(
             workflow(nodes = listOf(shell("build").copy(repo = "app")))
@@ -488,7 +502,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `--model is the default for nodes that don't name one, and never overrules one that does`() {
+    fun `run --model applies only to nodes naming none`() {
         sandbox.save(
             workflow(
                 nodes = listOf(agent("plan"), agent("fix").copy(model = "opus")),
@@ -503,7 +517,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `--provider is the same kind of default, and a node that named one keeps it`() {
+    fun `run --provider applies only to nodes naming none`() {
         sandbox.save(
             workflow(
                 nodes = listOf(agent("plan"), agent("fix").copy(provider = AgentProviderId.CLAUDE)),
@@ -518,7 +532,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `a CLI zopf cannot drive is refused before anything starts`() {
+    fun `run with an unavailable provider is refused`() {
         sandbox.save(workflow(nodes = listOf(agent("plan"))))
         val executor = FakeExecutor()
 
@@ -530,7 +544,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `a workflow name that isn't there is a usage error, not a run`() {
+    fun `run on an unknown name is a usage error`() {
         sandbox.save(workflow(nodes = listOf(shell("build"))))
 
         val failure = assertFailsWith<UsageError> { sandbox.run(listOf("nope")) }
@@ -538,7 +552,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `--format json prints the archive's own lines and nothing of its own`() {
+    fun `run --format json prints only archive lines`() {
         sandbox.save(workflow(nodes = listOf(shell("build"))))
 
         val (code, streams) = sandbox.run(listOf("demo", "--format", "json"), FakeExecutor(output = { """{"a":1}""" }))
@@ -548,7 +562,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `--format quiet says only how it ended`() {
+    fun `run --format quiet prints only the verdict`() {
         sandbox.save(workflow(nodes = listOf(shell("build"))))
 
         val (_, streams) = sandbox.run(listOf("demo", "--format", "quiet"), FakeExecutor())
@@ -559,7 +573,7 @@ class RunCommandTest {
     }
 
     @Test
-    fun `a branch that skips half the graph still exits zero`() {
+    fun `run on a branch that skips nodes exits zero`() {
         val branching =
             workflow(nodes = listOf(shell("build"), WorkflowNode("ok", NodeType.BRANCH, expression = "true"), shell("ship"), shell("report")))
                 .copy(

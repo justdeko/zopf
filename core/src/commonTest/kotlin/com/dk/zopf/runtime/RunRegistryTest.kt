@@ -39,7 +39,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `a retry runs the failed node and what it stranded, and carries the rest`() {
+    fun `a retry runs the failed node and its dependents`() {
         val executor = RecordingExecutor(fail = setOf("fix"))
         val registry = registry(executor)
         val chain = workflow(listOf(node("analyze"), node("fix"), node("build")), listOf("analyze" to "fix", "fix" to "build"))
@@ -58,7 +58,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `a carried node's output still reaches the node that reads it`() {
+    fun `a carried node's output reaches its reader`() {
         val executor = RecordingExecutor(fail = setOf("fix"))
         val registry = registry(executor)
         val chain =
@@ -109,7 +109,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `retrying from a node that succeeded redoes everything after it too`() {
+    fun `retrying a succeeded node redoes everything after it`() {
         val executor = RecordingExecutor()
         val registry = registry(executor)
         val chain = workflow(listOf(node("analyze"), node("fix"), node("build")), listOf("analyze" to "fix", "fix" to "build"))
@@ -124,7 +124,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `the run that was retried is left exactly as it was`() {
+    fun `the retried run is left unchanged`() {
         val executor = RecordingExecutor(fail = setOf("fix"))
         val registry = registry(executor)
         val chain = workflow(listOf(node("analyze"), node("fix")), listOf("analyze" to "fix"))
@@ -140,7 +140,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `a run restored from the archive says why it cannot be retried`() {
+    fun `a run restored from the archive cannot be retried`() {
         val registry = registry(RecordingExecutor())
         val restored =
             WorkflowRun.restored(
@@ -153,7 +153,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `a run still going cannot be retried`() {
+    fun `a running run cannot be retried`() {
         val registry = registry(RecordingExecutor(work = { delay(10.seconds) }))
         val chain = workflow(listOf(node("analyze")), emptyList())
         val run = registry.startWorkflow(workspace(), chain).getOrThrow()
@@ -166,7 +166,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `the configured concurrency is how many nodes run at once, and a change reaches the next run`() {
+    fun `the configured concurrency applies to the next run`() {
         val settings = LiveSettings(AppSettings(concurrency = 1))
         val executor = RecordingExecutor(work = { delay(50.milliseconds) })
         val registry = registry(executor, settings)
@@ -182,7 +182,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `the terminal to hand over to is whatever the settings name`() {
+    fun `the terminal is taken from the settings`() {
         assertEquals("iTerm", registry(RecordingExecutor(), LiveSettings(AppSettings(terminalApp = "iTerm"))).terminalApp)
 
         val settings = LiveSettings(AppSettings())
@@ -238,7 +238,7 @@ class RunRegistryTest {
     ) = WorkflowNode(id = id, type = NodeType.AGENT, prompt = prompt)
 
     @Test
-    fun `a gate that parks asks through a notification, the way an input node does`() {
+    fun `a parked gate posts a notification`() {
         val notifier = RecordingNotifier()
         val registry = registry(RecordingExecutor(), notifier = notifier)
         val gated =
@@ -262,7 +262,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `answering a gate in the window takes its notification back`() {
+    fun `answering a gate withdraws its notification`() {
         val notifier = RecordingNotifier()
         val registry = registry(RecordingExecutor(), notifier = notifier)
         val gated = workflow(listOf(WorkflowNode(id = "approve", type = NodeType.GATE, prompt = "Ship it?")), emptyList())
@@ -278,7 +278,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `nothing is posted while the window is the app you are looking at`() {
+    fun `nothing is posted while the window is focused`() {
         val notifier = RecordingNotifier()
         val scope = CoroutineScope(Job() + Dispatchers.Default).also { scopes.add(it) }
         val registry =
@@ -297,7 +297,7 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `a run that only succeeded says nothing when the level is important`() {
+    fun `a succeeded run posts nothing at the important level`() {
         val notifier = RecordingNotifier()
         val settings = LiveSettings(AppSettings(notify = NotifyLevel.IMPORTANT))
         val registry = registry(RecordingExecutor(), settings, notifier)

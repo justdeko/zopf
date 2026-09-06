@@ -64,7 +64,7 @@ class ConnectorRunnerTest {
         }
 
     @Test
-    fun `inputs arrive as one JSON object on stdin and the result comes back`() {
+    fun `inputs arrive as one JSON object on stdin`() {
         val script = script("printf '{\"result\": %s}' \"\$(cat)\"")
 
         val (exit, output) = run(script, mapOf("channel" to "#eng", "text" to "hello"))
@@ -76,7 +76,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `a script that logs before its JSON is still understood`() {
+    fun `a script that logs before its JSON is still read`() {
         val script =
             script(
                 """
@@ -94,7 +94,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `an error object is reported even when the JSON parses`() {
+    fun `an error object is reported though the JSON parses`() {
         val script = script("""cat > /dev/null; echo '{"error": "401 unauthorized"}'; exit 1""")
 
         val (exit, output) = run(script)
@@ -104,7 +104,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `a script that prints no JSON still hands its output on, and says so`() {
+    fun `a script printing no JSON passes its output on`() {
         val script = script("""cat > /dev/null; echo "just some text"""")
 
         val (_, output) = run(script)
@@ -127,7 +127,7 @@ class ConnectorRunnerTest {
         }
 
     @Test
-    fun `a script that was never chmod +x is made runnable`() {
+    fun `a script without the execute bit is made runnable`() {
         val script = script("""cat > /dev/null; echo '{"result": "ran anyway"}'""", executable = false)
         assertFalse(script.isExecutable())
 
@@ -138,7 +138,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `a connector that hangs is killed rather than parking the run`() {
+    fun `a connector that hangs is killed`() {
         val script = script("sleep 30")
 
         val session =
@@ -162,7 +162,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `JSON pretty-printed across several lines is still read`() {
+    fun `JSON across several lines is still read`() {
         val output = ConnectorOutput.parse(listOf("{", """  "result": "spread out"""", "}"))
 
         assertEquals("spread out", output.result)
@@ -170,7 +170,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `every other key of the object comes back as its own field`() {
+    fun `every other key comes back as its own field`() {
         val output =
             ConnectorOutput.parse(
                 listOf("""{"result": "posted", "messageId": "1712.9", "permalink": "https://example.test/1"}"""),
@@ -181,7 +181,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `a structured field keeps its JSON form, and null is not a field`() {
+    fun `a structured field keeps its JSON form and null is dropped`() {
         val output = ConnectorOutput.parse(listOf("""{"result": "ok", "ids": [1, 2], "cursor": null}"""))
 
         assertEquals("[1,2]", output.fields["ids"])
@@ -189,7 +189,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `error is reported as an error rather than as a field`() {
+    fun `error is reported as an error not a field`() {
         val output = ConnectorOutput.parse(listOf("""{"error": "401", "retryAfter": "30"}"""))
 
         assertEquals("401", output.error)
@@ -197,7 +197,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `an object with no result is the result, and still exposes its keys individually`() {
+    fun `an object with no result is the result and exposes its keys`() {
         val output = ConnectorOutput.parse(listOf("""{"id": 7, "url": "https://example.test"}"""))
 
         assertEquals("""{"id":7,"url":"https://example.test"}""", output.result)
@@ -206,7 +206,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `output with no JSON at all has no fields`() {
+    fun `output with no JSON has no fields`() {
         assertEquals(emptyMap(), ConnectorOutput.parse(listOf("just some text")).fields)
     }
 
@@ -225,7 +225,7 @@ class ConnectorRunnerTest {
     }
 
     @Test
-    fun `nothing on stdout is an empty result rather than a crash`() {
+    fun `nothing on stdout is an empty result`() {
         val output = ConnectorOutput.parse(emptyList())
 
         assertEquals("", output.result)
@@ -246,7 +246,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `a connector runs in its own directory with its inputs on stdin`() {
+    fun `a connector runs in its own directory`() {
         val workspace = workspace()
 
         connector(
@@ -284,7 +284,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `what a connector returns is what the next node reads`() {
+    fun `a connector's result reaches the next node`() {
         val workspace = workspace()
         connector(workspace, "namer", body = "cat > /dev/null; echo '{\"result\": \"ada\"}'")
 
@@ -299,7 +299,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `a connector's extra fields are addressable by the node after it, declared or not`() {
+    fun `a connector's extra fields are addressable downstream`() {
         val workspace = workspace()
         connector(
             workspace,
@@ -323,7 +323,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `zopf's own fields aren't shadowed by a connector returning the same name`() {
+    fun `a connector cannot shadow zopf's own fields`() {
         val workspace = workspace()
         connector(workspace, "liar", body = """cat > /dev/null; echo '{"result": "ok", "exitCode": "99"}'""")
 
@@ -337,7 +337,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `a declared output that didn't come back is said out loud`() {
+    fun `a declared output that did not come back is reported`() {
         val workspace = workspace()
         connector(
             workspace,
@@ -365,7 +365,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `the manifest's defaults fill in the inputs a node doesn't set`() {
+    fun `the manifest's defaults fill in unset inputs`() {
         val workspace = workspace()
         connector(
             workspace,
@@ -384,7 +384,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `a missing required input fails the node before anything is launched`() {
+    fun `a missing required input fails the node before launch`() {
         val workspace = workspace()
         connector(
             workspace,
@@ -406,7 +406,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `a connector that reports an error fails the run and skips what follows`() {
+    fun `a connector error fails the run and skips downstream`() {
         val workspace = workspace()
         connector(workspace, "flaky", body = "cat > /dev/null; echo '{\"error\": \"401\"}'; exit 1")
 
@@ -422,7 +422,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `a resolved secret reaches the script's environment, whichever place it came from`() {
+    fun `a resolved secret reaches the script's environment`() {
         val workspace = workspace()
         connector(
             workspace,
@@ -447,7 +447,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `a secret that can't be found anywhere stops the node before it launches`() {
+    fun `an unresolved secret stops the node before launch`() {
         val workspace = workspace()
         connector(
             workspace,
@@ -475,7 +475,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `an optional secret that isn't set doesn't stop anything`() {
+    fun `an unset optional secret stops nothing`() {
         val workspace = workspace()
         connector(
             workspace,
@@ -495,7 +495,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `a connector nobody installed is refused before the run starts`() {
+    fun `an uninstalled connector is refused before the run`() {
         val result =
             engine().start(
                 workspace = workspace(),
@@ -508,7 +508,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `a connector that never finishes is given up on at the node's timeout rather than parking the run`() {
+    fun `a connector that never finishes is killed at its timeout`() {
         val workspace = workspace()
         connector(workspace, "sleeper", body = "cat > /dev/null\nexec sleep 30")
 
@@ -536,7 +536,7 @@ class ConnectorNodeTest {
     }
 
     @Test
-    fun `the raw output of a connector is archived like any other node`() {
+    fun `a connector's raw output is archived`() {
         val workspace = workspace()
         val archiveRoot = tempDir()
         connector(workspace, "chatty", body = "cat > /dev/null; echo working; echo '{\"result\": \"done\"}'")

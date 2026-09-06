@@ -22,7 +22,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `a first launch writes the defaults out, so there is a file to edit`() {
+    fun `a first launch writes the defaults to disk`() {
         val file = tempFile()
 
         val settings = SettingsStore(file).read().getOrThrow()
@@ -37,7 +37,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `what the file says is what the app gets`() {
+    fun `the file's values reach the app`() {
         val file = tempFile()
         file.writeText("""{"terminalApp": "iTerm", "defaultModel": "sonnet", "concurrency": 4}""")
 
@@ -47,7 +47,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `a key this version doesn't know doesn't cost the ones it does`() {
+    fun `an unknown key does not cost the known ones`() {
         val file = tempFile()
         file.writeText("""{"terminalApp": "Ghostty", "somethingNewer": true}""")
 
@@ -55,14 +55,14 @@ class SettingsTest {
     }
 
     @Test
-    fun `values that would break something are clamped rather than obeyed`() {
+    fun `an out-of-range value is clamped`() {
         assertEquals(MAX_CONCURRENCY, AppSettings(concurrency = 200).sanitized().concurrency)
         assertEquals(1, AppSettings(concurrency = 0).sanitized().concurrency)
         assertEquals(1, AppSettings(concurrency = -3).sanitized().concurrency)
     }
 
     @Test
-    fun `a blank value means unset, not an empty one`() {
+    fun `a blank value reads as unset`() {
         val sanitized = AppSettings(terminalApp = "  ", defaultModel = "  ").sanitized()
 
         assertEquals(DEFAULT_TERMINAL_APP, sanitized.terminalApp)
@@ -71,7 +71,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `a file that doesn't parse is reported rather than ignored`() {
+    fun `a malformed file is reported`() {
         val file = tempFile()
         file.writeText("{ this is not json")
 
@@ -100,7 +100,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `a file written before a key existed takes that key's default`() {
+    fun `a file missing a key takes that key's default`() {
         val file = tempFile()
         file.writeText("""{"terminalApp": "Terminal", "defaultModel": null, "concurrency": 3}""")
 
@@ -112,7 +112,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `the theme is written in the case a person would type it`() {
+    fun `the theme is written in readable case`() {
         val file = tempFile()
 
         SettingsStore(file).save(AppSettings(theme = ThemePreference.LIGHT))
@@ -121,7 +121,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `a theme is read leniently, whatever case it is in and however unheard of`() {
+    fun `a theme is read in any case and falls back`() {
         val file = tempFile()
         file.writeText("""{"terminalApp": "Ghostty", "concurrency": 4, "theme": "sepia"}""")
 
@@ -136,7 +136,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `an edit is both in effect and on disk`() {
+    fun `an edit reaches the app and the disk`() {
         val file = tempFile()
         val live = LiveSettings(store = SettingsStore(file))
 
@@ -147,7 +147,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `an edit is clamped the same way the file is`() {
+    fun `an edit is clamped like the file`() {
         val live = LiveSettings(AppSettings(concurrency = 99))
         assertEquals(MAX_CONCURRENCY, live.current.concurrency)
 
@@ -158,7 +158,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `a settings file that can't be written still changes the running app`() {
+    fun `an unwritable file still changes the running app`() {
         val unwritable = Files.createTempDirectory("zopf-settings").also { dirs.add(it) }
         val live = LiveSettings(store = SettingsStore(unwritable))
 
@@ -169,7 +169,7 @@ class SettingsTest {
     }
 
     @Test
-    fun `a fresh install keeps every run until it is told not to`() {
+    fun `a fresh install keeps every run`() {
         val settings = AppSettings()
 
         assertEquals(KEEP_EVERY_RUN, settings.keepRuns)

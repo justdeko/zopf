@@ -21,7 +21,7 @@ class WorkflowValidationTest {
     ) = WorkflowNode(id, NodeType.SHELL, command = command)
 
     @Test
-    fun `a node naming a repo the workflow never declared is flagged`() {
+    fun `a node naming an undeclared repo is an error`() {
         val w =
             Workflow(
                 name = "w",
@@ -42,7 +42,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `an output field that shadows a built-in one, or that cannot be named, is caught`() {
+    fun `an output field that shadows or is unnamable is an error`() {
         val w =
             wf(
                 WorkflowNode(
@@ -69,14 +69,14 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `only an agent node can declare an output schema`() {
+    fun `only an agent node may declare an output schema`() {
         val w = wf(shell("build").copy(schema = listOf(SchemaField("severity"))))
 
         assertEquals(1, w.validate().mentioning("only an agent node").size)
     }
 
     @Test
-    fun `a node whose CLI isn't installed is warned about before the run, not during it`() {
+    fun `a node whose provider is missing is a warning`() {
         val w =
             wf(
                 WorkflowNode("plan", NodeType.AGENT, prompt = "hi"),
@@ -93,14 +93,14 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `nothing is said about a CLI when zopf has no way to look`() {
+    fun `a provider is not checked without a lookup`() {
         val w = wf(WorkflowNode("plan", NodeType.AGENT, prompt = "hi"))
 
         assertEquals(emptyList(), w.validate().messages())
     }
 
     @Test
-    fun `a clean schema is silent`() {
+    fun `a clean schema reports nothing`() {
         val w =
             wf(
                 WorkflowNode(
@@ -115,7 +115,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a repo whose path has gone away is flagged once, for the workflow`() {
+    fun `a missing repo path is reported once`() {
         val w = Workflow(name = "w", repos = listOf(RepoRef("app", "/nope")))
 
         val issues = w.validate(repoExists = { false })
@@ -125,7 +125,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a reference to a node that is not upstream is flagged, and one that is is not`() {
+    fun `a reference to a node that is not upstream is an error`() {
         val w =
             wf(
                 WorkflowNode("analyze", NodeType.AGENT, prompt = "look"),
@@ -141,14 +141,14 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a reference to a deleted node is called out as such`() {
+    fun `a reference to a deleted node is an error`() {
         val w = wf(WorkflowNode("fix", NodeType.AGENT, prompt = "apply \${analyze.result}"))
 
         assertEquals(1, w.validate().mentioning("no longer a node").size)
     }
 
     @Test
-    fun `a reference to a field the upstream node never produces is an error, and a declared one is not`() {
+    fun `a reference to an unproduced field is an error`() {
         val w =
             wf(
                 WorkflowNode(
@@ -174,7 +174,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a shell node's exit code is a reference but an agent's cost is not its own`() {
+    fun `a shell node exposes its exit code and an agent does not`() {
         val w =
             wf(
                 shell("build"),
@@ -186,7 +186,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a connector's output is only checked when its manifest is there to check against`() {
+    fun `a connector output is checked only against a manifest`() {
         val w =
             wf(
                 WorkflowNode("post", NodeType.CONNECTOR, connector = "slack-post"),
@@ -207,7 +207,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a field on a node that is not upstream is reported once, as the missing edge it really is`() {
+    fun `a field on a node that is not upstream reports the missing edge`() {
         val w =
             wf(
                 WorkflowNode("analyze", NodeType.AGENT, prompt = "look"),
@@ -221,7 +221,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `each node type is asked for the one field it cannot run without`() {
+    fun `each node type requires its own mandatory field`() {
         val w =
             wf(
                 WorkflowNode("a", NodeType.AGENT),
@@ -240,7 +240,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a branch needs both of its edges labelled, and only one of each`() {
+    fun `a branch requires one true edge and one false edge`() {
         val unlabelled =
             wf(
                 WorkflowNode("ok", NodeType.BRANCH, expression = "true"),
@@ -260,7 +260,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a floating node is a warning, not an error, and a lone node is neither`() {
+    fun `a floating node is a warning and a lone node is clean`() {
         val floating =
             wf(
                 WorkflowNode("a", NodeType.GATE),
@@ -277,14 +277,14 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `the plan's example workflow validates clean`() {
+    fun `the example workflow validates clean`() {
         assertEquals(emptyList(), exampleWorkflow.validate().messages())
     }
 
     private fun exampleWithConnector(manifest: ConnectorManifest?) = exampleWorkflow.validate(connector = { manifest })
 
     @Test
-    fun `a connector nothing has installed is flagged on the node that calls it`() {
+    fun `an uninstalled connector is an error on its node`() {
         val issues = exampleWithConnector(null)
 
         assertEquals(listOf("notify"), issues.map { it.nodeId })
@@ -292,7 +292,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a node validates clean against the manifest it fills in`() {
+    fun `a node that fills its manifest validates clean`() {
         val manifest =
             ConnectorManifest(
                 name = "slack-post",
@@ -307,7 +307,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a required input the node leaves out is an error, unless the manifest defaults it`() {
+    fun `a missing required input is an error unless defaulted`() {
         val required = ConnectorInput("webhook", required = true)
         val defaulted = required.copy(default = "https://example.test/hook")
 
@@ -319,7 +319,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `an input the manifest does not declare is a warning, not an error`() {
+    fun `an undeclared input is a warning`() {
         val issues =
             exampleWithConnector(
                 ConnectorManifest("slack-post", inputs = listOf(ConnectorInput("channel"))),
@@ -332,7 +332,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `connectors are not checked at all when nothing knows what is installed`() {
+    fun `connectors are not checked without a lookup`() {
         assertEquals(emptyList(), exampleWorkflow.validate().mentioning("slack-post"))
     }
 
@@ -342,12 +342,12 @@ class WorkflowValidationTest {
     ) = wf(WorkflowNode("review", NodeType.AGENT, prompt = prompt, promptFile = file))
 
     @Test
-    fun `a prompt file satisfies the node that would otherwise need a prompt`() {
+    fun `a prompt file satisfies a node needing a prompt`() {
         assertEquals(emptyList(), withPromptFile("prompts/review.md").validate().messages())
     }
 
     @Test
-    fun `a prompt file that isn't on disk is an error on the node`() {
+    fun `a missing prompt file is an error on its node`() {
         val issues = withPromptFile("prompts/gone.md").validate(fileExists = { false })
 
         assertEquals(listOf("review"), issues.map { it.nodeId })
@@ -356,7 +356,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `an inline prompt under a prompt file is a warning, because nothing sends it`() {
+    fun `an inline prompt under a prompt file is a warning`() {
         val issues = withPromptFile("prompts/review.md", prompt = "left over").validate()
 
         assertEquals(1, issues.size)
@@ -372,7 +372,7 @@ class WorkflowValidationTest {
         )
 
     @Test
-    fun `a reference inside a prompt file is checked, and the issue says which file`() {
+    fun `a reference in a prompt file is checked and names the file`() {
         val issues =
             twoNodesWithPromptFile()
                 .validate(promptText = { "Look at \${gone.result} and \${build.result}" })
@@ -384,7 +384,7 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a prompt file reference to a node that isn't upstream is flagged too`() {
+    fun `a prompt file reference to a node that is not upstream is an error`() {
         val w = twoNodesWithPromptFile().copy(edges = emptyList())
 
         val issues = w.validate(promptText = { "\${build.result}" }).mentioning("nothing connects")
@@ -394,12 +394,12 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a prompt file nothing can read is not guessed at`() {
+    fun `an unreadable prompt file is not checked`() {
         assertEquals(emptyList(), twoNodesWithPromptFile().validate().messages())
     }
 
     @Test
-    fun `a skill name nothing can resolve is a warning on the node that names it`() {
+    fun `an unresolved skill name is a warning on its node`() {
         val issues = exampleWorkflow.validate(knownSkills = emptySet()).mentioning("code-review")
 
         assertEquals(listOf("analyze"), issues.map { it.nodeId })
@@ -408,13 +408,13 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `skills are not checked at all when nothing knows what is installed`() {
+    fun `skills are not checked without a lookup`() {
         assertEquals(emptyList(), exampleWorkflow.validate().mentioning("code-review"))
         assertEquals(emptyList(), exampleWorkflow.validate(knownSkills = setOf("code-review")).messages())
     }
 
     @Test
-    fun `a failure edge is only worth drawing out of a node that can fail`() {
+    fun `a failure edge out of a node that cannot fail is a warning`() {
         fun recovering(source: WorkflowNode) =
             wf(
                 source,
@@ -435,14 +435,14 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `an input node with no question is caught before it asks nothing`() {
+    fun `an input node with no question is an error`() {
         val workflow = wf(WorkflowNode("ask", NodeType.INPUT))
 
         assertEquals(listOf("ask needs a question"), workflow.validate().mentioning("question").messages())
     }
 
     @Test
-    fun `a default has to be one of the choices offered beside it`() {
+    fun `a default outside the choices is an error`() {
         fun asking(default: String) =
             wf(
                 WorkflowNode(
@@ -462,64 +462,44 @@ class WorkflowValidationTest {
     }
 
     @Test
-    fun `a when on a non-branch edge is an error rather than a node that never runs`() {
-        val workflow =
-            wf(
-                shell("tests", command = "./gradlew test"),
-                shell("ship"),
-                edges = listOf(WorkflowEdge("tests", "ship", condition = true)),
-            )
-
-        val issue = workflow.validate().single { it.nodeId == "tests" }
-        assertEquals(WorkflowIssue.Severity.ERROR, issue.severity)
-        assertTrue("isn't a branch" in issue.message, issue.message)
+    fun `a malformed graph is an error naming what is wrong`() {
+        listOf(
+            Triple(
+                "a when on a non-branch edge",
+                wf(shell("tests"), shell("ship"), edges = listOf(WorkflowEdge("tests", "ship", condition = true))),
+                listOf("isn't a branch", "tests"),
+            ),
+            Triple(
+                "a loop",
+                wf(shell("a"), shell("b"), edges = listOf(WorkflowEdge("a", "b"), WorkflowEdge("b", "a"))),
+                listOf("loop", "a", "b"),
+            ),
+            Triple(
+                "two nodes sharing an id",
+                wf(shell("a", command = "echo first"), shell("a", command = "echo second")),
+                listOf("unique", "2 nodes called \"a\""),
+            ),
+            Triple(
+                "an edge naming a node that isn't there",
+                wf(shell("build"), shell("deploy"), edges = listOf(WorkflowEdge("buld", "deploy"))),
+                listOf("buld"),
+            ),
+            Triple(
+                "a node wired to itself",
+                wf(shell("a"), edges = listOf(WorkflowEdge("a", "a"))),
+                listOf("feeds itself", "a"),
+            ),
+        ).forEach { (case, workflow, fragments) ->
+            val errors = workflow.validate().filter { it.severity == WorkflowIssue.Severity.ERROR }
+            assertTrue(errors.isNotEmpty(), case)
+            fragments.forEach { fragment ->
+                assertTrue(errors.any { fragment in it.message }, "$case: no error mentioning \"$fragment\" in ${errors.messages()}")
+            }
+        }
     }
 
     @Test
-    fun `a loop is an error rather than a run that fails halfway`() {
-        val workflow =
-            wf(
-                shell("a"),
-                shell("b"),
-                edges = listOf(WorkflowEdge("a", "b"), WorkflowEdge("b", "a")),
-            )
-
-        val issue = workflow.validate().single { "loop" in it.message }
-        assertEquals(WorkflowIssue.Severity.ERROR, issue.severity)
-        assertTrue("a" in issue.message && "b" in issue.message, issue.message)
-    }
-
-    @Test
-    fun `two nodes sharing an id are an error, and the message says which id`() {
-        val workflow = wf(shell("a", command = "echo first"), shell("a", command = "echo second"))
-
-        val issue = workflow.validate().single { "unique" in it.message }
-        assertEquals(WorkflowIssue.Severity.ERROR, issue.severity)
-        assertTrue("2 nodes called \"a\"" in issue.message, issue.message)
-    }
-
-    @Test
-    fun `an edge naming a node that does not exist is an error`() {
-        val workflow =
-            wf(
-                shell("build"),
-                shell("deploy"),
-                edges = listOf(WorkflowEdge("buld", "deploy"), WorkflowEdge("build", "deploy")),
-            )
-
-        val issue = workflow.validate().single { "buld" in it.message }
-        assertEquals(WorkflowIssue.Severity.ERROR, issue.severity)
-    }
-
-    @Test
-    fun `a node wired to itself is an error`() {
-        val workflow = wf(shell("a"), edges = listOf(WorkflowEdge("a", "a")))
-
-        assertTrue(workflow.validate().any { "feeds itself" in it.message })
-    }
-
-    @Test
-    fun `a diamond is not mistaken for a loop`() {
+    fun `a diamond is not a loop`() {
         val workflow =
             wf(
                 shell("start"),
@@ -546,7 +526,7 @@ class WorkflowEditsTest {
     ) = Workflow(name = "w", nodes = nodes.toList(), edges = edges)
 
     @Test
-    fun `added nodes get an unused id derived from their type`() {
+    fun `an added node gets an unused id from its type`() {
         var w = Workflow(name = "w")
         repeat(3) { w = w.addNode(NodeType.AGENT).first }
         w = w.addNode(NodeType.SHELL).first
@@ -555,7 +535,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `an id already taken by a hand-written file is skipped rather than clobbered`() {
+    fun `an id already taken is skipped`() {
         val existing = workflow(WorkflowNode("shell", NodeType.AGENT, title = "hand written"))
 
         val (updated, added) = existing.addNode(NodeType.SHELL)
@@ -565,7 +545,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `a duplicate keeps the fields and the references, and picks up none of the edges`() {
+    fun `a duplicate keeps the fields and references and no edges`() {
         val original =
             workflow(
                 WorkflowNode("plan", NodeType.AGENT),
@@ -589,7 +569,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `duplicating a node with no title leaves it untitled, since its id already tells them apart`() {
+    fun `duplicating an untitled node leaves it untitled`() {
         val original = workflow(WorkflowNode("shell", NodeType.SHELL, command = "echo hi"))
 
         val (_, clone) = requireNotNull(original.duplicateNode("shell"))
@@ -599,12 +579,12 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `duplicating an id that isn't there is null rather than a no-op copy`() {
+    fun `duplicating a missing id returns null`() {
         assertNull(workflow(WorkflowNode("a", NodeType.GATE)).duplicateNode("b"))
     }
 
     @Test
-    fun `renaming a node carries its edges and every reference to it`() {
+    fun `renaming a node carries its edges and references`() {
         val original =
             workflow(
                 WorkflowNode("analyze", NodeType.AGENT),
@@ -626,7 +606,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `renaming refuses a taken id and an id that could not appear in a reference`() {
+    fun `renaming refuses a taken id and an unreferenceable id`() {
         val w = workflow(WorkflowNode("a", NodeType.AGENT), WorkflowNode("b", NodeType.AGENT))
 
         assertTrue(w.renameNode("a", "b").isFailure)
@@ -636,7 +616,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `renaming a connector input rewrites the value, not the input name`() {
+    fun `renaming a connector input rewrites the value only`() {
         val w =
             workflow(
                 WorkflowNode("analyze", NodeType.AGENT),
@@ -649,7 +629,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `removing a node takes its edges with it`() {
+    fun `removing a node removes its edges`() {
         val w =
             workflow(
                 WorkflowNode("a", NodeType.AGENT),
@@ -665,7 +645,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `ancestors walk the whole graph above a node, not just its direct parents`() {
+    fun `ancestors walk the whole graph above a node`() {
         val w =
             workflow(
                 WorkflowNode("analyze", NodeType.AGENT),
@@ -687,7 +667,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `a connector's declared outputs are references, and nobody else's are`() {
+    fun `only a connector's declared outputs are references`() {
         val node = WorkflowNode("post", NodeType.CONNECTOR, connector = "slack-post")
         val manifest =
             ConnectorManifest(
@@ -706,7 +686,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `a declared output schema is what an agent node's references are`() {
+    fun `an agent node's references come from its output schema`() {
         val node =
             WorkflowNode(
                 "review",
@@ -720,7 +700,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `an optional field is declared nullable, since a partial required list is not a strict schema`() {
+    fun `an optional field is declared nullable`() {
         val schema =
             listOf(
                 SchemaField("severity", description = "low, medium or high"),
@@ -735,7 +715,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `positions are written onto the nodes they belong to, and dropped from the rest`() {
+    fun `positions are written onto their own nodes only`() {
         val w =
             workflow(
                 WorkflowNode("a", NodeType.AGENT, position = Position(1f, 1f)),
@@ -750,7 +730,7 @@ class WorkflowEditsTest {
     }
 
     @Test
-    fun `dropping a repo also drops it as the default, but leaves the nodes to validation`() {
+    fun `dropping a repo also drops it as the default`() {
         val w =
             Workflow(
                 name = "w",

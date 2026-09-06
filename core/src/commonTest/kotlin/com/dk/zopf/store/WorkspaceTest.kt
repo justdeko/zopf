@@ -22,7 +22,6 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.name
-import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -46,30 +45,22 @@ class WorkspaceTest {
     }
 
     @Test
-    fun `absolute paths pass through unchanged`() {
-        val workspace = Workspace.create(tempDir().resolve("ws"))
-        assertEquals(Paths.get("/usr/local/bin"), workspace.resolvePath("/usr/local/bin"))
-    }
-
-    @Test
-    fun `tilde expands to the home directory`() {
+    fun `a path resolves against home, the workspace root, or itself`() {
         val workspace = Workspace.create(tempDir().resolve("ws"))
         val home = Paths.get(System.getProperty("user.home"))
-        assertEquals(home.resolve("dev/kuiver"), workspace.resolvePath("~/dev/kuiver"))
-        assertEquals(home, workspace.resolvePath("~"))
-    }
-
-    @Test
-    fun `relative paths resolve against the workspace root`() {
-        val workspace = Workspace.create(tempDir().resolve("ws"))
         val root = workspace.root
-        assertEquals(root.resolve("sub/repo").normalize(), workspace.resolvePath("sub/repo"))
 
-        assertEquals(root.parent.normalize(), workspace.resolvePath(".."))
+        listOf(
+            "/usr/local/bin" to Paths.get("/usr/local/bin"),
+            "~/dev/kuiver" to home.resolve("dev/kuiver"),
+            "~" to home,
+            "sub/repo" to root.resolve("sub/repo").normalize(),
+            ".." to root.parent.normalize(),
+        ).forEach { (raw, expected) -> assertEquals(expected, workspace.resolvePath(raw), raw) }
     }
 
     @Test
-    fun `workspace inside a git repo exposes it as self`() {
+    fun `a workspace inside a git repo exposes it as self`() {
         val repo = tempDir().resolve("myrepo")
         repo.resolve(".git").createDirectories()
         val workspace = Workspace.create(repo.resolve(".zopf"))
@@ -82,7 +73,7 @@ class WorkspaceTest {
     }
 
     @Test
-    fun `workspace outside a git repo has no self repo`() {
+    fun `a workspace outside a git repo has no self repo`() {
         val workspace = Workspace.create(tempDir().resolve("standalone"))
         assertNull(workspace.selfRepo)
         assertNull(workspace.resolveRepo(Workflow(name = "w"), SELF_REPO_ID))
@@ -102,7 +93,7 @@ class WorkspaceTest {
     }
 
     @Test
-    fun `resolveRepo falls back to the workflow default and returns null for unknown ids`() {
+    fun `resolveRepo falls back to the default and returns null for unknown ids`() {
         val workspace = Workspace.create(tempDir().resolve("ws"))
         val workflow =
             Workflow(
@@ -135,7 +126,7 @@ class WorkspaceTest {
     }
 
     @Test
-    fun `a dot-zopf directory is a workspace with nothing in it but workflows`() {
+    fun `a dot-zopf directory is a workspace`() {
         val repo = tempDir().resolve("myrepo")
         repo.resolve(".zopf/workflows").createDirectories()
 
@@ -147,7 +138,7 @@ class WorkspaceTest {
     }
 
     @Test
-    fun `a zopf yaml on its own does not make a directory a workspace`() {
+    fun `a zopf yaml alone does not make a workspace`() {
         val dir = tempDir().resolve("looks-the-part")
         dir.resolve("workflows").createDirectories()
         dir.resolve(WORKSPACE_FILE).writeText("name: nope\n")
@@ -156,7 +147,7 @@ class WorkspaceTest {
     }
 
     @Test
-    fun `creating a workspace puts it in dot-zopf and writes no file`() {
+    fun `creating a workspace makes dot-zopf and writes no file`() {
         val repo = tempDir().resolve("myrepo")
         repo.createDirectories()
 
@@ -169,7 +160,7 @@ class WorkspaceTest {
     }
 
     @Test
-    fun `creating over a workspace that is already there returns it untouched`() {
+    fun `creating over an existing workspace returns it untouched`() {
         val repo = tempDir().resolve("myrepo")
         val existing = repo.resolve(".zopf/workflows").createDirectories().parent
         existing.resolve(WORKSPACE_FILE).writeText("name: My workflows\n")
@@ -181,7 +172,7 @@ class WorkspaceTest {
     }
 
     @Test
-    fun `creating one where the path already names dot-zopf does not nest another`() {
+    fun `creating inside dot-zopf does not nest another`() {
         val created = Workspace.create(tempDir().resolve("myrepo/.zopf"))
 
         assertEquals(".zopf", created.root.name)
@@ -189,7 +180,7 @@ class WorkspaceTest {
     }
 
     @Test
-    fun `the default workspace in the home directory is called zopf, not the user`() {
+    fun `the default workspace in home is called zopf`() {
         assertEquals(".zopf", AppPaths.defaultWorkspace.name)
         assertEquals(
             "zopf",
@@ -211,7 +202,7 @@ class WorkspacePortabilityTest {
     }
 
     @Test
-    fun `a workflow in a committed workspace runs in the enclosing checkout`() {
+    fun `a workflow in a committed workspace runs in the checkout`() {
         val repo = gitRepo()
         val workspace = Workspace.create(repo.resolve(".zopf"))
 
@@ -229,7 +220,7 @@ class WorkspacePortabilityTest {
     }
 
     @Test
-    fun `running a workflow leaves git status showing only the workspace`() {
+    fun `running a workflow leaves git status clean`() {
         val repo = gitRepo()
         val workspace = Workspace.create(repo.resolve(".zopf"))
         val workflow = selfWorkflow("echo one", second = "echo two")

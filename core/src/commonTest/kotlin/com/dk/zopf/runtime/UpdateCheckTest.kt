@@ -15,24 +15,29 @@ import kotlin.test.assertTrue
 
 class VersionTest {
     @Test
-    fun `a version is compared by number, not by spelling`() {
-        assertTrue(Version.parse("0.10.0")!! > Version.parse("0.9.0")!!)
-        assertTrue(Version.parse("1.0.0")!! > Version.parse("0.99.99")!!)
+    fun `a version parses to its numbers or to nothing`() {
+        listOf(
+            "1.1.0" to Version(1, 1, 0),
+            "v1.1.0" to Version(1, 1, 0),
+            "1.1.0-rc1" to Version(1, 1, 0),
+            "1" to Version(1, 0, 0),
+            "unknown" to null,
+            "" to null,
+            "main" to null,
+        ).forEach { (raw, expected) -> assertEquals(expected, Version.parse(raw), raw) }
+    }
+
+    @Test
+    fun `a version is compared by number`() {
+        listOf(
+            "0.10.0" to "0.9.0",
+            "1.0.0" to "0.99.99",
+            "1.0.10" to "1.0.9",
+        ).forEach { (bigger, smaller) ->
+            assertTrue(Version.parse(bigger)!! > Version.parse(smaller)!!, "$bigger > $smaller")
+        }
+
         assertEquals(Version.parse("1.0.0"), Version.parse("1.0.0"))
-    }
-
-    @Test
-    fun `a release tag and a build number are the same version`() {
-        assertEquals(Version.parse("1.1.0"), Version.parse("v1.1.0"))
-        assertEquals(Version(1, 1, 0), Version.parse("1.1.0-rc1"))
-        assertEquals(Version(1, 0, 0), Version.parse("1"))
-    }
-
-    @Test
-    fun `anything that isn't a version is no version at all`() {
-        assertNull(Version.parse("unknown"))
-        assertNull(Version.parse(""))
-        assertNull(Version.parse("main"))
     }
 }
 
@@ -55,7 +60,7 @@ class UpdateCheckTest {
     ) = UpdateCheck(source = source, file = file, current = current, now = { now })
 
     @Test
-    fun `a newer release is reported and cached for the next run to read`() {
+    fun `a newer release is reported and cached`() {
         val release = check().refresh()
 
         assertEquals(Version(1, 1, 0), release?.version)
@@ -66,18 +71,18 @@ class UpdateCheckTest {
     }
 
     @Test
-    fun `the release you are already running is not news`() {
+    fun `the running release is not reported`() {
         assertNull(check(latest = "1.0.0").refresh())
         assertNull(check(latest = "0.9.9").refresh())
     }
 
     @Test
-    fun `a build with no version number says nothing`() {
+    fun `a build with no version reports nothing`() {
         assertNull(check(current = "unknown").refresh())
     }
 
     @Test
-    fun `the check runs once a day, not once a launch`() {
+    fun `the check runs once a day`() {
         var asked = 0
         val source =
             ReleaseSource {
@@ -95,7 +100,7 @@ class UpdateCheckTest {
     }
 
     @Test
-    fun `a check that cannot reach GitHub is silent and keeps what it knew`() {
+    fun `a check without network is silent and keeps its cache`() {
         check().refresh()
 
         val release =
@@ -108,7 +113,7 @@ class UpdateCheckTest {
     }
 
     @Test
-    fun `a version is announced once, however many times it is seen`() {
+    fun `a version is announced once`() {
         val checker = check()
         val release = checker.refresh()!!
 
@@ -120,7 +125,7 @@ class UpdateCheckTest {
     }
 
     @Test
-    fun `an unreadable cache is a missing cache, not a crash`() {
+    fun `an unreadable cache reads as missing`() {
         file.writeText("{ this is not json")
 
         assertNull(check(source = { Result.failure(UnknownHostException()) }).cached())
@@ -128,7 +133,7 @@ class UpdateCheckTest {
     }
 
     @Test
-    fun `fetch answers with the latest release whether or not it is newer`() {
+    fun `fetch returns the latest release either way`() {
         val checker = check(latest = "1.0.0")
 
         assertEquals(Version(1, 0, 0), checker.fetch().getOrThrow().version)
@@ -158,18 +163,18 @@ class GitHubReleasesTest {
     }
 
     @Test
-    fun `every other field GitHub sends is ignored rather than refused`() {
+    fun `unknown fields in the payload are ignored`() {
         assertTrue(GitHubReleases().parse(payload).isSuccess, "GitHub adds keys between releases")
     }
 
     @Test
-    fun `a payload with no version in it fails rather than inventing one`() {
+    fun `a payload with no version fails`() {
         assertTrue(GitHubReleases().parse("""{"tag_name":"nightly"}""").isFailure)
         assertTrue(GitHubReleases().parse("not json").isFailure)
     }
 
     @Test
-    fun `a link off the network is either https or not a link at all`() {
+    fun `a link that is not https is refused`() {
         val release = GitHubReleases().parse("""{"tag_name":"v1.2.0","html_url":"file:///etc/passwd"}""").getOrThrow()
 
         assertEquals("https://github.com/justdeko/zopf/releases/latest", release.url)

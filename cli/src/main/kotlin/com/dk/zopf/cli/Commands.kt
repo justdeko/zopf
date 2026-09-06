@@ -7,6 +7,7 @@ import com.dk.zopf.runtime.issues
 import com.dk.zopf.runtime.money
 import com.dk.zopf.runtime.updateChecksSilenced
 import com.dk.zopf.store.AppPaths
+import com.dk.zopf.store.BrokenWorkflow
 import com.dk.zopf.store.BuildInfo
 import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.RunRecord
@@ -66,20 +67,27 @@ fun validateWorkflows(
     val listing = store.list()
 
     val requested = options.positionals
+    val broken = mutableListOf<BrokenWorkflow>()
     val workflows =
         if (requested.isEmpty()) {
+            broken += listing.broken
             listing.workflows
         } else {
-            requested.map { name ->
-                store.load(name)
-                    ?: throw UsageError("No workflow called \"$name\" in ${workspace.name} (${workspace.root})")
+            requested.mapNotNull { name ->
+                runCatching { store.load(name) }.fold(
+                    onSuccess = {
+                        it ?: throw UsageError("No workflow called \"$name\" in ${workspace.name} (${workspace.root})")
+                    },
+                    onFailure = {
+                        broken += BrokenWorkflow(store.fileFor(name), it.message ?: it::class.simpleName.orEmpty())
+                        null
+                    },
+                )
             }
         }
 
-    var refused = requested.isEmpty() && listing.broken.isNotEmpty()
-    listing.broken
-        .takeIf { requested.isEmpty() }
-        ?.forEach { out.println("${it.file.fileName}: doesn't parse. ${it.message}") }
+    var refused = broken.isNotEmpty()
+    broken.forEach { out.println("${it.file.fileName}: doesn't parse. ${it.message}") }
 
     workflows.forEach { workflow ->
         val issues = workflow.issues(workspace)

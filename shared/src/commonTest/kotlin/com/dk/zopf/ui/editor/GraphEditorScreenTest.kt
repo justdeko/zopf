@@ -164,7 +164,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the editor publishes its commands while it is up, and takes them back on the way out`() =
+    fun `the editor publishes its commands and withdraws them on exit`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var published: EditorCommands? = null
             var open by mutableStateOf(true)
@@ -197,7 +197,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the published commands drive the real canvas, and read back what it is showing`() =
+    fun `the published commands drive and read back the canvas`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var published: EditorCommands? = null
             editor(onCommands = { published = it })
@@ -218,7 +218,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `selecting the first node opens the inspector, and closing it afterwards sticks`() =
+    fun `selecting a node opens the inspector and closing it sticks`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var published: EditorCommands? = null
             val (state, _) = editor(onCommands = { published = it })
@@ -241,7 +241,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `isDirty follows the document, so Save in the menu greys out with the button`() =
+    fun `isDirty follows the document`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var published: EditorCommands? = null
             val (state, _) = editor(onCommands = { published = it })
@@ -257,7 +257,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `right-clicking a node opens its menu, and Duplicate lands a second node in the model`() =
+    fun `right-clicking a node opens its menu and Duplicate adds a node`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, _) = editor()
 
@@ -275,7 +275,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the node menu offers Run only for the types that mean something on their own`() =
+    fun `the node menu offers Run only for runnable types`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             editor(Workflow(name = "w", nodes = listOf(WorkflowNode("ask", NodeType.GATE))))
 
@@ -288,7 +288,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `escape leaves a clean editor without anything having been clicked first`() =
+    fun `escape leaves a clean editor`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var closed = 0
             editor(onClose = { closed++ })
@@ -301,7 +301,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `escape cancels connect mode instead of leaving, and only the first press`() =
+    fun `escape cancels connect mode before leaving`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var closed = 0
             val (state, _) = editor(onClose = { closed++ })
@@ -322,7 +322,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `escape on a dirty editor asks instead of leaving`() =
+    fun `escape on a dirty editor asks before leaving`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var closed = 0
             val (state, _) = editor(onClose = { closed++ })
@@ -339,7 +339,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a graph smaller than the canvas opens at its own size, and fit never magnifies it`() =
+    fun `a graph smaller than the canvas is never magnified`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (_, canvas) = editor(twoNodes)
 
@@ -353,7 +353,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `fitting a single node doesn't magnify it either`() =
+    fun `fitting a single node does not magnify it`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (_, canvas) = editor(oneNode)
 
@@ -365,7 +365,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `zooming in still goes past 100 percent, since the clamp is only on fitting`() =
+    fun `zooming in goes past 100 percent`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (_, canvas) = editor(twoNodes)
 
@@ -376,7 +376,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a chain too wide for the window is laid out downwards instead, and fits when it is`() =
+    fun `a chain too wide for the window is laid out downwards`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (_, canvas) = editor(longChain)
 
@@ -397,7 +397,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `dragging a node is an edit, and saving writes that node's position and no others`() =
+    fun `dragging a node is an edit and saving writes its position`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var written: Workflow? = null
             val (state, canvas) = editor(twoNodes, onSave = { written = it })
@@ -436,7 +436,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `dragging one node onto another connects the two`() =
+    fun `dragging one node onto another connects them`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(twoNodes)
             awaitLayout(canvas)
@@ -452,7 +452,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a drag that ends back on its own node connects nothing and offers nothing`() =
+    fun `a drag ending on its own node connects nothing`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(twoNodes)
             awaitLayout(canvas)
@@ -467,7 +467,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `dropping a drag on blank canvas makes the node it is dropped on`() =
+    fun `dropping a drag on blank canvas makes a node`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(oneNode)
             awaitLayout(canvas)
@@ -490,7 +490,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `with Move Nodes on, a drag moves instead of connecting`() =
+    fun `with Move Nodes on a drag moves instead of connecting`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(twoNodes)
             awaitLayout(canvas)
@@ -506,7 +506,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `C steps through the nodes a selected node could feed, and Enter connects to one`() =
+    fun `C steps through connectable nodes and Enter connects`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(threeNodes)
             awaitLayout(canvas)
@@ -531,7 +531,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `C wraps back round rather than running out of nodes`() =
+    fun `C wraps back round`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(threeNodes)
             awaitLayout(canvas)
@@ -549,7 +549,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `Escape drops a connection armed from the keyboard`() =
+    fun `escape drops a connection armed from the keyboard`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(threeNodes)
             awaitLayout(canvas)
@@ -569,7 +569,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `C typed into an inspector field is text, not a connect shortcut`() =
+    fun `C typed into an inspector field is text`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(threeNodes)
             awaitLayout(canvas)
@@ -589,7 +589,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the source pane shows what saving would write, and typing valid YAML redraws the canvas`() =
+    fun `the source pane shows what saving writes and valid yaml redraws`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(twoNodes)
             awaitLayout(canvas)
@@ -620,7 +620,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `YAML that does not parse is reported and leaves the workflow alone`() =
+    fun `yaml that does not parse is reported and changes nothing`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(twoNodes)
             awaitLayout(canvas)
@@ -643,7 +643,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a rename in the source pane is refused rather than orphaning the file`() =
+    fun `a rename in the source pane is refused`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, canvas) = editor(twoNodes)
             awaitLayout(canvas)
@@ -664,7 +664,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the canvas tools go away in the source pane, so nothing can edit behind the text`() =
+    fun `the canvas tools are hidden in the source pane`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (_, canvas) = editor(twoNodes)
             awaitLayout(canvas)
@@ -684,7 +684,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `laying out again hands every node back and saves a file with no positions`() =
+    fun `laying out again saves a file with no positions`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             var written: Workflow? = null
             val (state, _) = editor(twoNodes.handPlaced(), onSave = { written = it })
@@ -704,7 +704,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `dragging the splitter widens the inspector, and the far end of the drag is clamped`() =
+    fun `dragging the splitter widens the inspector and clamps`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             editor(twoNodes)
             showInspector()
@@ -736,7 +736,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `hiding the inspector takes its splitter with it, and it comes back the width it was left`() =
+    fun `hiding the inspector hides its splitter and keeps the width`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             editor(twoNodes)
             showInspector()
@@ -769,7 +769,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a node keeps its type icon while a run is painted on the graph`() =
+    fun `a node keeps its type icon during a run`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val waiting =
                 NodeRun(
@@ -788,7 +788,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the editor's back button clears the title bar, and is not padded when there isn't one`() {
+    fun `the editor's back button clears the title bar`() {
         val inset = 28.dp
 
         fun backTop(titleBarInset: Dp?): Dp {
@@ -809,7 +809,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `with nothing selected the inspector spends the room on what is wrong, and a click lands on the node`() =
+    fun `with nothing selected the inspector lists the issues`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val (state, _) =
                 editor(
@@ -837,7 +837,7 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a workflow with nothing wrong says so instead of leaving the inspector blank`() =
+    fun `a workflow with no issues says so`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             editor(twoNodes.copy(edges = listOf(WorkflowEdge("alpha", "beta"))).handPlaced())
             showInspector()
@@ -882,7 +882,7 @@ class NodeInspectorTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a node with a prompt file shows the file and can be switched back to an inline prompt`() =
+    fun `a node with a prompt file can switch back to inline`() =
         runDesktopComposeUiTest(width = 500, height = 900) {
             val workspace =
                 workspaceWith { root ->
@@ -915,7 +915,7 @@ class NodeInspectorTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `an inline node offers the file instead, and says so in its own words`() =
+    fun `an inline node offers a prompt file instead`() =
         runDesktopComposeUiTest(width = 500, height = 900) {
             inspector(
                 Workflow(name = "w", nodes = listOf(WorkflowNode("review", NodeType.AGENT, prompt = "hi"))),
@@ -927,7 +927,7 @@ class NodeInspectorTest {
         }
 
     @Test
-    fun `a picker opens in the directory the node runs in, and falls back downward`() {
+    fun `a picker opens in the node's directory`() {
         val workspace = workspaceWith()
         val repo = Files.createTempDirectory("zopf-repo").also { tempDirs.add(it) }
         val workflow =
@@ -952,7 +952,7 @@ class NodeInspectorTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a model the list has never heard of can still be typed`() =
+    fun `a model outside the list can still be typed`() =
         runDesktopComposeUiTest(width = 500, height = 900) {
             val state =
                 inspector(
@@ -970,7 +970,7 @@ class NodeInspectorTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `emptying the field is how a node goes back to the model it inherits`() =
+    fun `emptying the field returns the node to its inherited model`() =
         runDesktopComposeUiTest(width = 500, height = 900) {
             val state =
                 inspector(
@@ -991,7 +991,7 @@ class NodeInspectorTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the models a CLI is known for are a suggestion, not the whole choice`() =
+    fun `the suggested models are not the whole choice`() =
         runDesktopComposeUiTest(width = 500, height = 900) {
             val state =
                 inspector(
@@ -1013,7 +1013,7 @@ class NodeInspectorTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `the skills on disk are offered as chips, and ticking one lands on the node`() =
+    fun `the skills on disk are offered and ticking one lands on the node`() =
         runDesktopComposeUiTest(width = 500, height = 900) {
             val workspace =
                 workspaceWith { root ->

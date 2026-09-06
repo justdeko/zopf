@@ -28,7 +28,7 @@ class WorkflowGraphTest {
         )
 
     @Test
-    fun `the kuiver graph carries the ids and edges and nothing else`() {
+    fun `the kuiver graph carries only ids and edges`() {
         val graph = chain.toKuiver()
 
         assertEquals(setOf("analyze", "fix", "build"), graph.nodes.keys)
@@ -39,7 +39,7 @@ class WorkflowGraphTest {
     }
 
     @Test
-    fun `every edge leaves the right of a card and arrives at the left`() {
+    fun `a horizontal edge leaves the right and arrives at the left`() {
         val graph = chain.toKuiver()
 
         assertTrue(graph.edges.all { it.fromAnchor == OutAnchor && it.toAnchor == InAnchor })
@@ -48,7 +48,7 @@ class WorkflowGraphTest {
     }
 
     @Test
-    fun `a vertical layout names the top and bottom of a card instead`() {
+    fun `a vertical edge leaves the bottom and arrives at the top`() {
         val graph = chain.toKuiver(LayoutDirection.VERTICAL)
 
         assertTrue(graph.edges.all { it.fromAnchor == BottomAnchor && it.toAnchor == TopAnchor })
@@ -57,7 +57,7 @@ class WorkflowGraphTest {
     }
 
     @Test
-    fun `the shape of a graph is how deep it runs and how wide its widest level is`() {
+    fun `the shape of a graph is its depth and widest level`() {
         assertEquals(GraphShape(depth = 2, breadth = 1), chain.graphShape())
 
         val diamond =
@@ -81,7 +81,7 @@ class WorkflowGraphTest {
     }
 
     @Test
-    fun `an unconnected node lands on a level of its own`() {
+    fun `an unconnected node lands on its own level`() {
         val stray = chain.copy(nodes = chain.nodes + WorkflowNode("notes", NodeType.GATE))
 
         assertEquals(GraphShape(depth = 3, breadth = 1), stray.graphShape())
@@ -97,14 +97,14 @@ class WorkflowGraphTest {
     }
 
     @Test
-    fun `self edges and duplicates are refused`() {
+    fun `a self edge and a duplicate are refused`() {
         assertTrue(chain.connect("analyze", "analyze").isFailure)
         assertTrue(chain.connect("analyze", "fix").isFailure)
         assertTrue(chain.connect("nope", "fix").isFailure)
     }
 
     @Test
-    fun `a legal edge lands with no condition, including one that shortcuts across the chain`() {
+    fun `a legal edge lands with no condition`() {
         val updated = chain.connect("analyze", "build").getOrThrow()
 
         assertTrue(updated.hasEdge("analyze", "build"))
@@ -113,7 +113,7 @@ class WorkflowGraphTest {
     }
 
     @Test
-    fun `a branch labels its first two edges true then false, and stops guessing after that`() {
+    fun `a branch labels its first two edges true then false`() {
         val w =
             Workflow(
                 name = "w",
@@ -136,13 +136,13 @@ class WorkflowGraphTest {
     }
 
     @Test
-    fun `connectable targets exclude the source, existing edges and anything upstream`() {
+    fun `connectable targets exclude the source existing edges and upstream`() {
         assertEquals(emptySet(), chain.connectableTargets("build"))
         assertEquals(setOf("build"), chain.connectableTargets("analyze"))
     }
 
     @Test
-    fun `setting and clearing an edge condition touches only that edge`() {
+    fun `setting and clearing a condition touches one edge`() {
         val labelled = chain.setEdgeCondition("analyze", "fix", true)
 
         assertEquals(true, labelled.edges.first { it.to == "fix" }.condition)
@@ -166,7 +166,7 @@ class WorkflowGraphTest {
     }
 
     @Test
-    fun `positions survive the trip through kuiver's dp offsets`() {
+    fun `positions survive kuiver's dp offsets`() {
         val position = Position(40.5f, 120.25f)
 
         assertEquals(position, position.toDpOffset().toPosition())
@@ -185,7 +185,7 @@ class EditorCanvasTest {
     ) = preferredDirection(canvas, GraphShape(depth, breadth), card)
 
     @Test
-    fun `a graph that fits, or nearly fits, is never turned`() {
+    fun `a graph that fits is never turned`() {
         assertEquals(LayoutDirection.HORIZONTAL, direction(landscape, depth = 0, breadth = 1))
         assertEquals(LayoutDirection.HORIZONTAL, direction(landscape, depth = 2, breadth = 2))
 
@@ -195,23 +195,23 @@ class EditorCanvasTest {
     }
 
     @Test
-    fun `a long chain in a landscape window is turned on its side rather than shrunk`() {
+    fun `a long chain in a landscape window is turned`() {
         assertEquals(LayoutDirection.VERTICAL, direction(landscape, depth = 8, breadth = 1))
     }
 
     @Test
-    fun `a portrait window turns a graph that a landscape one would have left alone`() {
+    fun `a portrait window turns a graph a landscape one would not`() {
         assertEquals(LayoutDirection.HORIZONTAL, direction(landscape, depth = 4, breadth = 1))
         assertEquals(LayoutDirection.VERTICAL, direction(portrait, depth = 4, breadth = 1))
     }
 
     @Test
-    fun `a wide fan stays horizontal even in a portrait window`() {
+    fun `a wide fan stays horizontal in a portrait window`() {
         assertEquals(LayoutDirection.HORIZONTAL, direction(portrait, depth = 1, breadth = 8))
     }
 
     @Test
-    fun `an empty graph has no shape to pick a direction from`() {
+    fun `an empty graph picks no direction`() {
         assertEquals(LayoutDirection.HORIZONTAL, direction(landscape, depth = 0, breadth = 0))
         assertEquals(LayoutDirection.HORIZONTAL, direction(DpSize(0.dp, 0.dp), depth = 6, breadth = 1))
     }

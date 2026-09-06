@@ -11,7 +11,7 @@ file in the same commit. `.zopf/workflows/claude-md-audit.yaml` exists to catch 
 
 An architectural overview: the modules, how the engine, the store and the front ends fit together,
 and the constraints that shape them. It stays at that altitude — an implementation detail belongs in
-the code, and the reason for one belongs in a test name.
+the code, and the reason for one belongs here.
 
 Most changes therefore add nothing here. A bug fix, a screen, a refactor, a field, the wording of a
 status line: none of them are architecture. It is not a changelog either — no "changed X to Y", no
@@ -279,9 +279,16 @@ subprojects apply it without a version.
 
 **No comments. Anywhere.** Not in main source, not in tests, no KDoc. Every Kotlin source set is at
 zero and stays there; the only exceptions are the license header in `ui/theme/ZopfIcons.kt` and the
-Gradle build scripts, which are not Kotlin source sets. Explanation belongs in this file, or in a
-test name long enough to say what it asserts (`everyWorkflowInTheSkillDocsIsWrittenTheWayTheEditorWouldWriteIt`).
-A comment restating what's here is a second copy that drifts.
+Gradle build scripts, which are not Kotlin source sets. Explanation belongs in this file, never
+beside the code. A comment restating what's here is a second copy that drifts.
+
+**A test name is a name, not an explanation.** Backticked, lowercase, and one plain clause:
+subject, verb, what is asserted. `a cycle fails the nodes in it`, `run --format quiet prints only
+the verdict`, `an unresolved secret stops the node before launch`. No subordinate clause saying why
+it matters, no second fact spliced on with a comma, no contrast the assertion doesn't make. Where
+the reason is worth writing down at all, it is architecture and belongs in this file; where it
+isn't, it goes nowhere. Name the thing under test first, so the failures of one command or one
+screen sort together.
 
 Everything that is not a Kotlin source set may comment: the Gradle scripts, the connector scripts,
 `main.swift`, the shell scripts. Comments there earn their place or go. Write the label a developer
@@ -301,15 +308,33 @@ house style; match them.
 ktlint runs on every module. `.editorconfig` disables three rules on purpose: PascalCase Composables,
 PascalCase constants (`ArrowSize`, `TitleBarHeight`), and the filename rule on `main.kt`.
 
+## How tests are written
+
+**kotlin.test on JUnit 4, and no test framework beyond it.** `kotlin-test` is the only test
+dependency the JVM modules declare; there is no `useJUnitPlatform()`, so JUnit 5 is not on the
+classpath and `@Nested`, `@ParameterizedTest` and the Jupiter assertions do not exist here. A
+parameterized test is a `listOf(...)` of rows and a `forEach` inside one `@Test`, and grouping is a
+second class in the same file. Both read fine and neither costs a dependency.
+
+**A case that varies only by input is a row, not a method.** Where several assertions differ by one
+value — an operator, a path, a version string, a provider — write the table, pass the input as the
+assertion message so a failure names the row that broke, and give the one test a name covering all
+of them. Keep a case out of the table when it needs its own setup or asserts something the others
+don't; a table that needs an `if` in it was two tests.
+
+**A test file is a subject, not a scenario.** Everything driving one class belongs in that class's
+file, even when a group of tests has its own fixture — put it in a second class in the same file
+rather than a new file. `EditorStateTest.kt` holds the disk-watch and source-pane classes for this
+reason. A file with one test in it is a file to merge somewhere.
+
 ## Tests worth knowing about
 
 These guard things a normal unit test wouldn't:
 
 - `store/DogfoodWorkspaceTest.kt` parses and validates this repo's own `.zopf/` workspace, so a
   model change that breaks the committed workflows fails the build. CI runs `zopf validate` on it too.
-- `store/SkillExamplesTest.kt` re-encodes every fenced YAML workflow in `plugins/zopf/skills/**` and
-  asserts it is byte-identical to what the editor would write — the skill docs cannot drift from the
-  serializer.
+  It also re-encodes every fenced YAML workflow in `plugins/zopf/skills/**` and asserts it is
+  byte-identical to what the editor would write, so the skill docs cannot drift from the serializer.
 - `store/EditorRoundTripTest.kt` (in `:shared`) drives editor commands and asserts the file on disk.
 - `core/src/testFixtures/` holds `exampleWorkflow` and is wired into **both** `:core`'s and
   `:shared`'s test source sets, so the two suites assert against one fixture.

@@ -32,26 +32,26 @@ class SkillPlanTest {
     ) = SkillPlan(skills.toList(), unresolved)
 
     @Test
-    fun `nothing selected changes nothing about the prompt`() {
+    fun `no skill selected leaves the prompt unchanged`() {
         assertEquals("Review the diff.", plan().withInvocation("Review the diff."))
         assertTrue(plan().pluginDirs.isEmpty())
         assertTrue(plan().notices.isEmpty())
     }
 
     @Test
-    fun `one skill is asked for by name`() {
+    fun `one skill is named in the prompt`() {
         val prompt = plan(skill("code-review")).withInvocation("Review the diff.")
         assertEquals("Use the code-review skill.\n\nReview the diff.", prompt)
     }
 
     @Test
-    fun `several are asked for in one sentence`() {
+    fun `several skills are named in one sentence`() {
         val prompt = plan(skill("a"), skill("b"), skill("c")).withInvocation("Go.")
         assertEquals("Use the a, b and c skills.\n\nGo.", prompt)
     }
 
     @Test
-    fun `a skill the prompt already mentions is left alone`() {
+    fun `a skill the prompt already names is left alone`() {
         val prompt =
             plan(skill("code-review"), skill("triage"))
                 .withInvocation("Run /code-review on the diff.")
@@ -62,19 +62,19 @@ class SkillPlanTest {
     }
 
     @Test
-    fun `a longer word that merely starts with a skill's name does not count as naming it`() {
+    fun `a longer word starting with a skill name does not count`() {
         val prompt = plan(skill("review")).withInvocation("Write a reviewer guide.")
         assertEquals("Use the review skill.\n\nWrite a reviewer guide.", prompt)
     }
 
     @Test
-    fun `a skill that cannot be model-invoked gets the one command slot`() {
+    fun `a skill that cannot be model-invoked takes the command slot`() {
         val prompt = plan(skill("release", mustBeNamed = true), skill("triage")).withInvocation("Ship it.")
         assertEquals("/release\nUse the triage skill.\n\nShip it.", prompt)
     }
 
     @Test
-    fun `only one forced skill can fire, and the console says which`() {
+    fun `only one forced skill fires and the console names it`() {
         val notices =
             plan(
                 skill("release", mustBeNamed = true),
@@ -95,7 +95,7 @@ class SkillPlanTest {
     }
 
     @Test
-    fun `a name nothing resolves is a warning rather than silence`() {
+    fun `an unresolved skill name is a warning`() {
         val notices = plan(unresolved = listOf("ghost")).notices
         assertEquals(1, notices.size)
         assertTrue(notices.single().isWarning)
@@ -122,7 +122,7 @@ class SkillPlanTest {
         }
 
     @Test
-    fun `a skill under the node's own claude directory needs no flag`() {
+    fun `a skill under the node's claude directory needs no flag`() {
         val repo = tempDir()
         val own = onDisk(repo.resolve(".claude/skills").also { it.createDirectories() }, "local")
         val shared = onDisk(tempDir(), "external")
@@ -144,7 +144,7 @@ class SkillPlanTest {
     }
 
     @Test
-    fun `resolution reads the frontmatter and reports names it could not find`() {
+    fun `resolution reads the frontmatter and reports what is missing`() {
         val root = tempDir()
         val forced = onDisk(root, "release", frontmatter = "disable-model-invocation: true\n")
 
@@ -192,7 +192,7 @@ class DiscoveryTest {
     }
 
     @Test
-    fun `the workspace's own skills are found, and a repo's shadow them`() {
+    fun `a repo's skills shadow the workspace's`() {
         val root = tempDir()
         val workspace = Workspace.create(root.resolve("ws"))
         val repo = root.resolve("app").also { it.resolve(".claude/skills").createDirectories() }
@@ -209,7 +209,7 @@ class DiscoveryTest {
     }
 
     @Test
-    fun `a directory the workflow declares by path wins over a discovered one`() {
+    fun `a declared skill path wins over a discovered one`() {
         val root = tempDir()
         val workspace = Workspace.create(root.resolve("ws"))
         skill(workspace.root.resolve("skills").also { it.createDirectories() }, "review")
@@ -227,7 +227,7 @@ class DiscoveryTest {
     }
 
     @Test
-    fun `disable-model-invocation is read out of the frontmatter`() {
+    fun `disable-model-invocation is read from the frontmatter`() {
         val root = tempDir()
         val ordinary = skill(root, "review")
         val forced = skill(root, "release", frontmatter = "disable-model-invocation: true\n")

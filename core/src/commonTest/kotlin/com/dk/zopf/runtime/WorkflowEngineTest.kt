@@ -68,7 +68,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a failure skips everything downstream instead of feeding it nothing`() {
+    fun `a failure skips everything downstream`() {
         val executor = FakeExecutor(fail = setOf("analyze"))
         val workflow =
             workflow(
@@ -85,7 +85,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `an on-failure edge runs when its source fails, and only then`() {
+    fun `an on-failure edge runs only when its source fails`() {
         val workflow =
             wired(
                 nodes = listOf(shell("tests"), claude("diagnose"), claude("ship")),
@@ -109,7 +109,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a failed success-edge skips a node whose failure edge never fired`() {
+    fun `a failed success edge skips a node with an unfired failure edge`() {
         val executor = FakeExecutor(fail = setOf("build"))
         val workflow =
             wired(
@@ -127,7 +127,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `an on-failure edge that arrived still runs when another predecessor failed too`() {
+    fun `an on-failure edge runs when another predecessor also failed`() {
         val executor = FakeExecutor(fail = setOf("build", "lint"))
         val workflow =
             wired(
@@ -145,7 +145,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `stopping a run does not count as a failure for an on-failure edge`() =
+    fun `stopping a run does not fire an on-failure edge`() =
         runBlocking {
             val executor = FakeExecutor(work = { delay(10.seconds) })
             val workflow =
@@ -165,7 +165,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `a branch runs the side it took and skips the other`() {
+    fun `a branch runs one side and skips the other`() {
         val executor = FakeExecutor()
         val workflow =
             wired(
@@ -193,7 +193,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a node after both sides of a branch still runs, on the side that was taken`() {
+    fun `a node after both sides of a branch runs on the taken side`() {
         val executor = FakeExecutor()
         val workflow =
             wired(
@@ -223,7 +223,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a node that finishes instantly doesn't strand the rest of the chain`() {
+    fun `a node that finishes instantly does not strand the chain`() {
         val workflow =
             workflow(
                 nodes = listOf(claude("a"), claude("b"), claude("c"), claude("d")),
@@ -240,7 +240,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a cycle in hand-written yaml fails the nodes in it rather than hanging`() {
+    fun `a cycle fails the nodes in it`() {
         val executor = FakeExecutor()
         val workflow =
             workflow(
@@ -257,7 +257,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a prompt gets the output of the node it references`() {
+    fun `a prompt gets the output it references`() {
         val executor = FakeExecutor(output = { "$it-output" })
         val workflow =
             workflow(
@@ -275,7 +275,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a gate waits, and approving it lets the rest of the run through`() =
+    fun `approving a gate continues the run`() =
         runBlocking {
             val executor = FakeExecutor()
             val workflow =
@@ -300,7 +300,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `a gate shows the upstream output it is asking you to approve`() =
+    fun `a gate shows its upstream output`() =
         runBlocking {
             val executor = FakeExecutor(output = { "$it-output" })
             val workflow =
@@ -329,7 +329,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `a gate with no prompt of its own falls back to its title`() =
+    fun `a gate with no prompt falls back to its title`() =
         runBlocking {
             val executor = FakeExecutor()
             val workflow = workflow(nodes = listOf(gate()), edges = emptyList())
@@ -353,7 +353,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `rejecting a gate stops the run rather than failing it`() =
+    fun `rejecting a gate stops the run without failing`() =
         runBlocking {
             val executor = FakeExecutor()
             val workflow =
@@ -375,7 +375,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `an input node parks the run and its answer reaches the nodes after it`() =
+    fun `an input node parks the run and its answer reaches downstream`() =
         runBlocking {
             val executor = FakeExecutor()
             val workflow =
@@ -404,7 +404,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `the question is interpolated, so it can quote what came before it`() =
+    fun `an input question is interpolated`() =
         runBlocking {
             val executor = FakeExecutor(output = { "3 files changed" })
             val workflow =
@@ -426,7 +426,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `cancelling an input stops the run rather than failing it`() =
+    fun `cancelling an input stops the run without failing`() =
         runBlocking {
             val executor = FakeExecutor()
             val workflow =
@@ -448,7 +448,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `a parked question is announced, because nothing else will ever decide it`() =
+    fun `a parked question is announced`() =
         runBlocking {
             val (engine, run, waiting) = watchingWaits(input(question = "Which branch?"))
 
@@ -462,7 +462,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `a parked gate is announced too, so a headless run can act on it without polling`() =
+    fun `a parked gate is announced`() =
         runBlocking {
             val (engine, run, waiting) = watchingWaits(gate())
 
@@ -476,7 +476,7 @@ class WorkflowEngineTest {
         }
 
     @Test
-    fun `every archived line is offered to whoever asked to watch them`() {
+    fun `every archived line reaches a watcher`() {
         val executor = FakeExecutor(work = { }, output = { "green" })
         val seen = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
         val workflow = workflow(nodes = listOf(shell("build")), edges = emptyList())
@@ -503,7 +503,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `no more than the configured number of processes run at once`() {
+    fun `no more than the configured processes run at once`() {
         val executor = FakeExecutor(work = { delay(50.milliseconds) })
         val workflow =
             workflow(
@@ -556,7 +556,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a workspace default reaches a node whose workflow names no CLI`() {
+    fun `a workspace default reaches a workflow naming no provider`() {
         val run =
             runBlocking {
                 val started =
@@ -573,7 +573,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a workflow that names its own CLI ignores the workspace it sits in`() {
+    fun `a workflow naming its own provider ignores the workspace`() {
         val onCodex =
             wired(listOf(claude("analyze")), emptyList()).let {
                 it.copy(defaults = it.defaults.copy(provider = AgentProviderId.CODEX))
@@ -593,7 +593,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a node type the graph gives meaning to is refused on its own`() {
+    fun `a graph-only node type is refused on its own`() {
         val result =
             engine(FakeExecutor()).start(
                 workspace = workspace(),
@@ -605,7 +605,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a workflow written for a newer zopf is refused rather than run with half of it ignored`() {
+    fun `a workflow from a newer zopf is refused`() {
         val result =
             engine(FakeExecutor()).start(
                 workspace = workspace(),
@@ -621,7 +621,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a repo that isn't declared stops a single-node run before it starts`() {
+    fun `an undeclared repo stops a single-node run`() {
         val result =
             engine(FakeExecutor()).start(
                 workspace = workspace(),
@@ -633,7 +633,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a declared repo that has moved surfaces as a failure, not a crash mid-run`() {
+    fun `a moved repo fails the node`() {
         val result =
             engine(FakeExecutor()).start(
                 workspace = workspace(),
@@ -645,7 +645,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `a broken repo on a path nobody takes doesn't stop the workflow`() {
+    fun `a broken repo on an untaken path does not stop the run`() {
         val executor = FakeExecutor()
         val workflow =
             Workflow(
@@ -679,7 +679,7 @@ class WorkflowEngineTest {
     }
 
     @Test
-    fun `the archive records every node, including the skipped ones`() {
+    fun `the archive records every node including skipped ones`() {
         val executor = FakeExecutor(fail = setOf("analyze"))
         val archiveRoot = tempDir()
         val workflow =

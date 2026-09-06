@@ -96,12 +96,12 @@ class EditorRoundTripTest {
     }
 
     @Test
-    fun `the example workflow drawn in the editor matches the one in the design`() {
+    fun `the example workflow matches the design fixture`() {
         assertEquals(exampleWorkflow, drawExample())
     }
 
     @Test
-    fun `it saves as YAML a person would be willing to read`() {
+    fun `it saves as readable yaml`() {
         val (_, store) = newStore()
         store.save(drawExample())
 
@@ -128,7 +128,7 @@ class EditorRoundTripTest {
     }
 
     @Test
-    fun `an input node keeps its choices and its default`() {
+    fun `an input node keeps its choices and default`() {
         val (_, store) = newStore()
         val w =
             Workflow(
@@ -153,7 +153,7 @@ class EditorRoundTripTest {
     }
 
     @Test
-    fun `a gate keeps the prompt that says what is being approved`() {
+    fun `a gate keeps its prompt`() {
         val (_, store) = newStore()
         store.save(
             Workflow(
@@ -176,7 +176,7 @@ class EditorRoundTripTest {
     }
 
     @Test
-    fun `a gate with nothing to show writes no prompt at all`() {
+    fun `a gate with no prompt writes none`() {
         val (_, store) = newStore()
         store.save(
             Workflow(
@@ -190,7 +190,7 @@ class EditorRoundTripTest {
     }
 
     @Test
-    fun `a free-text input writes neither of the fields it never set`() {
+    fun `a free-text input writes no choices or default`() {
         val (_, store) = newStore()
         store.save(
             Workflow(
@@ -205,7 +205,7 @@ class EditorRoundTripTest {
     }
 
     @Test
-    fun `creating from a template writes that template's graph under the new name`() {
+    fun `creating from a template writes its graph under the new name`() {
         val (_, store) = newStore()
         val created = store.create("my-checks", "fix-failing-tests").getOrThrow()
 
@@ -215,14 +215,14 @@ class EditorRoundTripTest {
     }
 
     @Test
-    fun `creating without a template still starts on an empty canvas`() {
+    fun `creating without a template starts empty`() {
         val (_, store) = newStore()
 
         assertEquals(emptyList(), store.create("blank").getOrThrow().nodes)
     }
 
     @Test
-    fun `a workflow saved with no positions reopens without inventing any`() {
+    fun `a workflow with no positions reopens without any`() {
         val (_, store) = newStore()
         val w = Workflow(name = "plain").addNode(NodeType.GATE).first
         store.save(w)

@@ -40,7 +40,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `connectors come from the workspace and from the shared root`() {
+    fun `connectors come from the workspace and the shared root`() {
         val workspace = workspace()
         val shared = tempDir()
         connector(workspace.connectorsDir, "local")
@@ -54,7 +54,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `a workspace connector shadows a shared one of the same name`() {
+    fun `a workspace connector shadows a shared one`() {
         val workspace = workspace()
         val shared = tempDir()
         connector(workspace.connectorsDir, "notify", manifest = """{"description": "the workspace one"}""")
@@ -67,7 +67,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `the directory name wins over the name in the manifest`() {
+    fun `the directory name wins over the manifest name`() {
         val shared = tempDir()
         connector(shared, "slack-post", manifest = """{"name": "something-else"}""")
 
@@ -75,7 +75,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `a connector with no script is broken rather than missing`() {
+    fun `a connector with no script is broken`() {
         val shared = tempDir()
         connector(shared, "half-written", script = null)
 
@@ -92,7 +92,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `an unparseable manifest is listed as broken, not swallowed`() {
+    fun `an unparseable manifest is listed as broken`() {
         val shared = tempDir()
         connector(shared, "mangled", manifest = "{ this is not json")
 
@@ -103,7 +103,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `a directory without a manifest isn't a connector at all`() {
+    fun `a directory without a manifest is not a connector`() {
         val shared = tempDir()
         shared.resolve("just-a-folder").createDirectories()
 
@@ -111,7 +111,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `unknown manifest keys are ignored so a newer connector still loads`() {
+    fun `unknown manifest keys are ignored`() {
         val shared = tempDir()
         connector(shared, "future", manifest = """{"description": "d", "retries": 3, "auth": {"kind": "oauth"}}""")
 
@@ -119,7 +119,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `a secret can be written as a bare name or as an object`() {
+    fun `a secret can be a bare name or an object`() {
         val shared = tempDir()
         connector(
             shared,
@@ -145,7 +145,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `the bare and the object form of a secret and an output both survive a round trip`() {
+    fun `both forms of a secret and an output round trip`() {
         val manifest =
             ConnectorManifest(
                 name = "round-trip",
@@ -169,7 +169,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `an output field can be written as a bare name or as an object`() {
+    fun `an output field can be a bare name or an object`() {
         val shared = tempDir()
         connector(
             shared,
@@ -192,7 +192,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `create makes the directory in the workspace, or in the shared root when asked`() {
+    fun `create makes the directory in the workspace or shared root`() {
         val workspace = workspace()
         val shared = tempDir()
         val store = ConnectorStore(workspace, shared)
@@ -205,7 +205,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `create refuses to overwrite a connector that already exists`() {
+    fun `create refuses to overwrite an existing connector`() {
         val workspace = workspace()
         connector(workspace.connectorsDir, "notify")
 
@@ -216,7 +216,7 @@ class ConnectorStoreTest {
     }
 
     @Test
-    fun `the shared root isn't searched twice when the workspace is the shared one`() {
+    fun `the shared root is not searched twice`() {
         val workspace = Workspace.create(tempDir().resolve("zopf"), "zopf")
         connector(workspace.connectorsDir, "only-one")
 

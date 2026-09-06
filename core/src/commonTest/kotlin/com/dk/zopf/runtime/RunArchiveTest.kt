@@ -39,7 +39,7 @@ class RunHistoryTest {
     }
 
     @Test
-    fun `a finished run comes back with its verdict and its output`() {
+    fun `a finished run comes back with its verdict and output`() {
         val archiveRoot = tempDir()
         val original = runOnce(archiveRoot)
 
@@ -60,7 +60,7 @@ class RunHistoryTest {
     }
 
     @Test
-    fun `replaying a transcript leaves the node's verdict alone`() {
+    fun `replaying a transcript leaves the verdict alone`() {
         val archiveRoot = tempDir()
         runOnce(archiveRoot)
 
@@ -72,7 +72,7 @@ class RunHistoryTest {
     }
 
     @Test
-    fun `loading twice doesn't print the transcript twice`() {
+    fun `loading twice does not repeat the transcript`() {
         val archiveRoot = tempDir()
         runOnce(archiveRoot)
         val restored = RunHistory.list(archiveRoot).single()
@@ -85,7 +85,7 @@ class RunHistoryTest {
     }
 
     @Test
-    fun `deleting an archived run takes it off disk`() {
+    fun `deleting an archived run removes it from disk`() {
         val archiveRoot = tempDir()
         runOnce(archiveRoot)
         val restored = RunHistory.list(archiveRoot).single()
@@ -153,7 +153,7 @@ class SessionReconcilerTest {
         """.trimIndent()
 
     @Test
-    fun `the agent list parses, and an unknown field doesn't break it`() {
+    fun `the agent list parses and ignores unknown fields`() {
         val agents = SessionReconciler.parse(realOutput)
 
         assertEquals(2, agents.size)
@@ -163,14 +163,14 @@ class SessionReconcilerTest {
     }
 
     @Test
-    fun `anything that isn't a list of agents is no reason to fail the launch`() {
+    fun `an unparseable agent list does not fail the launch`() {
         assertTrue(SessionReconciler.parse("").isEmpty())
         assertTrue(SessionReconciler.parse("not json at all").isEmpty())
         assertTrue(SessionReconciler.parse("""{"error":"nope"}""").isEmpty())
     }
 
     @Test
-    fun `a session still alive comes back as a detached run that can be taken over`() {
+    fun `a live session comes back as a detached run`() {
         val root = tempDir()
         write(root, unfinishedRecord(sessionId = "session-1"))
 
@@ -186,7 +186,7 @@ class SessionReconcilerTest {
     }
 
     @Test
-    fun `a session that died with the app is closed out, and stays closed on the next launch`() {
+    fun `a dead session is closed out and stays closed`() {
         val root = tempDir()
         write(root, unfinishedRecord(sessionId = "session-1"))
 
@@ -203,7 +203,7 @@ class SessionReconcilerTest {
     }
 
     @Test
-    fun `a run that finished normally is left alone`() {
+    fun `a finished run is left alone`() {
         val root = tempDir()
         write(root, unfinishedRecord(sessionId = "session-1").copy(status = RunStatus.SUCCEEDED.name))
 
@@ -303,7 +303,7 @@ class RunArchiveTest {
     }
 
     @Test
-    fun `two workspaces called dot-zopf get separate directories`() {
+    fun `two workspaces of the same name get separate directories`() {
         val a = RunArchive.workspaceId(tempDir().resolve("alpha/.zopf").createDirectories())
         val b = RunArchive.workspaceId(tempDir().resolve("beta/.zopf").createDirectories())
 
@@ -312,7 +312,7 @@ class RunArchiveTest {
     }
 
     @Test
-    fun `a node id that isn't a safe filename still gets a file`() {
+    fun `an unsafe node id still gets a file`() {
         val archive = RunArchive.create("run-3", "ws", tempDir())
         archive.appendRaw("../escape", "line")
         archive.close()

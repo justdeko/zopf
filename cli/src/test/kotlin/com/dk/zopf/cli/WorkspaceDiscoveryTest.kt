@@ -22,7 +22,7 @@ class WorkspaceDiscoveryTest {
     fun cleanup() = dirs.forEach { it.toFile().deleteRecursively() }
 
     @Test
-    fun `the workspace is the nearest one above you`() {
+    fun `discovery finds the nearest workspace above`() {
         val root = tempDir()
         val created = Workspace.create(root)
         val deep = root.resolve("src/main/kotlin").also { it.createDirectories() }
@@ -31,7 +31,7 @@ class WorkspaceDiscoveryTest {
     }
 
     @Test
-    fun `a committed dot-zopf inside a repo counts, which is the point of committing one`() {
+    fun `discovery finds a dot-zopf inside a repo`() {
         val repo = tempDir()
         val workspace = repo.resolve(".zopf").also { it.createDirectories() }
         workspace.resolve(WORKSPACE_FILE).writeText("name: shipped\n")
@@ -40,7 +40,7 @@ class WorkspaceDiscoveryTest {
     }
 
     @Test
-    fun `the nearest one wins over the one further up`() {
+    fun `discovery prefers the nearest workspace`() {
         val outer = tempDir()
         Workspace.create(outer)
         val inner = outer.resolve("packages/api").also { it.createDirectories() }
@@ -50,7 +50,7 @@ class WorkspaceDiscoveryTest {
     }
 
     @Test
-    fun `--workspace wins over wherever you happen to be standing`() {
+    fun `--workspace overrides discovery`() {
         val here = tempDir()
         Workspace.create(here)
         val elsewhere = tempDir()
@@ -60,7 +60,7 @@ class WorkspaceDiscoveryTest {
     }
 
     @Test
-    fun `--workspace pointing at something that isn't one says so`() {
+    fun `--workspace on a non-workspace is refused`() {
         val plain = tempDir()
 
         val failure = assertFailsWith<UsageError> { locateWorkspace(requested = plain.toString(), from = plain) }
@@ -69,7 +69,7 @@ class WorkspaceDiscoveryTest {
     }
 
     @Test
-    fun `a directory with nothing above it has no workspace to find`() {
+    fun `discovery finds nothing outside a workspace`() {
         assertNull(enclosingWorkspace(tempDir().resolve("a/b").also { it.createDirectories() }))
     }
 }

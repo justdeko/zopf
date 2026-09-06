@@ -31,7 +31,7 @@ class ShellRunnerTest {
     }
 
     @Test
-    fun `stdout and stderr both come back, tagged, with the exit code`() =
+    fun `stdout and stderr come back tagged with the exit code`() =
         runBlocking {
             val session =
                 ShellRunner().start(
@@ -54,7 +54,7 @@ class ShellRunnerTest {
         }
 
     @Test
-    fun `stopping a long command kills it`() =
+    fun `stopping a running command kills it`() =
         runBlocking {
             val session = ShellRunner().start(ShellInvocation("sleep 30", tempDir()))
             session.stop()
@@ -63,7 +63,7 @@ class ShellRunnerTest {
         }
 
     @Test
-    fun `a command that reads stdin gets end-of-file rather than hanging`() =
+    fun `a command reading stdin gets end-of-file`() =
         runBlocking {
             val session = ShellRunner().start(ShellInvocation("read -r answer; echo got=\$answer", tempDir()))
             val lines = session.lines().toList()
@@ -126,7 +126,7 @@ class NodeTimeoutTest {
     }
 
     @Test
-    fun `the workflow's own default applies to a node that names no deadline`() {
+    fun `a workflow deadline applies to a node naming none`() {
         val run =
             runWorkflow(
                 Workflow(

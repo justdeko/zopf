@@ -63,7 +63,7 @@ class WorkspaceSwitchTest {
     }
 
     @Test
-    fun `picking the workspace that is already active leaves an open editor alone`() {
+    fun `picking the active workspace leaves an open editor alone`() {
         val app = app()
         val dir = tempDir().resolve("one")
         app.addWorkspace(dir)
@@ -76,7 +76,7 @@ class WorkspaceSwitchTest {
     }
 
     @Test
-    fun `actually moving workspace does close the editor`() {
+    fun `moving workspace closes the editor`() {
         val app = app()
         app.addWorkspace(tempDir().resolve("one"))
         val second = tempDir().resolve("two")
@@ -194,7 +194,7 @@ class RunGateTest {
         )
 
     @Test
-    fun `the Run button refuses what the canvas is already painting red`() {
+    fun `the Run button refuses a workflow with errors`() {
         val app = app()
 
         app.runWorkflow(broken)
@@ -204,7 +204,7 @@ class RunGateTest {
     }
 
     @Test
-    fun `the editor's own view of the errors is what an open editor is judged on`() {
+    fun `an open editor is judged on its own issues`() {
         val app = app()
         app.openEditor(broken)
 
@@ -215,7 +215,7 @@ class RunGateTest {
     }
 
     @Test
-    fun `the Run button refuses what the CLI would refuse, not what the editor last read`() {
+    fun `the Run button refuses on a fresh snapshot`() {
         val app = app()
         val workspace = assertNotNull(assertNotNull(app.activeWorkspace).workspace)
         workspace.root.resolve("prompts").createDirectories()

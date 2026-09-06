@@ -19,7 +19,7 @@ class PromptsTest {
         )
 
     @Test
-    fun `every prompt is packaged and comes out with no holes left in it`() {
+    fun `every prompt is packaged and fully interpolated`() {
         everyPrompt().forEach { (name, rendered) ->
             assertTrue(rendered.isNotBlank(), "$name rendered blank")
             assertFalse(
@@ -30,14 +30,14 @@ class PromptsTest {
     }
 
     @Test
-    fun `the contract reaches the model with its interpolation syntax intact`() {
+    fun `the contract keeps its interpolation syntax`() {
         val contract = Prompts.read("connector-contract")
         assertTrue("\${node.result}" in contract, contract)
         assertTrue("\${node.<key>}" in contract, contract)
     }
 
     @Test
-    fun `the connector prompts carry the contract, and ask rather than inventing one`() {
+    fun `the connector prompts carry the contract`() {
         val create = ConnectorScaffold.createPrompt("slack-post")
 
         listOf("slack-post", "connector.json", "stdin", "\"result\"", "\"error\"", "\${node.result}")
@@ -51,20 +51,20 @@ class PromptsTest {
     }
 
     @Test
-    fun `an unsupplied hole is left standing rather than blanked`() {
+    fun `an unsupplied hole is left standing`() {
         val rendered = Prompts.render("connector-create", "name" to "slack-post")
         assertTrue("{{contract}}" in rendered, "a missing value should be visible, not invisible")
         assertTrue("slack-post" in rendered)
     }
 
     @Test
-    fun `a trailing newline in the file is not part of the prompt`() {
+    fun `a trailing newline is not part of the prompt`() {
         val one = Prompts.render("skill-use-one", "skill" to "code-review")
         assertEquals("Use the code-review skill.", one)
     }
 
     @Test
-    fun `a prompt the build forgot fails loudly`() {
+    fun `a missing prompt fails loudly`() {
         val thrown = runCatching { Prompts.read("no-such-prompt") }.exceptionOrNull()
         assertTrue(thrown is IllegalStateException, "got $thrown")
         assertTrue("prompts/no-such-prompt.md" in thrown.message.orEmpty(), thrown.message.orEmpty())

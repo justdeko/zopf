@@ -53,7 +53,7 @@ class WorkflowMigrationTest {
         )
 
     @Test
-    fun `a workflow with no version is read by today's rules, not by the oldest ones`() {
+    fun `a workflow with no version is read as current`() {
         val workflow =
             migrate(
                 """
@@ -70,7 +70,7 @@ class WorkflowMigrationTest {
     }
 
     @Test
-    fun `a workflow pinned to an older version is carried forward one step at a time`() {
+    fun `an older workflow is carried forward step by step`() {
         val workflow =
             migrate(
                 """
@@ -88,7 +88,7 @@ class WorkflowMigrationTest {
     }
 
     @Test
-    fun `only the steps between the version the file declares and this one run`() {
+    fun `only the steps after the declared version run`() {
         val workflow =
             migrate(
                 """
@@ -106,7 +106,7 @@ class WorkflowMigrationTest {
     }
 
     @Test
-    fun `migrations run on the YAML, because parsing has already dropped a key the model no longer has`() {
+    fun `migrations run on the YAML not the model`() {
         val parsedFirst =
             migrate(
                 """
@@ -124,14 +124,14 @@ class WorkflowMigrationTest {
     }
 
     @Test
-    fun `a version that isn't a number is left for the parser to complain about`() {
+    fun `a non-numeric version is left to the parser`() {
         val failure = runCatching { migrate("version: banana\nname: nonsense\n") }.exceptionOrNull()
 
         assertNotNull(failure, "\"banana\" doesn't name a version, and inventing one would hide the typo")
     }
 
     @Test
-    fun `a workflow that has been carried forward is saved without a version, because it is current again`() {
+    fun `a migrated workflow is saved without a version`() {
         val store = newStore()
         store.fileFor("old").writeText(
             """
@@ -152,7 +152,7 @@ class WorkflowMigrationTest {
     }
 
     @Test
-    fun `a workflow from a newer zopf keeps its version and says so rather than running`() {
+    fun `a workflow from a newer zopf keeps its version and is refused`() {
         val store = newStore()
         store.fileFor("future").writeText(
             """
