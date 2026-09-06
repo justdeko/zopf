@@ -41,11 +41,12 @@ aboutLibraries {
     }
 }
 
-// jpackage copies this in before signing
-val stageAppResources by tasks.registering(Sync::class) {
-    from(rootProject.file("LICENSE"))
-    into(layout.buildDirectory.dir("appResources/common"))
-}
+val stageAppResources =
+    tasks.register<Sync>("stageAppResources") {
+        description = "Stages the license into the app resources directory jpackage copies in before signing."
+        from(rootProject.file("LICENSE"))
+        into(layout.buildDirectory.dir("appResources/common"))
+    }
 
 tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(stageAppResources) }
 
