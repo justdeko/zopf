@@ -116,6 +116,10 @@ nodes:
       - Anything half-landed: a flag added but undocumented, a claim in CLAUDE.md the commits have
         made untrue, a format change with no path for files already written.
 
+      The tree is not bumped yet. gradle.properties, the plugin manifest and CHANGELOG.md all still
+      carry the previous version, because the cut writes them after the gate. That is the shape of
+      every run of this workflow and never the concern.
+
       Report the single thing most worth holding the release for as `concern`, in one line, or
       exactly `none`. Do not manufacture one.
   - id: reconcile
@@ -153,6 +157,9 @@ nodes:
       smaller than the changes justify, a concern that isn't `none`. It is yes when the tree is clean
       and what's left is a judgment a person can make at the gate; the notes' wording is not one of
       those, it is theirs to edit afterwards.
+
+      The tree still carries the previous version everywhere, and CHANGELOG.md has no entry for this
+      one, because the cut writes both after the gate. Leave that out of the summary.
 
       Give `because` as one line naming the thing that decided it, and `summary` as at most six
       lines of what someone needs to know before they approve.

@@ -45,9 +45,10 @@ object SessionReconciler {
         for (archive in RunArchive.all(root).take(SCAN_LIMIT)) {
             val record = archive.read() ?: continue
             if (!record.isUnfinished()) continue
+            if (record.hasLiveOwner()) continue
 
             if (record.nodes.any { it.resumable() && it.sessionId in alive }) {
-                orphans += WorkflowRun.restored(record)
+                orphans += WorkflowRun.restored(record, Restore.ORPHANED)
             } else {
                 archive.write(record.closedOut())
                 closed++

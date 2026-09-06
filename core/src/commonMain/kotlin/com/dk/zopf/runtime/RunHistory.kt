@@ -2,9 +2,22 @@ package com.dk.zopf.runtime
 
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.RunArchive
+import com.dk.zopf.store.RunRecord
 import java.nio.file.Path
+import java.time.Instant
 import kotlin.io.path.exists
 import kotlin.io.path.useLines
+
+internal fun RunRecord.hasLiveOwner(): Boolean {
+    val owner = pid ?: return false
+    if (owner == ProcessHandle.current().pid()) return false
+    val handle = ProcessHandle.of(owner).orElse(null)?.takeIf { it.isAlive } ?: return false
+    val began = runCatching { Instant.parse(startedAt) }.getOrNull() ?: return true
+    val started = handle.info().startInstant().orElse(null) ?: return true
+    return !started.isAfter(began)
+}
+
+internal fun RunRecord.restoreAs(): Restore = if (hasLiveOwner()) Restore.LIVE else Restore.SETTLED
 
 object RunHistory {
     const val DEFAULT_LIMIT = 100
@@ -18,9 +31,11 @@ object RunHistory {
             .take(limit)
             .mapNotNull { archive ->
                 archive.read()?.let { record ->
-                    WorkflowRun.restored(record, orphaned = false).also { it.archiveDir = archive.dir }
+                    WorkflowRun.restored(record, record.restoreAs()).also { it.archiveDir = archive.dir }
                 }
             }
+
+    fun record(run: WorkflowRun): RunRecord? = run.archiveDir?.let { RunArchive(it).read() }
 
     fun loadTranscript(run: WorkflowRun) {
         if (run.transcriptLoaded) return

@@ -136,6 +136,11 @@ working perfectly under `:desktopApp:run`.
 screen, and finishes with a notification, while the app is already open. It reads runs that something
 else wrote; it starts nothing.
 
+An active record is either a run in flight elsewhere or one that died with whatever wrote it.
+`RunRecord.pid` says which, and `restoreAs()` is the only place that asks. The engine writes the
+record on every settle pass so a watched run reads as running, and `isElsewhere` marks one that
+isn't ours to stop, clear, take over, delete or close out.
+
 Everything zopf posts goes through one generated bundle, `zopf-notify.app`, built by
 `runtime/MacNotifier.kt` because **`UNUserNotificationCenter` refuses a process with no bundle
 identifier**, which `:desktopApp:run` under Gradle is. `runtime/Notifier.kt` is the seam, so a

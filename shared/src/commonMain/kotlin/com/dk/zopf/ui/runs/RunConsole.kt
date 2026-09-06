@@ -85,9 +85,10 @@ fun RunConsole(
     onDecide: (allow: Boolean, forRestOfRun: Boolean) -> Unit = { _, _ -> },
     onClose: (() -> Unit)? = null,
     terminalApp: String = DEFAULT_TERMINAL_APP,
+    isElsewhere: Boolean = false,
 ) {
     Column(modifier.fillMaxSize()) {
-        RunHeader(run, onStop, onTakeOver, onClose, terminalApp)
+        RunHeader(run, onStop, onTakeOver, onClose, terminalApp, isElsewhere)
         HorizontalDivider()
         Transcript(run, Modifier.weight(1f))
         when {
@@ -121,6 +122,7 @@ private fun RunHeader(
     onTakeOver: () -> Unit,
     onClose: (() -> Unit)?,
     terminalApp: String,
+    isElsewhere: Boolean = false,
 ) {
     var now by remember(run.id) { mutableStateOf(Instant.now()) }
     LaunchedEffect(run.id, run.status) {
@@ -161,7 +163,7 @@ private fun RunHeader(
                 )
             }
 
-            if (run.canTakeOver) {
+            if (run.canTakeOver && !isElsewhere) {
                 TextButton(onClick = onTakeOver) {
                     Icon(ZopfIcons.Terminal, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
@@ -169,7 +171,7 @@ private fun RunHeader(
                     Text("Take over in $terminalApp")
                 }
             }
-            if (run.status.isActive) {
+            if (run.status.isActive && !isElsewhere) {
                 TextButton(onClick = onStop) {
                     Icon(ZopfIcons.Stop, contentDescription = null, Modifier.size(14.dp))
                     Spacer(Modifier.width(8.dp))

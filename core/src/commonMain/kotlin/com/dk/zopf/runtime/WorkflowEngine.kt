@@ -177,7 +177,8 @@ class WorkflowEngine(
             var inFlight = 0
 
             while (true) {
-                for (node in settle(run, workflow, plan, planned, branches)) {
+                val ready = settle(run, workflow, plan, planned, branches)
+                for (node in ready) {
                     val nodeRun = run.node(node.id) ?: continue
                     inFlight++
                     launch {
@@ -187,6 +188,7 @@ class WorkflowEngine(
                         completions.send(Unit)
                     }
                 }
+                if (ready.isNotEmpty()) archive.write(run.record())
 
                 if (inFlight == 0) break
                 completions.receive()

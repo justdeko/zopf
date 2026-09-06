@@ -32,11 +32,18 @@ class RunHistoryTest {
 
     private fun tempDir(): Path = Files.createTempDirectory("zopf-history").also { dirs.add(it) }
 
+    private val spawned = mutableListOf<Process>()
+
     @AfterTest
     fun cleanup() {
         scopes.forEach { it.coroutineContext[Job]?.cancel() }
+        spawned.forEach { it.destroyForcibly() }
         dirs.forEach { it.toFile().deleteRecursively() }
     }
+
+    private fun liveProcess(): Process = ProcessBuilder("/bin/sleep", "60").start().also { spawned.add(it) }
+
+    private fun deadPid(): Long = ProcessBuilder("/usr/bin/true").start().also { it.waitFor() }.pid()
 
     @Test
     fun `a finished run comes back with its verdict and output`() {
@@ -94,6 +101,53 @@ class RunHistoryTest {
 
         assertEquals(emptyList(), RunHistory.list(archiveRoot))
     }
+
+    @Test
+    fun `an unfinished run comes back stopped once its owner is gone`() {
+        val rows =
+            listOf(
+                "written before zopf recorded a pid" to null,
+                "written by a process that has exited" to deadPid(),
+                "written by this process" to ProcessHandle.current().pid(),
+            )
+
+        rows.forEach { (owner, pid) ->
+            val root = tempDir()
+            RunArchive.create("run-1", "ws-abcd1234", root).write(unfinished(pid))
+
+            assertEquals(RunStatus.STOPPED, RunHistory.list(root).single().status, owner)
+        }
+    }
+
+    @Test
+    fun `a run whose owner is still alive comes back running`() {
+        val root = tempDir()
+        val owner = liveProcess()
+        RunArchive.create("run-1", "ws-abcd1234", root).write(unfinished(owner.pid()))
+
+        val restored = RunHistory.list(root).single()
+
+        assertEquals(RunStatus.RUNNING, restored.status)
+        assertTrue(restored.isElsewhere)
+    }
+
+    private fun unfinished(pid: Long?) =
+        RunRecord(
+            id = "run-1",
+            workflow = "release-cut",
+            startedAt = Instant.now().toString(),
+            status = RunStatus.RUNNING.name,
+            pid = pid,
+            nodes =
+                listOf(
+                    NodeRunRecord(
+                        nodeId = "checks",
+                        type = NodeType.SHELL,
+                        status = RunStatus.RUNNING.name,
+                        startedAt = Instant.now().toString(),
+                    ),
+                ),
+        )
 
     private fun runOnce(archiveRoot: Path): WorkflowRun {
         val workspace = Workspace.create(tempDir().resolve("ws"))
@@ -200,6 +254,20 @@ class SessionReconcilerTest {
         assertNotNull(record.finishedAt)
 
         assertEquals(Reconciliation(), SessionReconciler.reconcile(root, agents = emptyList()))
+    }
+
+    @Test
+    fun `a run still going elsewhere is left alone`() {
+        val root = tempDir()
+        val owner = ProcessBuilder("/bin/sleep", "60").start()
+        try {
+            write(root, unfinishedRecord(sessionId = "session-1").copy(pid = owner.pid()))
+
+            assertEquals(Reconciliation(), SessionReconciler.reconcile(root, agents = emptyList()))
+            assertEquals(RunStatus.RUNNING.name, assertNotNull(RunArchive.all(root).single().read()).status)
+        } finally {
+            owner.destroyForcibly()
+        }
     }
 
     @Test

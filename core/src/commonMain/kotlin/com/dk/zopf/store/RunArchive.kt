@@ -25,6 +25,7 @@ data class RunRecord(
     val startedAt: String,
     val finishedAt: String? = null,
     val status: String,
+    val pid: Long? = null,
     val nodes: List<NodeRunRecord> = emptyList(),
 )
 

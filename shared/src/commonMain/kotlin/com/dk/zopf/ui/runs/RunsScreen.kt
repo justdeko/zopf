@@ -67,6 +67,7 @@ fun RunsScreen(
                                 val handover = run.nodes.firstOrNull { it.canTakeOver && it.status.isActive }
                                 buildList {
                                     add(ContextMenuItem("Show") { registry.select(run) })
+                                    if (run.isElsewhere) return@buildList
                                     if (run.isActive) {
                                         add(ContextMenuItem("Stop") { registry.stop(run) })
                                         handover?.let { node ->
@@ -119,7 +120,7 @@ fun RunsScreen(
                                         retry?.let {
                                             add(ContextMenuItem("Retry from this node", it))
                                         }
-                                        if (node.canTakeOver && node.status.isActive) {
+                                        if (node.canTakeOver && node.status.isActive && !run.isElsewhere) {
                                             add(
                                                 ContextMenuItem("Take over in ${registry.terminalApp}") {
                                                     registry.takeOver(node)
@@ -158,6 +159,7 @@ fun RunsScreen(
                 run = node,
                 onStop = { registry.stop(run) },
                 onTakeOver = { registry.takeOver(node) },
+                isElsewhere = run.isElsewhere,
                 onSend = { registry.send(node, it) },
                 onFinish = { registry.finishInput(node) },
                 onApprove = { registry.approve(node, it) },
@@ -206,14 +208,17 @@ private fun RunRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (run.isActive) {
-            IconButton(onClick = onStop) {
-                Icon(ZopfIcons.Stop, contentDescription = "Stop run", Modifier.size(12.dp))
-            }
-        } else {
-            IconButton(onClick = onRemove) {
-                Icon(ZopfIcons.Clear, contentDescription = "Clear run", Modifier.size(14.dp))
-            }
+        when {
+            run.isElsewhere -> Unit
+            run.isActive ->
+                IconButton(onClick = onStop) {
+                    Icon(ZopfIcons.Stop, contentDescription = "Stop run", Modifier.size(12.dp))
+                }
+
+            else ->
+                IconButton(onClick = onRemove) {
+                    Icon(ZopfIcons.Clear, contentDescription = "Clear run", Modifier.size(14.dp))
+                }
         }
     }
 }

@@ -117,20 +117,25 @@ class RunRegistry(
         return engine.start(run.workspace, workflow, inherited = inherited).onSuccess(::adopt)
     }
 
-    fun stop(run: WorkflowRun) = engine.stop(run)
+    fun stop(run: WorkflowRun) {
+        if (run.isElsewhere) return
+        engine.stop(run)
+    }
 
     fun stopAll() {
         permissions.denyOutstanding()
-        runs.filter { it.isActive }.forEach { engine.stop(it) }
+        ours().forEach { engine.stop(it) }
     }
 
     fun shutdown() {
         permissions.shutdown()
-        runs.filter { it.isActive }.forEach { engine.stop(it) }
+        ours().forEach { engine.stop(it) }
     }
 
+    private fun ours(): List<WorkflowRun> = runs.filter { it.isActive && !it.isElsewhere }
+
     fun remove(run: WorkflowRun) {
-        if (run.isActive) engine.stop(run)
+        if (run.isActive) stop(run)
         runs.remove(run)
         if (selectedRunId == run.id) select(runs.firstOrNull())
     }
@@ -158,7 +163,10 @@ class RunRegistry(
         get() = runs.flatMap { run -> run.nodes.filter { it.isAwaitingInput }.map { run to it } }
 
     val awaitingApproval: List<Pair<WorkflowRun, NodeRun>>
-        get() = runs.flatMap { run -> run.nodes.filter { it.isAwaitingApproval }.map { run to it } }
+        get() =
+            runs
+                .filterNot { it.isElsewhere }
+                .flatMap { run -> run.nodes.filter { it.isAwaitingApproval }.map { run to it } }
 
     fun decide(
         node: NodeRun,
@@ -343,13 +351,27 @@ class RunRegistry(
         scope.launch(Dispatchers.IO) {
             while (isActive) {
                 delay(ARCHIVE_POLL_MILLIS.milliseconds)
-                val known = runs.mapTo(mutableSetOf()) { it.id }
-                val arrived = RunHistory.list(archiveRoot).filterNot { it.id in known }
-                if (arrived.isEmpty()) continue
-                runs.addAll(0, arrived)
-                arrived.filterNot { it.isActive }.forEach(::announceElsewhere)
+                readArchive()
             }
         }
+    }
+
+    internal fun readArchive() {
+        val watched = runs.filter { it.isElsewhere }
+        val known = runs.mapTo(mutableSetOf()) { it.id }
+        val arrived = RunHistory.list(archiveRoot).filterNot { it.id in known }
+
+        runs.addAll(0, arrived)
+        arrived.filterNot { it.isActive }.forEach(::announceElsewhere)
+        watched.forEach(::follow)
+    }
+
+    private fun follow(run: WorkflowRun) {
+        val record = RunHistory.record(run) ?: return
+        run.refreshFrom(record, record.restoreAs())
+        if (run.isActive) return
+        announceElsewhere(run)
+        if (run.id == selectedRunId) readTranscript(run)
     }
 
     private fun announceElsewhere(run: WorkflowRun) {
@@ -377,6 +399,9 @@ class RunRegistry(
     }
 
     fun forget(run: WorkflowRun): Result<Unit> {
+        if (run.isElsewhere) {
+            return Result.failure(IllegalStateException("${run.workflowName} is still running outside zopf"))
+        }
         val dir =
             run.archiveDir
                 ?: return Result.failure(IllegalStateException("This run isn't on disk yet"))

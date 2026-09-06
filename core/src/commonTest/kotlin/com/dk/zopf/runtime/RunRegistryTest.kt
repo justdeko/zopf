@@ -6,7 +6,9 @@ import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.LiveSettings
+import com.dk.zopf.store.NodeRunRecord
 import com.dk.zopf.store.NotifyLevel
+import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.RunRecord
 import com.dk.zopf.store.Workspace
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +19,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Instant
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
@@ -32,9 +35,12 @@ class RunRegistryTest {
 
     private fun tempDir(): Path = Files.createTempDirectory("zopf-registry").also { dirs.add(it) }
 
+    private val spawned = mutableListOf<Process>()
+
     @AfterTest
     fun cleanup() {
         scopes.forEach { it.coroutineContext[Job]?.cancel() }
+        spawned.forEach { it.destroyForcibly() }
         dirs.forEach { it.toFile().deleteRecursively() }
     }
 
@@ -145,6 +151,7 @@ class RunRegistryTest {
         val restored =
             WorkflowRun.restored(
                 RunRecord(id = "old", workflow = "test", startedAt = "2026-08-07T00:00:00Z", status = "FAILED"),
+                Restore.SETTLED,
             )
 
         val failure = registry.retry(restored, "fix").exceptionOrNull()
@@ -197,9 +204,10 @@ class RunRegistryTest {
         executor: NodeExecutor,
         settings: LiveSettings = LiveSettings(),
         notifier: Notifier = SilentNotifier,
+        archiveRoot: Path = tempDir(),
     ): RunRegistry {
         val scope = CoroutineScope(Job() + Dispatchers.Default).also { scopes.add(it) }
-        return RunRegistry(scope, settings, executor, tempDir(), notifier)
+        return RunRegistry(scope, settings, executor, archiveRoot, notifier)
     }
 
     private fun RunRegistry.runToCompletion(workflow: Workflow): WorkflowRun =
@@ -309,6 +317,87 @@ class RunRegistryTest {
         failing.runToCompletion(workflow(listOf(node("analyze")), emptyList()))
         assertEquals(1, notifier.posted.size)
         assertTrue(notifier.posted.single().isFailure)
+    }
+
+    @Test
+    fun `a run still going elsewhere is not announced`() {
+        val notifier = RecordingNotifier()
+        val root = tempDir()
+        val registry = registry(RecordingExecutor(), notifier = notifier, archiveRoot = root)
+        elsewhere(root, RunStatus.RUNNING)
+
+        registry.readArchive()
+
+        val watched = registry.runs.single()
+        assertEquals(RunStatus.RUNNING, watched.status)
+        assertTrue(watched.isElsewhere)
+        assertTrue(notifier.posted.isEmpty(), notifier.posted.toString())
+    }
+
+    @Test
+    fun `a run that finishes elsewhere is announced once`() {
+        val notifier = RecordingNotifier()
+        val root = tempDir()
+        val registry = registry(RecordingExecutor(), notifier = notifier, archiveRoot = root)
+        elsewhere(root, RunStatus.RUNNING)
+        registry.readArchive()
+
+        elsewhere(root, RunStatus.SUCCEEDED)
+        registry.readArchive()
+        registry.readArchive()
+
+        val watched = registry.runs.single()
+        assertEquals(RunStatus.SUCCEEDED, watched.status)
+        assertEquals(1, notifier.posted.size, notifier.posted.toString())
+        assertTrue(
+            notifier.posted
+                .single()
+                .title
+                .contains("done"),
+            notifier.posted.single().title,
+        )
+    }
+
+    @Test
+    fun `a run whose owner is killed is announced as stopped`() {
+        val notifier = RecordingNotifier()
+        val root = tempDir()
+        val registry = registry(RecordingExecutor(), notifier = notifier, archiveRoot = root)
+        val owner = elsewhere(root, RunStatus.RUNNING)
+        registry.readArchive()
+
+        owner.destroyForcibly().waitFor()
+        registry.readArchive()
+
+        assertEquals(RunStatus.STOPPED, registry.runs.single().status)
+        assertEquals(1, notifier.posted.size, notifier.posted.toString())
+    }
+
+    private fun elsewhere(
+        root: Path,
+        status: RunStatus,
+    ): Process {
+        val owner = ProcessBuilder("/bin/sleep", "60").start().also { spawned.add(it) }
+        RunArchive.create("run-elsewhere", "ws-abcd1234", root).write(
+            RunRecord(
+                id = "run-elsewhere",
+                workflow = "release-cut",
+                startedAt = Instant.now().toString(),
+                finishedAt = Instant.now().toString().takeIf { status.isFinished },
+                status = status.name,
+                pid = owner.pid(),
+                nodes =
+                    listOf(
+                        NodeRunRecord(
+                            nodeId = "checks",
+                            type = NodeType.SHELL,
+                            status = status.name,
+                            startedAt = Instant.now().toString(),
+                        ),
+                    ),
+            ),
+        )
+        return owner
     }
 
     private suspend fun awaitAsked(notifier: RecordingNotifier) {

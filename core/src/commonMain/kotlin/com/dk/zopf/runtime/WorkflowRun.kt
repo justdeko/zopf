@@ -16,6 +16,12 @@ import java.nio.file.Paths
 import java.time.Duration
 import java.time.Instant
 
+enum class Restore {
+    ORPHANED,
+    SETTLED,
+    LIVE,
+}
+
 @Stable
 class WorkflowRun(
     val id: String,
@@ -60,6 +66,8 @@ class WorkflowRun(
 
     val isActive: Boolean get() = outcome == null
 
+    val isElsewhere: Boolean get() = fromArchive && isActive
+
     val focusNode: NodeRun?
         get() =
             nodes.firstOrNull { it.status == RunStatus.WAITING }
@@ -101,6 +109,7 @@ class WorkflowRun(
             startedAt = startedAt.toString(),
             finishedAt = finishedAt?.toString(),
             status = status.name,
+            pid = ProcessHandle.current().pid(),
             nodes =
                 nodes.map { node ->
                     NodeRunRecord(
@@ -119,10 +128,31 @@ class WorkflowRun(
                 },
         )
 
+    internal fun refreshFrom(
+        record: RunRecord,
+        restore: Restore,
+    ) {
+        record.nodes.forEach { archived ->
+            val node = node(archived.nodeId) ?: return@forEach
+            node.sessionId = archived.sessionId
+            node.costUsd = archived.costUsd
+            node.exitCode = archived.exitCode
+            node.command = archived.command
+            node.finishedAt = archived.finishedAt?.let(::parseInstant)
+            node.status = statusOf(archived.status, restore)
+        }
+        finishedAt = record.finishedAt?.let(::parseInstant)
+        outcome = statusOf(record.status, restore).takeIf { it.isFinished }
+        if (!isActive && transcriptLoaded) {
+            nodes.forEach { it.reset() }
+            transcriptLoaded = false
+        }
+    }
+
     companion object {
         fun restored(
             record: RunRecord,
-            orphaned: Boolean = true,
+            restore: Restore,
         ): WorkflowRun {
             val run =
                 WorkflowRun(
@@ -144,29 +174,26 @@ class WorkflowRun(
                         cwd = node.cwd?.let { Paths.get(it) },
                         startedAt = parseInstant(node.startedAt),
                         provider = node.provider,
-                    ).apply {
-                        sessionId = node.sessionId
-                        costUsd = node.costUsd
-                        exitCode = node.exitCode
-                        command = node.command
-                        finishedAt = node.finishedAt?.let(::parseInstant)
-                        if (orphaned) {
-                            status = RunStatus.DETACHED
-                            notice("Started before zopf last quit, and is still running outside it.")
-                        } else {
-                            status = statusOf(node.status)
-                        }
-                    }
+                    )
             }
-            run.finishedAt = record.finishedAt?.let(::parseInstant)
-            run.outcome = if (orphaned) RunStatus.DETACHED else statusOf(record.status)
+            run.refreshFrom(record, restore)
+            if (restore == Restore.ORPHANED) {
+                run.nodes.forEach { it.notice("Started before zopf last quit, and is still running outside it.") }
+            }
             return run
         }
 
-        private fun statusOf(name: String): RunStatus =
-            runCatching { RunStatus.valueOf(name) }
-                .getOrDefault(RunStatus.STOPPED)
-                .let { if (it.isActive) RunStatus.STOPPED else it }
+        private fun statusOf(
+            name: String,
+            restore: Restore,
+        ): RunStatus {
+            val status = runCatching { RunStatus.valueOf(name) }.getOrDefault(RunStatus.STOPPED)
+            return when {
+                restore == Restore.ORPHANED -> RunStatus.DETACHED
+                restore == Restore.LIVE || status.isFinished -> status
+                else -> RunStatus.STOPPED
+            }
+        }
 
         private fun parseInstant(value: String): Instant = runCatching { Instant.parse(value) }.getOrElse { Instant.now() }
     }

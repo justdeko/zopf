@@ -306,6 +306,13 @@ class NodeRun(
     }
 
     @Synchronized
+    internal fun reset() {
+        entries.clear()
+        outputBuffer.setLength(0)
+        outputFields = emptyMap()
+    }
+
+    @Synchronized
     internal fun restore(settled: RunStatus) {
         closeStreaming(null, isThinking = false)
         status = settled
