@@ -284,10 +284,12 @@ test name long enough to say what it asserts (`everyWorkflowInTheSkillDocsIsWrit
 A comment restating what's here is a second copy that drifts.
 
 Everything that is not a Kotlin source set may comment: the Gradle scripts, the connector scripts,
-`main.swift`, the shell scripts. Comments there earn their place or go. One lowercase fragment on the
-line someone would otherwise break, like `// non-jvm dirs read by unit tests so tests don't go stale`.
-Not a sentence, not a restatement of the line under it, and never a second copy of a paragraph from
-this file. The older scripts predate this and still carry prose; trim them as you touch them.
+`main.swift`, the shell scripts. Comments there earn their place or go. Write the label a developer
+would write on the line someone would otherwise break. Lowercase, a few words, naming the thing:
+`// include license in cli tarball`. Anything longer turns into prose — a clause explaining the line
+under it, two facts spliced with a comma, a contrast nobody asked for. Cut to the half that carries
+the information. Never a restatement of the line under it, and never a second copy of a paragraph
+from this file.
 
 User-facing strings are full sentences that say what to do next, not error codes —
 `"Repo \"app\" isn't at ~/dev/app any more"`, not `"invalid repo"`. That is a rule against error

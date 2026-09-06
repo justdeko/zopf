@@ -6,8 +6,7 @@ plugins {
 }
 
 ktlint {
-    // Compose's resource generator writes source into build/generated, which ktlint
-    // otherwise picks up as part of the source set it's attached to.
+    // skip compose generated source
     filter {
         exclude { it.file.path.contains("/generated/") }
     }
@@ -17,19 +16,12 @@ kotlin {
     jvm()
 
     sourceSets {
-        // The expressive half of Material 3 — MaterialExpressiveTheme, MotionScheme, the emphasized
-        // type styles, LoadingIndicator, FloatingToolbar — is still behind an opt-in. It is opted
-        // into once here rather than at each call site because the theme is app-wide: every screen
-        // reads an emphasized style or a motion spec, so per-file annotations would just be noise.
         all {
             languageSettings.optIn("androidx.compose.material3.ExperimentalMaterial3Api")
             languageSettings.optIn("androidx.compose.material3.ExperimentalMaterial3ExpressiveApi")
         }
 
         commonMain.dependencies {
-            // api(), against the kuiver rule below and for the reason that rule gives: the tray and
-            // the menu bar in :desktopApp name RunRegistry, RunStatus, NodeRun and NodeType, so
-            // hiding :core here would only force a second declaration there.
             api(project(":core"))
 
             implementation(libs.compose.runtime)

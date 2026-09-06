@@ -2,11 +2,8 @@ import AppKit
 import Foundation
 import UserNotifications
 
-// zopf posts through this bundle because UNUserNotificationCenter raises
-// NSInternalInconsistencyException in a process with no bundle identifier.
-//
-// With --respond the process stays alive until the notification is answered and prints the action id
-// that was clicked, or "default" for the body itself; a dismissal or the timeout prints nothing.
+// --respond blocks until answered and prints the clicked action id
+// "default" is the body itself and a dismissal prints nothing
 
 func die(_ message: String, _ code: Int32) -> Never {
     FileHandle.standardError.write((message + "\n").data(using: .utf8)!)
@@ -62,7 +59,7 @@ func parse(_ argv: [String]) -> Options {
     return options
 }
 
-// .accessory keeps this one out of the Dock for as long as it lives
+// .accessory keeps this out of the Dock
 NSApplication.shared.setActivationPolicy(.accessory)
 
 let options = parse(Array(CommandLine.arguments.dropFirst()))
@@ -70,7 +67,7 @@ let center = UNUserNotificationCenter.current()
 
 if !options.withdraw.isEmpty {
     center.removeDeliveredNotifications(withIdentifiers: options.withdraw)
-    // removeDelivered is asynchronous with no completion handler; exiting immediately can outrun it
+    // removeDelivered is async with no callback
     Thread.sleep(forTimeInterval: 0.2)
     exit(0)
 }
@@ -112,8 +109,7 @@ final class Responder: NSObject, UNUserNotificationCenterDelegate {
 let responder = Responder()
 center.delegate = responder
 
-// Every step happens in a callback off the main run loop. Blocking it instead makes center.add
-// report success for a notification the daemon never receives.
+// blocking the run loop makes center.add report a delivery that never happens
 var delivered = false
 
 center.requestAuthorization(options: [.alert, .sound]) { granted, error in
@@ -148,7 +144,7 @@ center.requestAuthorization(options: [.alert, .sound]) { granted, error in
         content.categoryIdentifier = category
     }
     if !sound.isEmpty {
-        // osascript accepts Glass, this API requires Glass.aiff
+        // this API wants Glass.aiff where osascript takes Glass
         let named = sound.contains(".") ? sound : sound + ".aiff"
         content.sound = UNNotificationSound(named: UNNotificationSoundName(named))
     }
@@ -161,7 +157,7 @@ center.requestAuthorization(options: [.alert, .sound]) { granted, error in
         }
         delivered = true
         guard options.respond else {
-            // add calls back when the request is accepted, which is before the daemon has it
+            // add calls back on accept rather than on delivery
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }
             return
         }

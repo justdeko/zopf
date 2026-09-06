@@ -68,8 +68,7 @@ def build():
             run([codesign, "--force", "--sign", "-", app], 15)
         if os.path.exists(APP):
             shutil.rmtree(APP)
-        # Renaming into place, never copying over the installed bundle, is what evicts the cached
-        # icon; without a moved mtime a changed icon.icns never reaches the screen.
+        # rename or the cached icon sticks
         os.rename(app, APP)
         if os.path.isfile(LSREGISTER):
             run([LSREGISTER, "-f", APP], 15)
@@ -94,8 +93,7 @@ def post_bundled(body, title, subtitle, sound):
 
 
 def post_osascript(body, title, subtitle, sound):
-    # Built as text because AppleScript has no way to say "this clause is absent" — but every value
-    # still travels in argv, so nothing user-supplied is ever part of the script itself.
+    # AppleScript can't leave a clause out
     clauses = ["display notification (item 1 of argv) with title (item 2 of argv)"]
     if subtitle:
         clauses.append("subtitle (item 3 of argv)")

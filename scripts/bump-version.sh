@@ -1,7 +1,4 @@
 #!/bin/sh
-# Moves the version in every file that spells it out. gradle.properties is the one
-# that counts; the rest are manifests and examples that have to agree with it.
-
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -61,7 +58,6 @@ current_version() {
         err "gradle.properties has no zopfVersion= line to read the current version from."
 }
 
-# macOS won't install a bundle whose CFBundleShortVersionString starts at 0.
 check_shape() {
     case "$1" in
         [1-9]*.[0-9]*.[0-9]*) ;;
@@ -86,8 +82,7 @@ next_version() {
     esac
 }
 
-# Each edit is checked afterwards, so a file that has moved on fails the bump
-# instead of keeping the old number.
+# verify each edit so a file that moved on fails the bump
 replace() {
     file="$1"
     pattern="$2"

@@ -1,8 +1,6 @@
 #!/bin/sh
 # curl -fsSL https://raw.githubusercontent.com/justdeko/zopf/main/install.sh | sh
-#
-# Everything lives in main(), called on the very last line, so a transfer that dies
-# halfway leaves a partial script that has defined some functions and run none of them.
+# main() runs last so a partial download does nothing
 
 set -eu
 
@@ -65,9 +63,7 @@ check_platform() {
     command -v tar >/dev/null 2>&1 || err "tar is required and isn't on your PATH."
 }
 
-# /releases/latest redirects to /releases/tag/vX.Y.Z, so reading the version out of the
-# redirect costs no API call and can't be rate limited. It also ignores drafts, which is
-# what keeps a tagged-but-unpublished build invisible here.
+# /releases/latest redirects to the newest tag
 resolve_version() {
     [ -z "$VERSION" ] || return 0
     url=$(curl -sSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" 2>/dev/null) ||
@@ -119,8 +115,7 @@ path_line() {
     esac
 }
 
-# A child process can't put anything on its parent shell's PATH, so the most an installer
-# can do is edit the rc file and say which one it edited.
+# a child can't change its parent's PATH
 ensure_on_path() {
     case ":$PATH:" in
         *":$PREFIX/bin:"*) return 0 ;;
@@ -141,8 +136,7 @@ ensure_on_path() {
     RESTART_HINT="Added $PREFIX/bin to $rc — run 'exec \$SHELL' or open a new terminal."
 }
 
-# The tarball carries no runtime, unlike the .app, so a launcher installed next to no JDK
-# would fail on first use with a message about java rather than about zopf.
+# the tarball ships no JDK
 check_java() {
     java_bin="java"
     [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ] && java_bin="$JAVA_HOME/bin/java"

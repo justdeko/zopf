@@ -158,8 +158,7 @@ def consumed_results(wf, repo):
     return seen
 
 
-# Tools that write their diagnostics — the part you actually want — to stderr.
-# git log / git show / echo are stdout-native and are not the hazard.
+# tools that write diagnostics to stderr
 DIAGNOSES_ON_STDERR = re.compile(
     r"\b(npm run (lint|test|build)|npx|eslint|tsc|jest|vitest|"
     r"go (build|test|vet)|cargo|pytest|python -m|mypy|ruff|flake8|"
@@ -279,8 +278,7 @@ def eval1(outputs, repo):
     out.append(result("The branch does not compare == directly against a claude node's ${...result}",
                       not direct, f"offenders: {direct}" if direct else "none"))
 
-    # Either shape is correct: a schema field on the claude node (preferred), or a shell
-    # node reducing its prose to a token (what you write when the producer can't declare one).
+    # both shapes are fine: a schema field on the claude node or a shell node reducing it to a token
     comparable = []
     for b in branches:
         for m in REF.finditer(b.get("expression") or ""):

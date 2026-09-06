@@ -10,16 +10,15 @@ trap 'rm -rf "$work"' EXIT
 
 render() { rsvg-convert -w "$1" -h "$1" "$master" -o "$2"; }
 
-# Linux: full-bleed PNG.
+# linux: full-bleed png
 render 512 "$here/icon.png"
 
-# Windows: multi-resolution full-bleed ICO.
+# windows: multi-res full-bleed ico
 for s in 16 32 48 64 128 256; do render "$s" "$work/ico-$s.png"; done
 magick "$work"/ico-16.png "$work"/ico-32.png "$work"/ico-48.png \
        "$work"/ico-64.png "$work"/ico-128.png "$work"/ico-256.png "$here/icon.ico"
 
-# macOS: artwork sits in the 824/1024 safe area so it matches neighbouring
-# dock icons, padded out to the full canvas with transparency.
+# macos: 824/1024 safe area padded out to the full canvas
 set="$work/icon.iconset"
 mkdir -p "$set"
 emit() { # emit <canvas> <outfile>
@@ -39,7 +38,7 @@ emit 512  icon_512x512.png
 emit 1024 icon_512x512@2x.png
 iconutil -c icns "$set" -o "$here/icon.icns"
 
-# zopf-notify is built from these resources at runtime, so it needs the icon too.
+# zopf-notify builds from these at runtime
 notifier="$here/../../core/src/commonMain/resources/notifier"
 also=""
 if [ -d "$notifier" ]; then

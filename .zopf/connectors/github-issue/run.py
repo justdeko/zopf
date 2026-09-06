@@ -3,10 +3,9 @@
 
 Inputs arrive as one flat JSON object of strings on stdin; one JSON object goes out on stdout.
 
-Not a shell node, for two reasons. The body is normally a whole ${node.result} — a Claude review,
-with backticks and quotes in it — which reaches `gh` here as an argv element rather than as
-something a shell re-parses. And the useful part of the answer is the issue number, which a shell
-node could only hand on as a line of text for the next node to slice up.
+Not a shell node. The body is normally a whole ${node.result} and reaches `gh` as an argv element
+that no shell re-parses. The issue number comes back as its own field instead of a line of text
+for the next node to slice up.
 """
 
 import json
@@ -47,13 +46,11 @@ def main():
         return 1
 
     if result.returncode != 0:
-        # gh's own message says which of the several ways this fails it was — no auth, no such
-        # label, no repo — and paraphrasing it would only lose that.
+        # gh's own message names the failure — no auth, no label, no repo
         print(json.dumps({"error": result.stderr.strip() or f"gh exited {result.returncode}"}))
         return 1
 
-    # gh prints the issue URL and nothing else on success. Reported rather than assumed, so a
-    # future gh that prints something extra fails visibly instead of handing on a truncated link.
+    # match so extra output fails visibly
     url = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
     match = ISSUE_URL.search(url)
     if not match:

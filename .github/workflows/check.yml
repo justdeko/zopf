@@ -7,14 +7,12 @@ on:
   pull_request:
 
 concurrency:
-  # A second push to the same branch makes the first one's result irrelevant.
+  # a second push makes the first result irrelevant
   group: check-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   check:
-    # Same runner the release builds on, so a green check means the release job's
-    # lint-and-test step will be green too.
     runs-on: macos-14
 
     steps:

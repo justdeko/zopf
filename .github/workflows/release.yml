@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    # Apple Silicon only
+    # apple silicon only
     runs-on: macos-14
     environment: release
 
@@ -96,7 +96,7 @@ jobs:
           STABLE="zopf-macos-arm64.dmg"
           cp "$FINAL" "$STABLE"
           TARBALL=$(find cli/build/distributions -name "*.tar.gz" | head -n1)
-          # install.sh verifies the tarball against this before it unpacks anything.
+          # install.sh verifies the tarball against this
           (cd "$(dirname "$TARBALL")" && shasum -a 256 "$(basename "$TARBALL")" > "$(basename "$TARBALL").sha256")
           # use notes of the release tag if they exist
           NOTES=$(git tag -l --format='%(contents)' "$TAG")

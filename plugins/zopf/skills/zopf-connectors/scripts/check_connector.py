@@ -190,8 +190,6 @@ def main():
     ok(f"connector.json parses, {script.name} is present")
 
     if not os.access(script, os.X_OK):
-        # zopf chmod +x's the entry point before launching it, so do the same rather than failing
-        # on something that would have run — but say so, since the committed file is still wrong.
         note(f"{script.name} is not executable — zopf sets the bit for you, but commit it set: chmod +x {script.name}")
         script.chmod(script.stat().st_mode | 0o111)
     first = script.read_text(errors="replace").splitlines()[:1]

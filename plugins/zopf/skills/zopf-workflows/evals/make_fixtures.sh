@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
-# Rebuilds the three eval fixture repos that check.py grades against.
-#
-# Each is a small project in a different ecosystem with its own .zopf workspace,
-# so the evals never lean on this repo's Kotlin/Gradle shape. eval-2 also carries
-# a deliberately broken nightly.yaml — four defects that all parse: an
-# unreachable exitCode branch, a missing when:false arm, a promtFile typo, and a
-# ${...} in a title. Regenerate with:  ./make_fixtures.sh [dest]
+# rebuilds the eval fixture repos check.py grades against:  ./make_fixtures.sh [dest]
+# eval-2's nightly.yaml is broken on purpose and all four defects parse:
+# unreachable exitCode branch, missing when:false arm, promtFile typo, ${...} in a title
 set -euo pipefail
 
 FX="${1:-$(cd "$(dirname "$0")" && pwd)/fixtures}"

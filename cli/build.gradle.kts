@@ -7,8 +7,7 @@ plugins {
     alias(libs.plugins.aboutLibraries)
 }
 
-// The CLI ships a much smaller dependency set than the app, so it gets its own list rather than
-// the app's superset. The JSON lands in resources and so travels inside the jar.
+// cli has fewer deps than the app
 aboutLibraries {
     collect {
         includePlatform = false
@@ -23,7 +22,7 @@ aboutLibraries {
     }
 }
 
-// Names the tarball the release publishes: zopf-cli-<version>.tar.gz.
+// names the release tarball zopf-cli-<version>.tar.gz
 version = (findProperty("packageVersion") as String?) ?: "1.0.0"
 
 dependencies {
@@ -35,29 +34,26 @@ dependencies {
 
 application {
     mainClass = "com.dk.zopf.cli.MainKt"
-    // The launcher installDist writes, and the directory the tarball unpacks into.
+    // name that shows up in launcher via installDist and the tarball dir
     applicationName = "zopf"
 }
 
 distributions {
     main {
         distributionBaseName = "zopf-cli"
-        // The obligations attach to the tarball, not to the repo. The library list and every
-        // license text ride along inside the jar; zopf's own license lives in no jar.
+        // include license in cli tarball
         contents {
             from(rootProject.file("LICENSE"))
         }
     }
 }
 
-// Homebrew wants a gzipped tarball, and the plain .tar the plugin defaults to isn't one.
+// homebrew needs a gzipped tarball
 tasks.distTar {
     compression = Compression.GZIP
     archiveExtension = "tar.gz"
 }
 
-// zopf is macOS-only — AppPaths resolves ~/Library/Application Support and the runners spawn
-// zsh — so shipping the plugin's Windows launcher only invites a bug report.
 tasks.startScripts {
     doLast { windowsScript.delete() }
 }
