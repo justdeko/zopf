@@ -18,7 +18,7 @@ fun WindowFrame?.toWindowState(): WindowState {
         } else {
             WindowPosition.PlatformDefault
         }
-    return WindowState(size = DpSize(frame.width.dp, frame.height.dp), position = position)
+    return WindowState(size = DefaultWindowSize, position = position)
 }
 
 fun WindowState.toFrame(): WindowFrame? {

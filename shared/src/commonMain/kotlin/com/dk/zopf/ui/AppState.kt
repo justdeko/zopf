@@ -188,7 +188,7 @@ class AppState(
 
             gone.forEach { RunArchive.delete(it) }
             Log.info("pruned ${gone.size} archived run(s), keeping $keep")
-            message = "Deleted ${gone.size} archived run(s), keeping the last $keep. See Settings › History."
+            prunedRunsMessage(gone.size, keep)?.let { message = it }
         }
     }
 
@@ -233,6 +233,7 @@ class AppState(
     fun openEditor(workflow: Workflow) {
         val workspace = activeWorkspace?.workspace ?: return
         selectedWorkflow = workflow
+        showRunPanel = runs.runForEditor(workflow.name)?.isActive == true
 
         refreshConnectors()
         editing =
@@ -323,7 +324,7 @@ class AppState(
             .startWorkflow(activeWorkspace?.workspace, target)
             .onSuccess {
                 showRunPanel = true
-                message = "Running ${target.name}"
+                if (editing?.workflow?.name != target.name) message = "Running ${target.name}"
             }.onFailure { message = it.message }
     }
 
@@ -419,4 +420,14 @@ class AppState(
     }
 }
 
-internal fun RunRegistry.runForEditor(workflowName: String): WorkflowRun? = selectedRun?.takeIf { it.workflowName == workflowName && it.isActive }
+internal fun prunedRunsMessage(
+    gone: Int,
+    keep: Int,
+): String? =
+    if (gone <= keep) {
+        null
+    } else {
+        "Deleted $gone archived runs, keeping the last $keep. See Settings › History."
+    }
+
+internal fun RunRegistry.runForEditor(workflowName: String): WorkflowRun? = selectedRun?.takeIf { it.workflowName == workflowName }

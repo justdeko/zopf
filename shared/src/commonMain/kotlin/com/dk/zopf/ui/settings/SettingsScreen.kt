@@ -43,6 +43,7 @@ import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.BuildInfo
 import com.dk.zopf.store.DEFAULT_KEEP_RUNS
 import com.dk.zopf.store.DEFAULT_TERMINAL_APP
+import com.dk.zopf.store.KEEP_EVERY_RUN
 import com.dk.zopf.store.Log
 import com.dk.zopf.store.MAX_CONCURRENCY
 import com.dk.zopf.store.NotifyLevel
@@ -293,7 +294,7 @@ private fun KeepRunsField(
     ConnectedChoices(
         options = KeepRunsOptions,
         selected = KeepRunsOptions.minByOrNull { kotlin.math.abs(it - value) } ?: DEFAULT_KEEP_RUNS,
-        label = { if (it == 0) "None" else "$it" },
+        label = { if (it == KEEP_EVERY_RUN) "All" else "$it" },
         onSelect = onSelect,
     )
     Hint(

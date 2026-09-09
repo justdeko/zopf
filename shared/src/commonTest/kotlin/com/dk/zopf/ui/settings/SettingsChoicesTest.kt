@@ -68,10 +68,10 @@ class SettingsChoicesTest {
     @Test
     fun `the runs-to-keep row survives a narrow window`() {
         runSettings(width = 360) {
-            onNodeWithText("None").assertExists()
+            onNodeWithText("All").assertExists()
         }
         runSettings(width = 900) { written ->
-            listOf("None", "50", "200", "1000").forEach { onNodeWithText(it).assertExists() }
+            listOf("All", "50", "200", "1000").forEach { onNodeWithText(it).assertExists() }
 
             onNodeWithText("1000").performScrollTo().performClick()
             assertEquals(listOf(1000), written.map { it.keepRuns })

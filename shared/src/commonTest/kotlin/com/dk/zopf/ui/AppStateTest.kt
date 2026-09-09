@@ -24,6 +24,7 @@ import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -102,12 +103,16 @@ class WorkspaceSwitchTest {
 class EditorRunPanelTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val dirs = mutableListOf<Path>()
+    private val apps = mutableListOf<AppState>()
 
     @AfterTest
     fun tearDown() {
         scope.cancel()
+        apps.forEach { it.shutdown() }
         dirs.forEach { it.toFile().deleteRecursively() }
     }
+
+    private fun tempDir(): Path = Files.createTempDirectory("zopf-panel-app").also { dirs.add(it) }
 
     private object Unused : NodeExecutor {
         override suspend fun execute(execution: NodeExecution): Unit = error("${execution.node.id} tried to start a process")
@@ -145,17 +150,26 @@ class EditorRunPanelTest {
     }
 
     @Test
-    fun theEditorLetsGoOfARunOnceItHasFinished() =
+    fun `the editor keeps a run after it has finished`() =
         runBlocking {
             val runs = registry()
             val alpha = runs.startWorkflow(null, settling()).getOrThrow()
             withTimeout(10.seconds) { alpha.job?.join() }
 
             assertEquals(RunStatus.SUCCEEDED, alpha.status)
-
-            assertEquals(alpha, runs.selectedRun)
-            assertNull(runs.runForEditor("alpha"))
+            assertEquals(alpha, runs.runForEditor("alpha"))
         }
+
+    @Test
+    fun `reopening the editor hides a panel left from before`() {
+        val app = AppState(WorkspaceRegistry(tempDir().resolve("workspaces.json"))).also { apps.add(it) }
+        app.addWorkspace(tempDir().resolve("ws"))
+        app.showRunPanel = true
+
+        app.openEditor(workflow("alpha"))
+
+        assertFalse(app.showRunPanel)
+    }
 
     @Test
     fun selectingAnotherRunElsewhereDoesNotLeakIntoTheEditor() {
@@ -215,6 +229,31 @@ class RunGateTest {
     }
 
     @Test
+    fun `the Run button says nothing when the editor shows the run`() {
+        val app = app()
+        val gate = Workflow(name = "demo", nodes = listOf(WorkflowNode(id = "look", type = NodeType.GATE)))
+        app.openEditor(gate)
+        app.message = null
+
+        app.runWorkflow()
+
+        assertEquals(1, app.runs.runs.size)
+        assertNull(app.message)
+    }
+
+    @Test
+    fun `the Run button names a run the editor is not showing`() {
+        val app = app()
+        val gate = Workflow(name = "demo", nodes = listOf(WorkflowNode(id = "look", type = NodeType.GATE)))
+        app.message = null
+
+        app.runWorkflow(gate)
+
+        assertEquals(1, app.runs.runs.size)
+        assertEquals("Running demo", app.message)
+    }
+
+    @Test
     fun `the Run button refuses on a fresh snapshot`() {
         val app = app()
         val workspace = assertNotNull(assertNotNull(app.activeWorkspace).workspace)
@@ -240,5 +279,29 @@ class RunGateTest {
         assertEquals(0, app.runs.runs.size)
         val message = assertNotNull(app.message)
         assertTrue("gone" in message, "the gate read the copy the editor took when it opened: $message")
+    }
+}
+
+class PrunedRunsMessageTest {
+    @Test
+    fun `show prune message only when it clears more than threshold`() {
+        listOf(
+            Triple(1, 50, false),
+            Triple(3, 50, false),
+            Triple(50, 50, false),
+            Triple(51, 50, true),
+            Triple(400, 50, true),
+            Triple(2, 1, true),
+        ).forEach { (gone, keep, expected) ->
+            assertEquals(expected, prunedRunsMessage(gone, keep) != null, "$gone gone, $keep kept")
+        }
+    }
+
+    @Test
+    fun `the pruning message names the count and the limit`() {
+        assertEquals(
+            "Deleted 400 archived runs, keeping the last 50. See Settings › History.",
+            prunedRunsMessage(400, 50),
+        )
     }
 }
