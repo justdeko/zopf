@@ -17,6 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # checkout writes the pushed tag as a lightweight ref, so refetch the annotated object for its message
+      - name: Refetch the annotated tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -100,14 +106,13 @@ jobs:
           (cd "$(dirname "$TARBALL")" && shasum -a 256 "$(basename "$TARBALL")" > "$(basename "$TARBALL").sha256")
           # use notes of the release tag if they exist
           NOTES=$(git tag -l --format='%(contents)' "$TAG")
-          if [ -n "$NOTES" ]; then
-            printf '%s\n' "$NOTES" > release-notes.md
-            gh release create "$TAG" "$FINAL" "$STABLE" "$TARBALL" "$TARBALL.sha256" \
-              --draft --title "$VERSION" --notes-file release-notes.md --generate-notes
-          else
-            gh release create "$TAG" "$FINAL" "$STABLE" "$TARBALL" "$TARBALL.sha256" \
-              --draft --title "$VERSION" --generate-notes
-          fi
+          ANCHOR=${VERSION//./}
+          {
+            [ -n "$NOTES" ] && printf '%s\n\n' "$NOTES"
+            printf '[Changelog for %s](CHANGELOG.md#%s)\n' "$VERSION" "$ANCHOR"
+          } > release-notes.md
+          gh release create "$TAG" "$FINAL" "$STABLE" "$TARBALL" "$TARBALL.sha256" \
+            --draft --title "$VERSION" --notes-file release-notes.md --generate-notes
 
       - name: Delete the throwaway keychain
         if: always()
