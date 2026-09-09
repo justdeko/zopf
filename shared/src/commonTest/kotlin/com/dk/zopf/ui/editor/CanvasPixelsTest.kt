@@ -2,6 +2,7 @@ package com.dk.zopf.ui.editor
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -31,6 +33,7 @@ import com.dk.kuiver.model.layout.LayoutDirection
 import com.dk.kuiver.renderer.KuiverNodeScope
 import com.dk.kuiver.ui.ArrowDrawer
 import com.dk.kuiver.ui.DefaultArrowDrawer
+import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.ui.theme.PathIcon
@@ -106,6 +109,54 @@ class CanvasPixelsTest {
             "PathIcon is no sharper than a magnified bitmap: $drawn soft pixels vs $cached",
         )
     }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a header too long for its row keeps the connect handle in the corner`() =
+        runDesktopComposeUiTest(width = 400, height = 400) {
+            setContent {
+                ZopfTheme(darkTheme = false) {
+                    Column(Modifier.size(400.dp, 400.dp).background(Color.White)) {
+                        with(Flags()) {
+                            WorkflowNodeCard(
+                                node = WorkflowNode("alpha", NodeType.SHELL, command = "echo hi"),
+                                isSelected = false,
+                                hasIssue = false,
+                                isConnectSource = false,
+                                isConnectable = true,
+                                connectMode = false,
+                                onConnectClick = {},
+                            )
+                            WorkflowNodeCard(
+                                node = WorkflowNode("beta", NodeType.AGENT, prompt = "hi"),
+                                isSelected = false,
+                                hasIssue = false,
+                                isConnectSource = false,
+                                isConnectable = true,
+                                connectMode = false,
+                                onConnectClick = {},
+                                provider = AgentProviderId.DSH,
+                                model = "a-model-name-far-too-long-for-the-row",
+                            )
+                        }
+                    }
+                }
+            }
+            waitForIdle()
+
+            val edges =
+                onAllNodesWithContentDescription("Connect from here")
+                    .fetchSemanticsNodes()
+                    .map { it.boundsInRoot.right }
+
+            assertEquals(2, edges.size, "both cards should have drawn a handle")
+            assertEquals(
+                edges.first(),
+                edges.last(),
+                absoluteTolerance = 0.5f,
+                message = "a long header pushed the handle off the corner it shares with every other card",
+            )
+        }
 
     @OptIn(ExperimentalTestApi::class)
     @Test

@@ -87,6 +87,13 @@ fun Workflow.providerFor(
     fallback: AgentProviderId = AgentProviderId.CLAUDE,
 ): AgentProviderId = node.provider ?: defaults.provider ?: fallback
 
+fun Workflow.modelFor(
+    node: WorkflowNode,
+    provider: AgentProviderId,
+    machineProvider: AgentProviderId,
+    machineModel: String?,
+): String? = node.model ?: inheritedModel(provider, machineProvider, machineModel)
+
 fun Workflow.inheritedModel(
     provider: AgentProviderId,
     machineProvider: AgentProviderId,

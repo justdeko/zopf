@@ -90,7 +90,10 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.blurb
+import com.dk.zopf.model.capabilities
 import com.dk.zopf.model.label
+import com.dk.zopf.model.modelFor
+import com.dk.zopf.model.providerFor
 import com.dk.zopf.model.validate
 import com.dk.zopf.runtime.NodeRun
 import com.dk.zopf.runtime.RunStatus
@@ -453,6 +456,7 @@ private fun Canvas(
     takeKeys: () -> Unit = {},
 ) {
     val workflow = state.workflow
+    val resolved = state.resolvedWorkflow
     val viewerState = canvas.viewer
     val connectFrom = state.connectFrom
     val drag = state.connectDrag
@@ -495,6 +499,12 @@ private fun Canvas(
                 workflow.node(kuiverNode.id)?.let { node ->
                     val isConnectSource = node.id == connectFrom
                     val isConnectable = node.id in connectable
+                    val provider =
+                        if (node.type == NodeType.AGENT) resolved.providerFor(node, state.fallbackProvider) else null
+                    val model =
+                        provider
+                            ?.takeIf { it.capabilities.modelSelection }
+                            ?.let { resolved.modelFor(node, it, state.defaultProvider, state.defaultModel) }
 
                     val dimmed = connectFrom != null && !isConnectable && !isConnectSource
                     Box(
@@ -523,6 +533,8 @@ private fun Canvas(
                                 connectMode = connectFrom != null,
                                 onConnectClick = { state.startConnecting(node.id) },
                                 runStatus = runningNodes.firstOrNull { it.nodeId == node.id }?.status,
+                                provider = provider,
+                                model = model,
                             )
                         }
                         EdgePort(node.id, canvas.direction, incoming = true, visible = false)

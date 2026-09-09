@@ -37,6 +37,7 @@ import com.dk.kuiver.renderer.KuiverNodeScope
 import com.dk.kuiver.renderer.KuiverViewer
 import com.dk.kuiver.renderer.KuiverViewerConfig
 import com.dk.kuiver.ui.LocalKuiverColors
+import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.label
@@ -74,6 +75,8 @@ fun KuiverNodeScope.WorkflowNodeCard(
     connectMode: Boolean,
     onConnectClick: () -> Unit,
     runStatus: RunStatus? = null,
+    provider: AgentProviderId? = null,
+    model: String? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
 
@@ -127,12 +130,13 @@ fun KuiverNodeScope.WorkflowNodeCard(
                 )
                 Spacer(Modifier.width(7.dp))
                 Text(
-                    node.type.label,
+                    node.headerLabel(provider, model),
                     style = MaterialTheme.typography.labelSmall,
                     color = if (hasIssue) scheme.error else roles.onContainer,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.weight(1f))
                 if (runStatus != null) {
                     Box(
                         Modifier.size(16.dp).background(scheme.surfaceContainerLowest, CircleShape),
@@ -200,6 +204,16 @@ private fun ConnectHandle(
     }
 }
 
+private fun WorkflowNode.headerLabel(
+    provider: AgentProviderId?,
+    model: String?,
+): String =
+    if (type == NodeType.AGENT && provider != null) {
+        listOfNotNull(provider.label, model).joinToString(" · ")
+    } else {
+        type.label
+    }
+
 private val NodeType.subtitleIsCode: Boolean
     get() = this == NodeType.SHELL || this == NodeType.BRANCH
 
@@ -257,6 +271,8 @@ private fun WorkflowNodeCardPreview() {
                                     connectMode = true,
                                     onConnectClick = {},
                                     runStatus = if (node.id == "route") RunStatus.RUNNING else null,
+                                    provider = AgentProviderId.CLAUDE.takeIf { node.type == NodeType.AGENT },
+                                    model = node.model,
                                 )
                             }
                         },

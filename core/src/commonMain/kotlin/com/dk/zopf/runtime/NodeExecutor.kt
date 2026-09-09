@@ -6,7 +6,7 @@ import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.ignoredFields
-import com.dk.zopf.model.inheritedModel
+import com.dk.zopf.model.modelFor
 import com.dk.zopf.model.providerFor
 import com.dk.zopf.model.toJsonSchema
 import com.dk.zopf.store.AppSettings
@@ -371,7 +371,7 @@ internal fun resolveModel(
     workflow: Workflow,
     settings: AppSettings,
     provider: AgentProviderId = resolveProvider(node, workflow, settings),
-): String? = node.model ?: workflow.inheritedModel(provider, settings.defaultProvider, settings.defaultModel)
+): String? = workflow.modelFor(node, provider, settings.defaultProvider, settings.defaultModel)
 
 internal fun resolveProvider(
     node: WorkflowNode,

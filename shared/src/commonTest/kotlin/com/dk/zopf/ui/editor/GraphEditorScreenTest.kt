@@ -769,6 +769,32 @@ class GraphEditorScreenTest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
+    fun `an agent node's card names its cli and model`() =
+        runDesktopComposeUiTest(width = 1400, height = 900) {
+            editor(
+                Workflow(
+                    name = "w",
+                    defaults = NodeDefaults(provider = AgentProviderId.CODEX),
+                    nodes =
+                        listOf(
+                            WorkflowNode(
+                                "alpha",
+                                NodeType.AGENT,
+                                provider = AgentProviderId.CLAUDE,
+                                model = "opus",
+                                prompt = "do a thing",
+                            ),
+                            WorkflowNode("beta", NodeType.AGENT, prompt = "do another"),
+                        ),
+                ),
+            )
+
+            onNodeWithText("Claude Code · opus").assertIsDisplayed()
+            onNodeWithText("codex").assertIsDisplayed()
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
     fun `a node keeps its type icon during a run`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
             val waiting =
