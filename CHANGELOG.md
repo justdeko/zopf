@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0
+
+- Watch a run move across the canvas: the edge being taken thickens and flows, arms the run passed over fade back, and every node carries a badge that spins while it works and settles into a tick, a warning or a stop.
+- A node with nothing to print now reads as running instead of sitting on starting, so a long quiet step no longer looks stuck.
+- Open a workflow that is already running and the canvas picks the run up, whether or not the run panel is showing.
+- A failed node whose `on: failure` arm ran no longer fails the whole run: the node still shows as failed, and `zopf run` exits 0.
+- Agent nodes name their provider and model on the card, and the run console header shows them too, including for runs replayed from the archive.
+- The Runs list says when each run started, as a time for today and a date for anything older.
+- Settings calls the keep-everything history option "All" rather than "None", and pruning only speaks up when it actually deleted runs.
+- A gate, an input or a permission prompt now shows up under a coloured rule in the run console instead of a filled bar.
+
 ## 1.2.0
 
 - Runs started from the CLI now show up on the Runs screen while they run, update as they go, and notify you when they finish.

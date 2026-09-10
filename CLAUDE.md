@@ -37,7 +37,7 @@ that isn't visible from outside.
 ./gradlew :desktopApp:run                   # the window, off the Gradle daemon
 ./gradlew :desktopApp:hotRun --autoReload   # same, with Compose hot reload
 ./gradlew :desktopApp:runMacApp             # build the .app and open it via LaunchServices
-./gradlew :desktopApp:packageDmg -PpackageVersion=1.2.0
+./gradlew :desktopApp:packageDmg -PpackageVersion=1.3.0
 ./gradlew :desktopApp:suggestRuntimeModules # re-run after touching the runtime layer
 
 ./gradlew :cli:installDist                  # cli/build/install/zopf-cli/bin/zopf
