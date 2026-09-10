@@ -5,7 +5,8 @@ description: |-
   The notes, the impact read and the suite run at once and join on one verdict. The suite writes its
   own exit code and always succeeds, because a fan-in runs as soon as one edge arrives — a failing
   arm would not stop it, it would leave it reading ${checks.result} verbatim. The branch before the
-  gate is what keeps an unattended run from parking on a question nobody is there to answer.
+  notes are offered is what keeps an unattended run from parking on a question nobody is there to
+  answer.
 repos:
   - id: self
     path: ..
@@ -69,7 +70,7 @@ nodes:
       - Grep
     schema:
       - name: body
-        description: the entry itself, as short bullet points, at most eight of them
+        description: the entry itself, at most four bullets, each a short phrase
     prompt: |
       Draft the release notes for zopf ${version.result}.
 
@@ -80,10 +81,14 @@ nodes:
       Open the files behind a commit whose subject doesn't say what actually changed; "cleanup" and
       "fix encoding" are not release notes.
 
-      Write short bullet points, each starting with `- `, saying what the release lets someone do
-      rather than naming a commit. One line each, and the change someone would notice first at the
-      top. Leave out what a user cannot see: refactors, test changes, build wiring. If the release
-      really is only internal work, say that in one bullet rather than inflating it.
+      At most four bullets, each starting with `- `. A bullet is a short phrase naming the change,
+      not a sentence describing it: `- more interactive node progress`, never a clause about what
+      thickens and what fades back. Under about eight words, no comma, no full stop.
+
+      The one someone would notice first goes at the top. Fold the small changes into one bullet
+      rather than listing them, and leave out what a user cannot see: refactors, test changes, build
+      wiring. If the release really is only internal work, say that in one bullet rather than
+      inflating it.
 
       `body` is published as written — it becomes the tag message and the GitHub release. Bullets and
       nothing else: no version heading, no preamble, no paragraph before or after them, no closing
@@ -91,6 +96,7 @@ nodes:
   - id: impact
     type: agent
     title: Is this the right size of release?
+    model: haiku
     allowedTools:
       - Read
       - Glob
@@ -101,20 +107,19 @@ nodes:
       - name: concern
         description: the one thing that should hold the release, or exactly "none"
     prompt: |
-      zopf ${version.result} is being cut as a ${bump.result} bump. Judge whether that is the right
-      size, and whether anything should hold it.
+      zopf ${version.result} is being cut as a ${bump.result} bump. Judge quickly whether that is the
+      right size, and whether anything should hold it.
 
       What has landed since the last release:
 
       ${history.result}
 
-      Read CHANGELOG.md and CLAUDE.md, then weigh two things:
+      Go on the log. Open a file only when a subject is too vague to place, and don't survey the tree
+      for anything the log doesn't already point at.
 
-      - Semantics. A change to what a workflow YAML may say, to what `zopf run` exits, or to where
-        files are written is a minor at least — those are contracts other people's files and scripts
-        already hold. Internal work is a patch however large the diff.
-      - Anything half-landed: a flag added but undocumented, a claim in CLAUDE.md the commits have
-        made untrue, a format change with no path for files already written.
+      A change to what a workflow YAML may say, to what `zopf run` exits, or to where files are
+      written is a minor at least — those are contracts other people's files and scripts already
+      hold. Internal work is a patch however large the diff.
 
       The tree is not bumped yet. gradle.properties, the plugin manifest and CHANGELOG.md all still
       carry the previous version, because the cut writes them after the gate. That is the shape of
@@ -176,6 +181,34 @@ nodes:
       subtitle: ${version.result} held
       message: ${reconcile.because}
       sound: Basso
+  - id: edit
+    type: input
+    title: The release notes
+    prompt: |
+      Drafted for v${version.result}:
+
+      ${notes.body}
+
+      Type ok to publish these as drafted, or write the bullets you want instead. Shift-return starts
+      a new line.
+  - id: final
+    type: shell
+    title: The notes as they will be published
+    command: |
+      set -eu
+      answer=$(mktemp)
+      cat <<'ZOPF_ANSWER' > "$answer"
+      ${edit.result}
+      ZOPF_ANSWER
+      drafted=$(mktemp)
+      cat <<'ZOPF_DRAFT' > "$drafted"
+      ${notes.body}
+      ZOPF_DRAFT
+      case "$(tr -d '[:space:]' < "$answer" | tr '[:upper:]' '[:lower:]')" in
+        ok) cat "$drafted" ;;
+        *) cat "$answer" ;;
+      esac
+      rm -f "$answer" "$drafted"
   - id: approve
     type: gate
     title: Commit the bump, push the tag and let the release build?
@@ -186,7 +219,7 @@ nodes:
 
       The notes that will become the tag message and the release body:
 
-      ${notes.body}
+      ${final.result}
   - id: prepare
     type: shell
     title: Bump the version and write the changelog entry
@@ -197,7 +230,7 @@ nodes:
       ./scripts/bump-version.sh ${bump.result}
       body=$(mktemp)
       cat <<'ZOPF_RELEASE_NOTES' > "$body"
-      ${notes.body}
+      ${final.result}
       ZOPF_RELEASE_NOTES
       out=$(mktemp)
       awk -v heading="## ${version.result}" -v file="$body" '
@@ -216,7 +249,7 @@ nodes:
       set -eu
       body=$(mktemp)
       cat <<'ZOPF_RELEASE_NOTES' > "$body"
-      ${notes.body}
+      ${final.result}
       ZOPF_RELEASE_NOTES
       git tag -a "v${version.result}" -F "$body"
       rm -f "$body"
@@ -262,8 +295,12 @@ edges:
     to: blocked
     when: false
   - from: ready
-    to: approve
+    to: edit
     when: true
+  - from: edit
+    to: final
+  - from: final
+    to: approve
   - from: approve
     to: prepare
   - from: prepare
