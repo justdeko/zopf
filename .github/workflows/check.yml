@@ -6,6 +6,9 @@ on:
     tags-ignore: ["v*.*.*"]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   # a second push makes the first result irrelevant
   group: check-${{ github.ref }}
