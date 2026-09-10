@@ -172,6 +172,25 @@ class EditorRunPanelTest {
     }
 
     @Test
+    fun `the canvas keeps painting a run while the panel is shut`() {
+        val runs = registry()
+        runs.startWorkflow(null, workflow("alpha")).getOrThrow()
+
+        assertNotNull(runs.runOnCanvas("alpha", panelOpen = false))
+    }
+
+    @Test
+    fun `the canvas drops a finished run once the panel is shut`() =
+        runBlocking {
+            val runs = registry()
+            val alpha = runs.startWorkflow(null, settling()).getOrThrow()
+            withTimeout(10.seconds) { alpha.job?.join() }
+
+            assertNotNull(runs.runOnCanvas("alpha", panelOpen = true))
+            assertNull(runs.runOnCanvas("alpha", panelOpen = false))
+        }
+
+    @Test
     fun selectingAnotherRunElsewhereDoesNotLeakIntoTheEditor() {
         val runs = registry()
         val alpha = runs.startWorkflow(null, workflow("alpha")).getOrThrow()

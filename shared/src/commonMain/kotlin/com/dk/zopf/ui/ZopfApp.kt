@@ -179,7 +179,11 @@ fun ZopfApp(state: AppState = remember { AppState() }) {
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         onRunNode = state::runNode,
                         onRunWorkflow = { state.runWorkflow() },
-                        runningNodes = workflowRun?.nodes.orEmpty(),
+                        runningNodes =
+                            state.runs
+                                .runOnCanvas(editor.workflow.name, state.showRunPanel)
+                                ?.nodes
+                                .orEmpty(),
                         onCommands = { state.editorCommands = it },
                     )
 

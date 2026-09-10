@@ -1,0 +1,92 @@
+name: canvas-states
+description: |-
+  Drive the canvas through every node status at once, to look at the editor rather than to get
+  anything done.
+
+  It costs nothing and needs no CLI installed: shells that sleep, one that fails into a repair arm,
+  a branch whose false arm is left dead, and a gate and an input that park until you answer. Run it
+  from the editor and watch the graph — a node running, a path taken, an arm skipped and a failure
+  handled all show at the same time. The last node fails on purpose and nothing catches it, so the
+  run settles red.
+repos:
+  - id: self
+    path: ..
+defaults:
+  repo: self
+nodes:
+  - id: start
+    type: shell
+    title: Start the run
+    command: sleep 1; echo ready
+  - id: pick
+    type: branch
+    title: Did the first node say ready?
+    expression: ${start.result} == ready
+  - id: ask
+    type: input
+    title: Which arm looks right?
+    default: green
+    choices:
+      - green
+      - red
+    prompt: Pick one so the gate has something to show.
+  - id: hold
+    type: gate
+    title: Let the run past?
+    prompt: You answered ${ask.result}.
+  - id: untaken
+    type: shell
+    title: Skipped — the branch went the other way
+    command: echo "this never runs either"
+  - id: flaky
+    type: shell
+    title: Fail on purpose
+    command: sleep 4; echo "exiting 1" >&2; exit 1
+  - id: repair
+    type: shell
+    title: Catch the failure
+    command: sleep 3; echo "repaired"
+  - id: never
+    type: shell
+    title: Skipped — its dependency failed
+    command: echo "this never runs"
+  - id: slow
+    type: shell
+    title: Twenty seconds of work
+    command: sleep 20; echo "the slow arm finished"
+  - id: join
+    type: shell
+    title: Join every arm
+    command: echo "slow=${slow.result} repair=${repair.result} gate=${hold.result}"
+  - id: boom
+    type: shell
+    title: Fail with nothing to catch it
+    command: sleep 2; echo "nothing handles this" >&2; exit 3
+edges:
+  - from: start
+    to: slow
+  - from: start
+    to: flaky
+  - from: start
+    to: pick
+  - from: flaky
+    to: repair
+    on: failure
+  - from: flaky
+    to: never
+  - from: pick
+    to: ask
+    when: true
+  - from: pick
+    to: untaken
+    when: false
+  - from: ask
+    to: hold
+  - from: slow
+    to: join
+  - from: repair
+    to: join
+  - from: hold
+    to: join
+  - from: join
+    to: boom

@@ -13,6 +13,7 @@ import com.dk.zopf.model.Position
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.outgoingEdges
+import com.dk.zopf.runtime.RunStatus
 
 const val InAnchor = "left"
 const val OutAnchor = "right"
@@ -36,6 +37,26 @@ fun Workflow.toKuiver(direction: LayoutDirection = LayoutDirection.HORIZONTAL): 
                 )
             },
         )
+
+enum class EdgeFlow {
+    IDLE,
+    TAKEN,
+    DEAD,
+}
+
+fun edgeFlow(
+    from: RunStatus?,
+    to: RunStatus?,
+    failure: Boolean,
+): EdgeFlow =
+    when {
+        from == null && to == null -> EdgeFlow.IDLE
+        from == RunStatus.SKIPPED || to == RunStatus.SKIPPED -> EdgeFlow.DEAD
+        from == RunStatus.SUCCEEDED && failure -> EdgeFlow.DEAD
+        from == RunStatus.FAILED && !failure -> EdgeFlow.DEAD
+        to == null || to == RunStatus.QUEUED -> EdgeFlow.IDLE
+        else -> EdgeFlow.TAKEN
+    }
 
 data class GraphShape(
     val depth: Int,

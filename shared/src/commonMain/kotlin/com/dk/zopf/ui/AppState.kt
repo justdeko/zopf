@@ -431,3 +431,8 @@ internal fun prunedRunsMessage(
     }
 
 internal fun RunRegistry.runForEditor(workflowName: String): WorkflowRun? = selectedRun?.takeIf { it.workflowName == workflowName }
+
+internal fun RunRegistry.runOnCanvas(
+    workflowName: String,
+    panelOpen: Boolean,
+): WorkflowRun? = runForEditor(workflowName)?.takeIf { panelOpen || it.isActive }

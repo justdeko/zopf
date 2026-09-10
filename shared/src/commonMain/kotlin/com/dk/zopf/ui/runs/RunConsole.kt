@@ -64,6 +64,7 @@ import com.dk.zopf.store.DEFAULT_TERMINAL_APP
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
+import com.dk.zopf.ui.theme.colors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -92,20 +93,11 @@ fun RunConsole(
         HorizontalDivider()
         Transcript(run, Modifier.weight(1f))
         when {
-            run.isAwaitingPermission -> {
-                HorizontalDivider()
-                PermissionBar(run.pendingPermission, onDecide)
-            }
+            run.isAwaitingPermission -> PermissionBar(run.pendingPermission, onDecide)
 
-            run.isAwaitingApproval -> {
-                HorizontalDivider()
-                GateBar(title = run.nodeTitle, onApprove = onApprove)
-            }
+            run.isAwaitingApproval -> GateBar(title = run.nodeTitle, onApprove = onApprove)
 
-            run.isAwaitingInput -> {
-                HorizontalDivider()
-                InputBar(run.pendingQuestion, onAnswer)
-            }
+            run.isAwaitingInput -> InputBar(run.pendingQuestion, onAnswer)
 
             run.status == RunStatus.WAITING && run.canFollowUp -> {
                 HorizontalDivider()
@@ -492,17 +484,30 @@ private fun FollowUpBar(
 }
 
 @Composable
+private fun AttentionBar(
+    status: RunStatus,
+    content: @Composable () -> Unit,
+) {
+    Column {
+        Box(Modifier.fillMaxWidth().height(AttentionRule).background(status.colors().accent))
+        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, content = content)
+    }
+}
+
+private val AttentionRule = 2.dp
+
+@Composable
 private fun PermissionBar(
     pending: PendingPermission?,
     onDecide: (Boolean, Boolean) -> Unit,
 ) {
     val request = pending?.request ?: return
-    Surface(color = MaterialTheme.colorScheme.errorContainer) {
+    AttentionBar(RunStatus.FAILED) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(
                 "${request.toolName} wants to run",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onErrorContainer,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             if (request.summary.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))
@@ -510,7 +515,7 @@ private fun PermissionBar(
                     request.summary,
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Spacer(Modifier.height(10.dp))
@@ -534,7 +539,7 @@ private fun GateBar(
     title: String,
     onApprove: (Boolean) -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.tertiaryContainer) {
+    AttentionBar(RunStatus.WAITING) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -542,7 +547,7 @@ private fun GateBar(
             Text(
                 title,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = { onApprove(false) }) { Text("Reject") }
@@ -564,7 +569,7 @@ private fun InputBar(
     if (question == null) return
     var text by remember(question) { mutableStateOf(question.initialAnswer) }
 
-    Surface(color = MaterialTheme.colorScheme.tertiaryContainer) {
+    AttentionBar(RunStatus.WAITING) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
             if (question.choices.isNotEmpty()) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -633,16 +638,7 @@ internal fun StatusDot(
 }
 
 @Composable
-internal fun RunStatus.color(): Color =
-    when (this) {
-        RunStatus.QUEUED -> MaterialTheme.colorScheme.outlineVariant
-        RunStatus.STARTING, RunStatus.RUNNING -> MaterialTheme.colorScheme.primary
-        RunStatus.WAITING -> MaterialTheme.colorScheme.tertiary
-        RunStatus.SUCCEEDED -> MaterialTheme.colorScheme.primary
-        RunStatus.FAILED -> MaterialTheme.colorScheme.error
-        RunStatus.STOPPED, RunStatus.SKIPPED -> MaterialTheme.colorScheme.onSurfaceVariant
-        RunStatus.DETACHED -> MaterialTheme.colorScheme.secondary
-    }
+internal fun RunStatus.color(): Color = colors().accent
 
 @Preview
 @Composable

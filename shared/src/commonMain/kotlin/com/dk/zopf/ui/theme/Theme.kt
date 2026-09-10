@@ -100,6 +100,30 @@ private val DarkNodeAccents =
         input = Color(0xFF5ED4BC),
     )
 
+private val LightStatusAccents =
+    StatusAccents(
+        queued = Color(0xFF7A6A63),
+        running = Color(0xFF0F62C4),
+        waiting = Color(0xFFA66200),
+        succeeded = Color(0xFF17733F),
+        failed = LightScheme.error,
+        stopped = Color(0xFF6B5952),
+        skipped = Color(0xFF86746D),
+        detached = Color(0xFF6A45C0),
+    )
+
+private val DarkStatusAccents =
+    StatusAccents(
+        queued = Color(0xFF9A8B85),
+        running = Color(0xFF7FB6F5),
+        waiting = Color(0xFFF2C14E),
+        succeeded = Color(0xFF5FD08D),
+        failed = DarkScheme.error,
+        stopped = Color(0xFFB6A49D),
+        skipped = Color(0xFF8D7F79),
+        detached = Color(0xFFC6ADFF),
+    )
+
 @Composable
 fun ThemePreference.isDark(): Boolean =
     when (this) {
@@ -116,7 +140,12 @@ fun ZopfTheme(
     val scheme: ColorScheme = if (darkTheme) DarkScheme else LightScheme
     val colors =
         remember(scheme, darkTheme) {
-            zopfColors(scheme, if (darkTheme) DarkNodeAccents else LightNodeAccents, darkTheme)
+            zopfColors(
+                scheme = scheme,
+                accents = if (darkTheme) DarkNodeAccents else LightNodeAccents,
+                statuses = if (darkTheme) DarkStatusAccents else LightStatusAccents,
+                dark = darkTheme,
+            )
         }
     CompositionLocalProvider(
         LocalZopfColors provides colors,

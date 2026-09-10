@@ -86,6 +86,7 @@ class DogfoodWorkspaceTest {
     fun `every branch can go both ways`() {
         val cases =
             mapOf(
+                "canvas-states" to "not ready",
                 "smoke" to "2.9.0 (Claude Code)",
                 "release-cut" to "no",
             )

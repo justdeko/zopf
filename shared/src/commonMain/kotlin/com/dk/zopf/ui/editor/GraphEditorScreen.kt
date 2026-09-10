@@ -1,6 +1,11 @@
 package com.dk.zopf.ui.editor
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -48,6 +53,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -112,6 +118,10 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import java.awt.Cursor
 import kotlin.time.Duration.Companion.milliseconds
+
+private val TakenEdgeStroke = 3.dp
+private const val DeadEdgeAlpha = 0.28f
+private const val FlowMillis = 900
 
 private val InspectorWidth = 340.dp
 private val MinInspectorWidth = 260.dp
@@ -475,6 +485,8 @@ private fun Canvas(
 
     val sources = remember(workflow.edges) { workflow.edges.map { it.from }.toSet() }
 
+    val dashPhase = if (runningNodes.any { it.status.holdsTheRun }) rememberDashPhase() else null
+
     KuiverBridge {
         KuiverViewer(
             state = viewerState,
@@ -553,22 +565,52 @@ private fun Canvas(
                 val failure = model?.on == EdgeTrigger.FAILURE
                 val label = model?.let { it.condition?.toString() ?: "failed".takeIf { _ -> failure } }
 
+                val toStatus = runningNodes.firstOrNull { it.nodeId == edge.toId }?.status
+                val flow = edgeFlow(runningNodes.firstOrNull { it.nodeId == edge.fromId }?.status, toStatus, failure)
+                val marching = flow == EdgeFlow.TAKEN && toStatus?.holdsTheRun == true
+
+                val resting =
+                    when {
+                        failure -> MaterialTheme.colorScheme.error
+                        model?.condition != null -> NodeType.BRANCH.colors().accent
+                        else -> LocalKuiverColors.current.edge
+                    }
+
                 WorkflowEdgeContent(
                     from = from,
                     to = to,
                     direction = canvas.direction,
                     label = label,
                     color =
-                        when {
-                            failure -> MaterialTheme.colorScheme.error
-                            model?.condition != null -> NodeType.BRANCH.colors().accent
-                            else -> LocalKuiverColors.current.edge
+                        when (flow) {
+                            EdgeFlow.TAKEN ->
+                                if (failure) RunStatus.FAILED.colors().accent else RunStatus.SUCCEEDED.colors().accent
+
+                            EdgeFlow.DEAD -> resting.copy(alpha = DeadEdgeAlpha)
+                            EdgeFlow.IDLE -> resting
                         },
-                    dashed = failure,
+                    dashed = failure || flow == EdgeFlow.DEAD || marching,
+                    width = if (flow == EdgeFlow.TAKEN) TakenEdgeStroke else EdgeStroke,
+                    dashPhase = if (marching && dashPhase != null) dashPhase.value else 0f,
                 )
             },
         )
     }
+}
+
+private val RunStatus.holdsTheRun: Boolean
+    get() = this == RunStatus.STARTING || this == RunStatus.WAITING
+
+@Composable
+private fun rememberDashPhase(): State<Float> {
+    val period = with(LocalDensity.current) { DashPeriod.toPx() }
+    val transition = rememberInfiniteTransition(label = "edgeFlow")
+    return transition.animateFloat(
+        initialValue = 0f,
+        targetValue = -period,
+        animationSpec = infiniteRepeatable(tween(durationMillis = FlowMillis, easing = LinearEasing)),
+        label = "dashPhase",
+    )
 }
 
 private fun nodeMenu(

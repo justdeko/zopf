@@ -8,6 +8,7 @@ import com.dk.zopf.store.Workspace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -147,6 +148,47 @@ class NodeTimeoutTest {
             val run = engine.start(workspace, workflow).getOrThrow()
             withTimeout(60.seconds) { run.job?.join() }
             run
+        }
+    }
+}
+
+class NodeProgressTest {
+    private val dirs = mutableListOf<Path>()
+    private val scopes = mutableListOf<CoroutineScope>()
+
+    private fun tempDir(): Path = Files.createTempDirectory("zopf-progress").also { dirs.add(it) }
+
+    @AfterTest
+    fun cleanup() {
+        scopes.forEach { it.coroutineContext[Job]?.cancel() }
+        dirs.forEach { it.toFile().deleteRecursively() }
+    }
+
+    @Test
+    fun `a node that prints nothing still reads as running`() {
+        val workspace = Workspace.create(tempDir().resolve("ws"))
+        val scope = CoroutineScope(Job() + Dispatchers.Default).also { scopes.add(it) }
+        val engine = WorkflowEngine(scope, ProcessNodeExecutor(), tempDir())
+
+        runBlocking {
+            val run =
+                engine
+                    .start(
+                        workspace,
+                        Workflow(
+                            name = "w",
+                            nodes = listOf(WorkflowNode(id = "quiet", type = NodeType.SHELL, command = "sleep 1")),
+                        ),
+                    ).getOrThrow()
+            val quiet = assertNotNull(run.node("quiet"))
+
+            withTimeout(30.seconds) {
+                while (quiet.status == RunStatus.QUEUED || quiet.status == RunStatus.STARTING) delay(10)
+            }
+            assertEquals(RunStatus.RUNNING, quiet.status)
+
+            withTimeout(30.seconds) { run.job?.join() }
+            assertEquals(RunStatus.SUCCEEDED, quiet.status)
         }
     }
 }

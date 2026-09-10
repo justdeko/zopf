@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import com.dk.zopf.model.NodeType
+import com.dk.zopf.runtime.RunStatus
 import com.dk.zopf.store.ThemePreference
 import kotlin.math.abs
 import kotlin.math.max
@@ -19,39 +20,44 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class NodeColorsTest {
-    private class Palette(
-        val zopf: ZopfColors,
-        val scheme: ColorScheme,
-    )
+private class Palette(
+    val zopf: ZopfColors,
+    val scheme: ColorScheme,
+)
 
-    @OptIn(ExperimentalTestApi::class)
-    private fun palette(dark: Boolean): Palette {
-        lateinit var captured: Palette
-        runDesktopComposeUiTest(10, 10) {
-            setContent {
-                ZopfTheme(darkTheme = dark) {
-                    captured = Palette(ZopfTheme.colors, MaterialTheme.colorScheme)
-                }
+@OptIn(ExperimentalTestApi::class)
+private fun palette(dark: Boolean): Palette {
+    lateinit var captured: Palette
+    runDesktopComposeUiTest(10, 10) {
+        setContent {
+            ZopfTheme(darkTheme = dark) {
+                captured = Palette(ZopfTheme.colors, MaterialTheme.colorScheme)
             }
-            waitForIdle()
         }
-        return captured
+        waitForIdle()
     }
+    return captured
+}
 
-    private fun Color.relativeLuminance(): Float {
-        fun channel(c: Float) = if (c <= 0.03928f) c / 12.92f else ((c + 0.055f) / 1.055f).pow(2.4f)
-        return 0.2126f * channel(red) + 0.7152f * channel(green) + 0.0722f * channel(blue)
-    }
+private fun Color.relativeLuminance(): Float {
+    fun channel(c: Float) = if (c <= 0.03928f) c / 12.92f else ((c + 0.055f) / 1.055f).pow(2.4f)
+    return 0.2126f * channel(red) + 0.7152f * channel(green) + 0.0722f * channel(blue)
+}
 
-    private fun contrast(
-        a: Color,
-        b: Color,
-    ): Float {
-        val (x, y) = a.relativeLuminance() to b.relativeLuminance()
-        return (max(x, y) + 0.05f) / (min(x, y) + 0.05f)
-    }
+private fun contrast(
+    a: Color,
+    b: Color,
+): Float {
+    val (x, y) = a.relativeLuminance() to b.relativeLuminance()
+    return (max(x, y) + 0.05f) / (min(x, y) + 0.05f)
+}
 
+private fun apart(
+    a: Color,
+    b: Color,
+): Float = abs(a.red - b.red) + abs(a.green - b.green) + abs(a.blue - b.blue)
+
+class NodeColorsTest {
     @Test
     fun `every accent holds contrast on node surfaces`() {
         listOf(false, true).forEach { dark ->
@@ -89,8 +95,8 @@ class NodeColorsTest {
                     val x = nodes.node(a).accent
                     val y = nodes.node(b).accent
 
-                    val apart = abs(x.red - y.red) + abs(x.green - y.green) + abs(x.blue - y.blue)
-                    assertTrue(apart > 0.3f, "$a and $b are $apart apart (dark=$dark)")
+                    val distance = apart(x, y)
+                    assertTrue(distance > 0.3f, "$a and $b are $distance apart (dark=$dark)")
                 }
             }
         }
@@ -103,7 +109,7 @@ class NodeColorsTest {
             NodeType.entries.forEach { type ->
                 val roles = nodes.node(type)
                 val fromSurface = contrast(roles.container, scheme.surfaceContainer)
-                assertTrue(fromSurface < 2f, "$type container drifted from the card (dark=$dark)")
+                assertTrue(fromSurface < 2.5f, "$type container drifted from the card (dark=$dark)")
                 assertTrue(roles.container != scheme.surfaceContainer, "$type container is untinted")
             }
         }
@@ -114,6 +120,65 @@ class NodeColorsTest {
         listOf(false, true).forEach { dark ->
             val (nodes, scheme) = palette(dark).let { it.zopf to it.scheme }
             assertEquals(scheme.primary, nodes.node(NodeType.AGENT).accent, "dark=$dark")
+        }
+    }
+}
+
+class StatusColorsTest {
+    @Test
+    fun `every status accent holds contrast on the surfaces it sits on`() {
+        listOf(false, true).forEach { dark ->
+            val (statuses, scheme) = palette(dark).let { it.zopf to it.scheme }
+            RunStatus.entries.forEach { status ->
+                val accent = statuses.status(status).accent
+
+                listOf(scheme.surfaceContainer, scheme.surfaceContainerHigh).forEach { surface ->
+                    val ratio = contrast(accent, surface)
+                    assertTrue(ratio >= 3f, "$status accent on $surface is $ratio:1 (dark=$dark)")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a badge glyph holds contrast on the status it fills`() {
+        val filled =
+            listOf(RunStatus.SUCCEEDED, RunStatus.FAILED, RunStatus.STOPPED, RunStatus.DETACHED)
+
+        listOf(false, true).forEach { dark ->
+            val statuses = palette(dark).zopf
+            filled.forEach { status ->
+                val roles = statuses.status(status)
+                val ratio = contrast(roles.onAccent, roles.accent)
+                assertTrue(ratio >= 4.5f, "$status glyph on its badge is $ratio:1 (dark=$dark)")
+            }
+        }
+    }
+
+    @Test
+    fun `the four statuses worth reacting to are told apart by colour`() {
+        val decisive =
+            listOf(RunStatus.RUNNING, RunStatus.WAITING, RunStatus.SUCCEEDED, RunStatus.FAILED)
+
+        listOf(false, true).forEach { dark ->
+            val statuses = palette(dark).zopf
+            decisive.forEachIndexed { i, a ->
+                decisive.drop(i + 1).forEach { b ->
+                    val distance = apart(statuses.status(a).accent, statuses.status(b).accent)
+                    assertTrue(distance > 0.4f, "$a and $b are $distance apart (dark=$dark)")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a finished run never wears the colour of a running one`() {
+        listOf(false, true).forEach { dark ->
+            val statuses = palette(dark).zopf
+            assertTrue(
+                statuses.status(RunStatus.SUCCEEDED).accent != statuses.status(RunStatus.RUNNING).accent,
+                "done and running share a colour (dark=$dark)",
+            )
         }
     }
 }

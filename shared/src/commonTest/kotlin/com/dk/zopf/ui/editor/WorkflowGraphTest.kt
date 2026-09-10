@@ -9,6 +9,7 @@ import com.dk.zopf.model.Position
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
+import com.dk.zopf.runtime.RunStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,6 +27,27 @@ class WorkflowGraphTest {
                 ),
             edges = listOf(WorkflowEdge("analyze", "fix"), WorkflowEdge("fix", "build")),
         )
+
+    @Test
+    fun `an edge is taken dead or resting according to the nodes it joins`() {
+        val rows =
+            listOf(
+                Triple(null, null, false) to EdgeFlow.IDLE,
+                Triple(RunStatus.SUCCEEDED, RunStatus.QUEUED, false) to EdgeFlow.IDLE,
+                Triple(RunStatus.SUCCEEDED, RunStatus.RUNNING, false) to EdgeFlow.TAKEN,
+                Triple(RunStatus.SUCCEEDED, RunStatus.SUCCEEDED, false) to EdgeFlow.TAKEN,
+                Triple(RunStatus.FAILED, RunStatus.RUNNING, true) to EdgeFlow.TAKEN,
+                Triple(RunStatus.FAILED, RunStatus.SKIPPED, false) to EdgeFlow.DEAD,
+                Triple(RunStatus.SUCCEEDED, RunStatus.SKIPPED, false) to EdgeFlow.DEAD,
+                Triple(RunStatus.SUCCEEDED, RunStatus.QUEUED, true) to EdgeFlow.DEAD,
+                Triple(RunStatus.SKIPPED, RunStatus.QUEUED, false) to EdgeFlow.DEAD,
+            )
+
+        rows.forEach { (input, expected) ->
+            val (from, to, failure) = input
+            assertEquals(expected, edgeFlow(from, to, failure), "$from to $to, failure=$failure")
+        }
+    }
 
     @Test
     fun `the kuiver graph carries only ids and edges`() {

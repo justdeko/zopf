@@ -1,7 +1,12 @@
 package com.dk.zopf.ui.editor
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,7 +32,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -43,7 +52,6 @@ import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.label
 import com.dk.zopf.runtime.RunStatus
 import com.dk.zopf.ui.preview.PreviewFixtures
-import com.dk.zopf.ui.runs.StatusDot
 import com.dk.zopf.ui.runs.color
 import com.dk.zopf.ui.theme.KuiverBridge
 import com.dk.zopf.ui.theme.PathIcon
@@ -52,6 +60,10 @@ import com.dk.zopf.ui.theme.ZopfTheme
 import com.dk.zopf.ui.theme.colors
 
 private val CardWidth = 260.dp
+private val BadgeSize = 15.dp
+private const val PulseMillis = 850
+private val SkippedAlpha = 0.5f
+private val SelectedTint = 0.07f
 
 val NodeType.icon: ImageVector
     get() =
@@ -108,9 +120,14 @@ fun KuiverNodeScope.WorkflowNodeCard(
     )
 
     Surface(
-        modifier = Modifier.width(CardWidth),
+        modifier = Modifier.width(CardWidth).alpha(if (runStatus == RunStatus.SKIPPED) SkippedAlpha else 1f),
         shape = RoundedCornerShape(14.dp),
-        color = if (isSelected) scheme.secondaryContainer else scheme.surfaceContainer,
+        color =
+            if (isSelected) {
+                accent.copy(alpha = SelectedTint).compositeOver(scheme.secondaryContainer)
+            } else {
+                roles.surface
+            },
         border = androidx.compose.foundation.BorderStroke(outlineWidth, outline),
         shadowElevation = if (isDragging) 8.dp else 1.dp,
     ) {
@@ -138,13 +155,8 @@ fun KuiverNodeScope.WorkflowNodeCard(
                     modifier = Modifier.weight(1f),
                 )
                 if (runStatus != null) {
-                    Box(
-                        Modifier.size(16.dp).background(scheme.surfaceContainerLowest, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        StatusDot(runStatus, size = 8)
-                    }
-                    Spacer(Modifier.width(4.dp))
+                    StatusBadge(runStatus)
+                    Spacer(Modifier.width(5.dp))
                 }
                 ConnectHandle(
                     isArmed = isConnectSource,
@@ -176,6 +188,54 @@ fun KuiverNodeScope.WorkflowNodeCard(
         }
     }
 }
+
+@Composable
+private fun StatusBadge(status: RunStatus) {
+    val roles = status.colors()
+
+    if (status.showsProgress) {
+        LoadingIndicator(Modifier.size(BadgeSize), color = roles.accent)
+        return
+    }
+
+    val glyph = status.glyph
+    val filled = glyph != null || status == RunStatus.WAITING
+    Box(
+        Modifier
+            .size(BadgeSize)
+            .alpha(if (status == RunStatus.WAITING) pulse() else 1f)
+            .background(if (filled) roles.accent else Color.Transparent, CircleShape)
+            .border(if (filled) 0.dp else 2.dp, roles.accent, CircleShape)
+            .semantics { contentDescription = status.label },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (glyph != null) {
+            PathIcon(glyph, contentDescription = null, size = 9.dp, tint = roles.onAccent)
+        }
+    }
+}
+
+@Composable
+private fun pulse(): Float {
+    val transition = rememberInfiniteTransition(label = "waiting")
+    val alpha by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(tween(PulseMillis), repeatMode = RepeatMode.Reverse),
+        label = "waitingPulse",
+    )
+    return alpha
+}
+
+private val RunStatus.glyph: ImageVector?
+    get() =
+        when (this) {
+            RunStatus.SUCCEEDED -> ZopfIcons.Check
+            RunStatus.FAILED -> ZopfIcons.Warning
+            RunStatus.STOPPED -> ZopfIcons.Stop
+            RunStatus.DETACHED -> ZopfIcons.Terminal
+            else -> null
+        }
 
 @Composable
 private fun ConnectHandle(

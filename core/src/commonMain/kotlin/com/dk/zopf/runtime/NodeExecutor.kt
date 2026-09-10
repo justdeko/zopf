@@ -124,7 +124,7 @@ class ProcessNodeExecutor(
         run.sessionId = session.sessionId
         run.command = session.command
         run.model = invocation.model
-        run.status = RunStatus.STARTING
+        run.status = RunStatus.RUNNING
         if (sandbox != null) run.notice("Sandbox: ${sandbox.cliValue}")
 
         if (provider.promptChannel == PromptChannel.STDIN) {
@@ -167,7 +167,7 @@ class ProcessNodeExecutor(
         val session = shell.start(ShellInvocation(command, cwd))
         run.live = ShellLive(session)
         run.command = listOf(command)
-        run.status = RunStatus.STARTING
+        run.status = RunStatus.RUNNING
         run.notice("$ $command")
 
         val exit =
@@ -240,7 +240,7 @@ class ProcessNodeExecutor(
         val session = connector.start(invocation)
         run.live = ConnectorLive(session)
         run.command = session.command
-        run.status = RunStatus.STARTING
+        run.status = RunStatus.RUNNING
         run.notice("${manifest.name} ← ${invocation.stdinJson()}")
 
         val exit =

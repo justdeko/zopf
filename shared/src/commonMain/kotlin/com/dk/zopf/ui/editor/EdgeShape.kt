@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.dk.kuiver.model.layout.LayoutDirection
@@ -35,16 +36,18 @@ internal fun WorkflowEdgeContent(
     color: Color,
     dashed: Boolean,
     arrowDrawer: ArrowDrawer = RoundArrowDrawer,
+    width: Dp = EdgeStroke,
+    dashPhase: Float = 0f,
 ) {
     val density = LocalDensity.current
     val curve = remember(from, to, direction, density) { flowCurve(from, to, direction, density) }
     val bounds =
-        remember(curve, density) {
-            curve.boundingRect(density = density, strokeWidth = EdgeStroke, arrowSize = ArrowSize)
+        remember(curve, density, width) {
+            curve.boundingRect(density = density, strokeWidth = maxOf(width, EdgeStroke), arrowSize = ArrowSize)
         }
 
     val edge = @Composable {
-        EdgeCanvas(bounds) { drawFlowCurve(curve, color, dashed, arrowDrawer) }
+        EdgeCanvas(bounds) { drawFlowCurve(curve, color, dashed, arrowDrawer, width, dashPhase) }
     }
 
     val labelPosition =
@@ -121,6 +124,8 @@ internal fun DrawScope.drawFlowCurve(
     color: Color,
     dashed: Boolean,
     arrowDrawer: ArrowDrawer,
+    width: Dp = EdgeStroke,
+    dashPhase: Float = 0f,
 ) {
     val path =
         Path().apply {
@@ -137,13 +142,16 @@ internal fun DrawScope.drawFlowCurve(
 
     drawPath(
         path = path,
-        color = color.copy(alpha = LineAlpha),
+        color = color.copy(alpha = color.alpha * LineAlpha),
         style =
             Stroke(
-                width = EdgeStroke.toPx(),
+                width = width.toPx(),
                 pathEffect =
                     if (dashed) {
-                        PathEffect.dashPathEffect(floatArrayOf(DashLength.toPx(), DashGap.toPx()))
+                        PathEffect.dashPathEffect(
+                            floatArrayOf(DashLength.toPx(), DashGap.toPx()),
+                            phase = dashPhase,
+                        )
                     } else {
                         null
                     },
@@ -172,6 +180,8 @@ private const val LineAlpha = 0.8f
 
 private val DashLength = 10.dp
 private val DashGap = 5.dp
+
+internal val DashPeriod = DashLength + DashGap
 
 private val MinLengthForLabel = 50.dp
 
