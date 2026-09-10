@@ -5,6 +5,7 @@ import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.runtime.UpdateCheck
 import com.dk.zopf.runtime.issues
 import com.dk.zopf.runtime.money
+import com.dk.zopf.runtime.stamp
 import com.dk.zopf.runtime.updateChecksSilenced
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.BrokenWorkflow
@@ -18,8 +19,6 @@ import java.io.PrintStream
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 val LIST_OPTIONS = setOf("workspace")
 val VALIDATE_OPTIONS = setOf("workspace")
@@ -195,10 +194,4 @@ internal fun WorkflowIssue.render(): String {
 
 private fun RunRecord.cost(): Double? = nodes.mapNotNull { it.costUsd }.takeIf { it.isNotEmpty() }?.sum()
 
-private fun String.readable(): String =
-    runCatching {
-        DateTimeFormatter
-            .ofPattern("yyyy-MM-dd HH:mm")
-            .withZone(ZoneId.systemDefault())
-            .format(Instant.parse(this))
-    }.getOrElse { this }
+private fun String.readable(): String = runCatching { stamp(Instant.parse(this)) }.getOrElse { this }

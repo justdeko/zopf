@@ -59,6 +59,7 @@ enum class DialogRequest { NEW_WORKFLOW, NEW_CONNECTOR }
 
 class AppState(
     val registry: WorkspaceRegistry = WorkspaceRegistry(),
+    private val archiveRoot: Path = AppPaths.runsDir,
 ) {
     var workspaces by mutableStateOf<List<OpenWorkspace>>(emptyList())
         private set
@@ -103,7 +104,7 @@ class AppState(
         RunRegistry(
             scope,
             settings,
-            archiveRoot = AppPaths.runsDir,
+            archiveRoot = archiveRoot,
             notifier = MacNotifier(),
             isForeground = { windowFocused },
             onActivate = { runId -> onActivateRun(runId) },
@@ -183,7 +184,7 @@ class AppState(
         scope.launch(Dispatchers.IO) {
             val keep = settings.current.keepRuns
             if (keep <= 0) return@launch
-            val gone = RunArchive.prune(keep = keep)
+            val gone = RunArchive.prune(root = archiveRoot, keep = keep)
             if (gone.isEmpty()) return@launch
 
             gone.forEach { RunArchive.delete(it) }

@@ -34,6 +34,7 @@ data class NodeRunRecord(
     val nodeId: String,
     val type: NodeType,
     val provider: AgentProviderId? = null,
+    val model: String? = null,
     val status: String,
     val startedAt: String,
     val finishedAt: String? = null,

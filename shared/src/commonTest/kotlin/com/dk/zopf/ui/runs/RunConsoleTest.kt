@@ -62,16 +62,18 @@ class RunConsoleTest {
         return run to answer
     }
 
-    private fun agent(provider: AgentProviderId) =
-        NodeRun(
-            id = "run-1",
-            workflowName = "demo",
-            nodeId = "analyze",
-            nodeTitle = "Analyze",
-            nodeType = NodeType.AGENT,
-            cwd = Paths.get("/tmp"),
-            provider = provider,
-        ).also { it.showing(status = RunStatus.WAITING, sessionId = "s-1") }
+    private fun agent(
+        provider: AgentProviderId,
+        model: String? = null,
+    ) = NodeRun(
+        id = "run-1",
+        workflowName = "demo",
+        nodeId = "analyze",
+        nodeTitle = "Analyze",
+        nodeType = NodeType.AGENT,
+        cwd = Paths.get("/tmp"),
+        provider = provider,
+    ).also { it.showing(status = RunStatus.WAITING, model = model, sessionId = "s-1") }
 
     private fun printing(lines: Int) =
         node(NodeType.SHELL, "build", RunStatus.SUCCEEDED).also { run ->
@@ -199,6 +201,14 @@ class RunConsoleTest {
         runDesktopComposeUiTest {
             console(agent(AgentProviderId.CLAUDE))
             onNodeWithText("Finish").assertIsDisplayed()
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `an agent run's header names its cli and model`() =
+        runDesktopComposeUiTest {
+            console(agent(AgentProviderId.CLAUDE, model = "claude-opus-5"))
+            onNodeWithText("Claude Code · claude-opus-5", substring = true).assertIsDisplayed()
         }
 
     @OptIn(ExperimentalTestApi::class)

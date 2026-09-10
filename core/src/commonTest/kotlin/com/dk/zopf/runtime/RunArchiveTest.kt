@@ -1,5 +1,6 @@
 package com.dk.zopf.runtime
 
+import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
@@ -64,6 +65,19 @@ class RunHistoryTest {
             output.any { it is ConsoleEntry.Output && it.text == "hello" },
             "the transcript should hold what the node printed, got ${output.size} entries",
         )
+    }
+
+    @Test
+    fun `an archived agent node comes back with its cli and model`() {
+        val run = WorkflowRun("run-1", "demo", null, isInteractive = false)
+        run.nodes +=
+            NodeRun("run-1:analyze", "demo", "analyze", "Analyze", NodeType.AGENT, null, provider = AgentProviderId.CODEX)
+                .showing(status = RunStatus.SUCCEEDED, model = "gpt-5.5")
+
+        val restored = WorkflowRun.restored(run.record(), Restore.SETTLED).node("analyze")
+
+        assertEquals(AgentProviderId.CODEX, restored?.provider)
+        assertEquals("gpt-5.5", restored?.model)
     }
 
     @Test

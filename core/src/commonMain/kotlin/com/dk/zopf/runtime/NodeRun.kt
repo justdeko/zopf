@@ -180,6 +180,13 @@ class NodeRun(
         get() =
             if (nodeType != NodeType.AGENT) null else AgentProviders.of(provider ?: AgentProviderId.CLAUDE)
 
+    val agentLabel: String?
+        get() =
+            agent?.let { provider ->
+                listOfNotNull(provider.id.label, model?.takeIf { provider.capabilities.modelSelection })
+                    .joinToString(" · ")
+            }
+
     val canTakeOver: Boolean
         get() = agent?.capabilities?.resumeInTerminal == true && sessionId != null && cwd != null
 

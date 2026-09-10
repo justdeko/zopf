@@ -116,6 +116,7 @@ class WorkflowRun(
                         nodeId = node.nodeId,
                         type = node.nodeType,
                         provider = node.provider,
+                        model = node.model,
                         status = node.status.name,
                         startedAt = node.startedAt.toString(),
                         finishedAt = node.finishedAt?.toString(),
@@ -135,6 +136,7 @@ class WorkflowRun(
         record.nodes.forEach { archived ->
             val node = node(archived.nodeId) ?: return@forEach
             node.sessionId = archived.sessionId
+            node.model = archived.model
             node.costUsd = archived.costUsd
             node.exitCode = archived.exitCode
             node.command = archived.command

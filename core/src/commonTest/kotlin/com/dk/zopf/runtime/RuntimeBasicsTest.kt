@@ -13,6 +13,8 @@ import com.dk.zopf.model.modelOptions
 import com.dk.zopf.model.withDefaultsFrom
 import com.dk.zopf.store.AppSettings
 import java.nio.file.Paths
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import kotlin.io.path.readText
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -551,5 +553,23 @@ class RunSummaryTest {
         run.nodes[2].status = RunStatus.RUNNING
 
         assertEquals("Running · 3/4 · b", run.summary())
+    }
+
+    @Test
+    fun `a run is stamped with when it started`() {
+        val zone = ZoneId.of("Europe/Berlin")
+        val now = ZonedDateTime.of(2026, 9, 10, 18, 0, 0, 0, zone)
+        val rows =
+            listOf(
+                ZonedDateTime.of(2026, 9, 10, 14, 32, 0, 0, zone) to "14:32",
+                ZonedDateTime.of(2026, 9, 10, 0, 5, 0, 0, zone) to "00:05",
+                ZonedDateTime.of(2026, 9, 9, 23, 55, 0, 0, zone) to "2026-09-09 23:55",
+                ZonedDateTime.of(2026, 1, 5, 8, 0, 0, 0, zone) to "2026-01-05 08:00",
+                ZonedDateTime.of(2025, 12, 31, 23, 59, 0, 0, zone) to "2025-12-31 23:59",
+            )
+
+        rows.forEach { (started, expected) ->
+            assertEquals(expected, format(started.toInstant(), now.toInstant(), zone), started.toString())
+        }
     }
 }

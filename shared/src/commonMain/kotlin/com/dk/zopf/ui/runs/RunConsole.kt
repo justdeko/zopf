@@ -141,6 +141,7 @@ private fun RunHeader(
                 Text(
                     buildString {
                         append(run.workflowName)
+                        run.agentLabel?.let { append(" · $it") }
                         append(" · ")
                         append(run.status.label)
                         append(" · ")

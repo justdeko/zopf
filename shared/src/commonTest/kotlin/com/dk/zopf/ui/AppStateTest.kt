@@ -10,6 +10,7 @@ import com.dk.zopf.runtime.RunRegistry
 import com.dk.zopf.runtime.RunStatus
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.LiveSettings
+import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.WorkspaceRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,7 +44,7 @@ class WorkspaceSwitchTest {
 
     private fun tempDir(): Path = Files.createTempDirectory("zopf-switch").also { dirs.add(it) }
 
-    private fun app(): AppState = AppState(WorkspaceRegistry(tempDir().resolve("workspaces.json"))).also { apps.add(it) }
+    private fun app(): AppState = AppState(WorkspaceRegistry(tempDir().resolve("workspaces.json")), archiveRoot = tempDir()).also { apps.add(it) }
 
     private val workflow =
         Workflow(
@@ -162,7 +163,7 @@ class EditorRunPanelTest {
 
     @Test
     fun `reopening the editor hides a panel left from before`() {
-        val app = AppState(WorkspaceRegistry(tempDir().resolve("workspaces.json"))).also { apps.add(it) }
+        val app = AppState(WorkspaceRegistry(tempDir().resolve("workspaces.json")), archiveRoot = tempDir()).also { apps.add(it) }
         app.addWorkspace(tempDir().resolve("ws"))
         app.showRunPanel = true
 
@@ -215,8 +216,8 @@ class RunGateTest {
 
     private fun tempDir(): Path = Files.createTempDirectory("zopf-gate").also { dirs.add(it) }
 
-    private fun app(): AppState =
-        AppState(WorkspaceRegistry(tempDir().resolve("workspaces.json")))
+    private fun app(archiveRoot: Path = tempDir()): AppState =
+        AppState(WorkspaceRegistry(tempDir().resolve("workspaces.json")), archiveRoot = archiveRoot)
             .also { apps.add(it) }
             .also { it.addWorkspace(tempDir().resolve("ws")) }
 
@@ -225,6 +226,19 @@ class RunGateTest {
             name = "demo",
             nodes = listOf(WorkflowNode(id = "build", type = NodeType.SHELL, command = "true", repo = "app")),
         )
+
+    @Test
+    fun `a run is archived under the root the app was given`() =
+        runBlocking {
+            val root = tempDir()
+            val app = app(root)
+
+            app.runWorkflow(Workflow(name = "demo", nodes = listOf(WorkflowNode("build", NodeType.SHELL, command = "true"))))
+            val run = app.runs.runs.single()
+            withTimeout(10.seconds) { run.job?.join() }
+
+            assertEquals(1, RunArchive.all(root).size, "the run was archived somewhere other than the root the app was given")
+        }
 
     @Test
     fun `the Run button refuses a workflow with errors`() {

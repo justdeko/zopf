@@ -293,6 +293,28 @@ class NodeRunTest {
         return run().apply { ClaudeEvents.parseAll(text).forEach(::consume) }
     }
 
+    private fun labelled(
+        provider: AgentProviderId?,
+        model: String?,
+        type: NodeType = NodeType.AGENT,
+    ) = NodeRun("r", "demo", "analyze", "Analyze", type, Paths.get("/tmp"), provider = provider)
+        .also { it.showing(model = model) }
+
+    @Test
+    fun `a run is labelled with the cli and the model it took`() {
+        val rows =
+            listOf(
+                labelled(AgentProviderId.CLAUDE, "claude-opus-5") to "Claude Code · claude-opus-5",
+                labelled(AgentProviderId.CODEX, null) to "codex",
+                labelled(AgentProviderId.DSH, "deepseek-chat") to "DeepSeek Harness",
+                labelled(null, "claude-opus-5", NodeType.SHELL) to null,
+            )
+
+        rows.forEach { (run, expected) ->
+            assertEquals(expected, run.agentLabel, "${run.nodeType} ${run.provider}")
+        }
+    }
+
     @Test
     fun `a schema'd turn answers in fields and keeps the object`() {
         val output = replayFixture("/claude-structured-stream.jsonl").output()

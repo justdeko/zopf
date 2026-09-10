@@ -1,6 +1,9 @@
 package com.dk.zopf.runtime
 
 import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 fun format(duration: Duration): String {
@@ -10,6 +13,23 @@ fun format(duration: Duration): String {
     } else {
         "${duration.toMinutes()}m ${String.format(Locale.ROOT, "%02d", duration.toSecondsPart())}s"
     }
+}
+
+private val TimeOfDay = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
+private val DateAndTime = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT)
+
+fun stamp(
+    at: Instant,
+    zone: ZoneId = ZoneId.systemDefault(),
+): String = DateAndTime.format(at.atZone(zone))
+
+fun format(
+    at: Instant,
+    now: Instant = Instant.now(),
+    zone: ZoneId = ZoneId.systemDefault(),
+): String {
+    val local = at.atZone(zone)
+    return if (local.toLocalDate() == now.atZone(zone).toLocalDate()) TimeOfDay.format(local) else stamp(at, zone)
 }
 
 fun money(usd: Double): String = String.format(Locale.ROOT, "$%.4f", usd)
