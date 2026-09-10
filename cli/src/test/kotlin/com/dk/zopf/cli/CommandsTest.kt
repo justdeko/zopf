@@ -1,6 +1,7 @@
 package com.dk.zopf.cli
 
 import com.dk.zopf.model.AgentProviderId
+import com.dk.zopf.model.EdgeTrigger
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.RepoRef
 import com.dk.zopf.model.Workflow
@@ -335,6 +336,10 @@ class RunCommandTest {
     @AfterTest
     fun cleanup() = sandbox.cleanup()
 
+    private fun caught() =
+        workflow(nodes = listOf(shell("build"), agent("diagnose")))
+            .copy(edges = listOf(WorkflowEdge("build", "diagnose", on = EdgeTrigger.FAILURE)))
+
     @Test
     fun `run on a passing workflow exits zero`() {
         sandbox.save(workflow(nodes = listOf(shell("build"), shell("test")), edges = listOf("build" to "test")))
@@ -390,6 +395,16 @@ class RunCommandTest {
         assertEquals(EXIT_FAILED, code)
         assertContains(streams.output(), "build: failed")
         assertContains(streams.output(), "ship: skipped")
+    }
+
+    @Test
+    fun `run on a handled failure exits zero and names the node`() {
+        sandbox.save(caught())
+
+        val (code, streams) = sandbox.run(listOf("demo"), FakeExecutor(fail = setOf("build")))
+
+        assertEquals(EXIT_OK, code)
+        assertContains(streams.output(), "build: failed")
     }
 
     @Test

@@ -88,7 +88,10 @@ not any graph-library ordering, and specifically not kuiver's `getTopologicalOrd
 canvas library is a viewer and knows nothing about `on: failure` edges, branch conditions or dead
 arms. Each pass marks nodes ready, skipped-because-a-dependency-failed, or skipped-because-the-run-
 took-another-path, and loops until nothing changes. Anything still `QUEUED` when the loop drains was
-unreachable — that is how a dependency cycle is reported instead of hanging.
+unreachable — that is how a dependency cycle is reported instead of hanging. The run's verdict is not
+the worst of those statuses: a failure is **handled** when an `on: failure` edge leaves it and the
+node behind that edge ran, so a graph with a repair arm settles as `SUCCEEDED` with a `FAILED` node
+in it. Nothing overrides that from outside the graph.
 
 Concurrency is one `Semaphore` sized from settings. **Gate, input and branch nodes run outside the
 permit; process nodes run inside `permits.withPermit`.** A gate parked over lunch must not hold a

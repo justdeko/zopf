@@ -117,16 +117,11 @@ fun usage(out: PrintStream) {
 
         zopf check-update         ask GitHub whether a newer zopf has been released
 
-        The workspace is the nearest .zopf directory above this one, unless --workspace says
-        otherwise. A zopf.yaml inside it is optional, and is where workspace-wide defaults go. Runs
-        are archived where the app reads them, so a run started from cron shows up on its Runs
-        screen.
+        The workspace is either the .zopf dir, the nearest parent that has one, or
+        ~/.zopf. Use zopf.yaml for workspace-wide defaults.
 
-        Nothing else here touches the network: `run` never checks for updates, and `version` only
-        reads what an earlier check left behind. ZOPF_NO_UPDATE_CHECK=1 (or DO_NOT_TRACK=1) silences
-        that notice; `check-update` asks anyway, since you typed it.
-
-        Exit codes: 0 everything settled, 1 a node failed, 2 the run was stopped, 3 bad usage.
+        Exit codes: 0 run successful, 1 a node failed with nothing to catch it, 2 the run was
+        stopped, 3 bad usage.
         """.trimIndent(),
     )
 }

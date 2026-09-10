@@ -145,6 +145,53 @@ class WorkflowEngineTest {
     }
 
     @Test
+    fun `a handled failure settles the run`() {
+        val executor = FakeExecutor(fail = setOf("tests"))
+        val workflow =
+            wired(
+                nodes = listOf(shell("tests"), claude("diagnose")),
+                edges = listOf(WorkflowEdge("tests", "diagnose", on = EdgeTrigger.FAILURE)),
+            )
+
+        val run = runToCompletion(workflow, executor)
+
+        assertEquals(RunStatus.SUCCEEDED, run.status)
+        assertEquals(RunStatus.FAILED, run.node("tests")?.status)
+    }
+
+    @Test
+    fun `a rescue arm that fails fails the run`() {
+        val executor = FakeExecutor(fail = setOf("tests", "diagnose"))
+        val workflow =
+            wired(
+                nodes = listOf(shell("tests"), claude("diagnose")),
+                edges = listOf(WorkflowEdge("tests", "diagnose", on = EdgeTrigger.FAILURE)),
+            )
+
+        val run = runToCompletion(workflow, executor)
+
+        assertEquals(RunStatus.FAILED, run.status)
+    }
+
+    @Test
+    fun `an on-failure edge out of another node leaves a failure unhandled`() {
+        val executor = FakeExecutor(fail = setOf("build"))
+        val workflow =
+            wired(
+                nodes = listOf(shell("build"), shell("lint"), claude("report")),
+                edges =
+                    listOf(
+                        WorkflowEdge("build", "report"),
+                        WorkflowEdge("lint", "report", on = EdgeTrigger.FAILURE),
+                    ),
+            )
+
+        val run = runToCompletion(workflow, executor)
+
+        assertEquals(RunStatus.FAILED, run.status)
+    }
+
+    @Test
     fun `stopping a run does not fire an on-failure edge`() =
         runBlocking {
             val executor = FakeExecutor(work = { delay(10.seconds) })

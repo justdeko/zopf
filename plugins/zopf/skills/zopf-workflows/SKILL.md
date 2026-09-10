@@ -170,6 +170,11 @@ with `choices:` and branch on the answer, not a gate.
 `gate`, `branch` and `input` never fail, so an `on: failure` edge out of one can never be taken — validation warns about
 it.
 
+A caught failure does not fail the run. When a node fails and the rescue node behind its `on: failure` edge runs, the
+run settles and `zopf run` exits 0; the failed node still shows as failed. A failure with no `on: failure` edge out of
+it, or a rescue node that fails in its turn, exits 1. There is no flag that changes this, so when a caught failure
+should still be a red build, say so in the graph: end the rescue arm with a `shell` node that exits non-zero.
+
 ## Passing data: `${nodeId.field}`
 
 This is the entire data-passing mechanism. There is no expression language, no default value syntax, no nesting.

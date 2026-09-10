@@ -8,11 +8,11 @@
   <b>A macOS app for running agent workflows as a graph.</b>
 </p>
 
-zopf allows you to connect several claude, codex or DeepSeek Harness sessions into a graph and run them together instead of one
+zopf allows you to connect several claude, codex or deepseek harness sessions into a graph and run them together instead of one
 terminal session at a time. You can also span this across multiple directories and invoke skills and other context on
 the side.
 
-It runs claude code in the non-interactive mode using `claude -p`, but you can also use codex or DeepSeek Harness
+It runs claude code in the non-interactive mode using `claude -p`, but you can also use codex or deepseek harness
 instead. There's also a CLI which allows you to run zopf workflows headlessly.
 
 <p align="center">
@@ -25,6 +25,10 @@ instead. There's also a CLI which allows you to run zopf workflows headlessly.
   <img src="docs/screenshot.png" alt="zopf window" width="900">
 </p>
 
+<p align="center">
+  <img src="docs/demo.gif" alt="A zopf workflow updating three repos, running each test suite after its edit" width="900">
+</p>
+
 ## Features
 
 * Live output with cost and elapsed time
@@ -32,6 +36,10 @@ instead. There's also a CLI which allows you to run zopf workflows headlessly.
 * Menu bar as an overview of your runs and workspace
 * Gates to pause a run for your approval
 * Connectors to communicate with external components
+
+<p align="center">
+  <img src="docs/statusbar.png" alt="The zopf menu bar item, with a gate waiting for an answer" width="492">
+</p>
 
 ## Getting Started
 
@@ -120,6 +128,7 @@ Some things that are crucial to understanding workflow nodes:
 
 - data along edges is implicit, you can embed it in the next node execution using literals: `${tests.result}`
 - some edges have implicit assumptions like true/false from gates or `on: failure` in the example
+- an `on: failure` edge does not fail the run (node still shows as failed)
 - generally, follow the [schema reference](plugins/zopf/skills/zopf-workflows/references/schema.md)
 
 The editor reads and writes to workflow files, so you can hand-edit it or draw it on the canvas. Or you can invoke the
@@ -191,7 +200,7 @@ zopf runs --last 5
 Exit codes:
 
 - `0` OK
-- `1` a step failed
+- `1` a step failed and was uncaught
 - `2` stopped
 - `3` never started
 

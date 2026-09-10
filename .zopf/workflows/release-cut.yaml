@@ -21,7 +21,7 @@ nodes:
       - minor
       - major
     prompt: |
-      Which part of the version does this release bump?
+      How big is the release?
   - id: history
     type: shell
     title: What has landed since the last tag

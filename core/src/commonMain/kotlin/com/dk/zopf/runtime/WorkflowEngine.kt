@@ -385,7 +385,7 @@ class WorkflowEngine(
         run.finishedAt = Instant.now()
         run.outcome =
             when {
-                run.nodes.any { it.status == RunStatus.FAILED } -> RunStatus.FAILED
+                run.nodes.any { it.status == RunStatus.FAILED && !run.isHandled(it) } -> RunStatus.FAILED
                 run.stopping || run.nodes.any { it.status == RunStatus.STOPPED } -> RunStatus.STOPPED
                 run.nodes.any { it.status == RunStatus.DETACHED } -> RunStatus.DETACHED
                 else -> RunStatus.SUCCEEDED
@@ -394,6 +394,13 @@ class WorkflowEngine(
         archive.close()
         onFinished(run)
     }
+
+    private fun WorkflowRun.isHandled(failed: NodeRun): Boolean =
+        workflow?.edges.orEmpty().any { edge ->
+            if (edge.on != EdgeTrigger.FAILURE || edge.from != failed.nodeId) return@any false
+            val rescue = node(edge.to)?.status ?: return@any false
+            rescue != RunStatus.SKIPPED
+        }
 
     private fun resolveCwd(
         workspace: Workspace?,
