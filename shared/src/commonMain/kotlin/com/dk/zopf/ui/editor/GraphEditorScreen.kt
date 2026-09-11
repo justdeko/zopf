@@ -101,8 +101,8 @@ import com.dk.zopf.model.label
 import com.dk.zopf.model.modelFor
 import com.dk.zopf.model.providerFor
 import com.dk.zopf.model.validate
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.ui.LocalTitleBarInset
 import com.dk.zopf.ui.LocalWindowDragArea
 import com.dk.zopf.ui.preview.PreviewFixtures

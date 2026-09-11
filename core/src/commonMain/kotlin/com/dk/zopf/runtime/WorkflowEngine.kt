@@ -8,10 +8,14 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.label
 import com.dk.zopf.model.withDefaultsFrom
-import com.dk.zopf.store.ConnectorStore
+import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.runtime.run.WorkflowRun
+import com.dk.zopf.runtime.run.needsProcess
 import com.dk.zopf.store.LiveSettings
 import com.dk.zopf.store.RunArchive
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.store.workspace.ConnectorStore
+import com.dk.zopf.store.workspace.Workspace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope

@@ -8,7 +8,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import com.dk.zopf.model.NodeType
-import com.dk.zopf.runtime.RunStatus
+import com.dk.zopf.runtime.run.RunStatus
 
 @Immutable
 class ZopfColors internal constructor(

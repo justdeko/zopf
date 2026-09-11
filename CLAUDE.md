@@ -60,6 +60,15 @@ desktopApp  main(), the window, the tray, the menu bar. Only macOS-specific AWT 
 cli         argument parsing and text rendering over :core.
 ```
 
+Inside `:core`, a file goes where its concern is, not where its caller is. `model` is the workflow
+document and the rules about it; `store` is what's on disk, split into `store/workflow` for the YAML
+and `store/workspace` for the directory around it, with machine-local state left at the root;
+`runtime` is the scheduler, split into `runtime/run` for the run model, `runtime/agent` for the
+providers and what they need, `runtime/exec` for spawning a node's subprocess and `runtime/macos`
+for what only exists because this is a Mac. `util` is small enough to be worth naming: it holds only
+what both front ends render with, so nothing in `:shared` or `:cli` reaches into `runtime` for a
+duration string.
+
 The layering rule is that **`:core` must stay runnable headlessly**. `zopf run` starts an engine
 with no composition around it, so anything in `:core` that needs a window is a bug, and `:core`
 depends on no UI-level dependencies. The run model lives there rather than in `:shared` despite
@@ -154,14 +163,15 @@ the shared surface between the app and the CLI, and `--format json` is that same
 Both front ends read it, so anything a run needs to be replayable afterwards has to reach the archive
 and not just the composition.
 
-`runtime/PermissionBridge.kt` is a loopback `com.sun.net.httpserver` server plus a generated settings
-file, hooking Claude Code's tool calls back into the app for inline approval. The three deadlines are
-nested on purpose and must stay ordered: the UI has 540s to answer, the curl in the hook gives up at
-570s, and the hook itself times out at 600s — each layer must fail before the one outside it, or the
-outer layer reports a timeout for a decision that was actually made. The banner a prompt raises is
-the innermost layer again: it is asked with the UI's own 540s, so it withdraws itself exactly when
-the thing it was asking about stops being answerable. This is also why `jdk.httpserver` is in
-`desktopApp`'s jlink module list; without it every agent node fails in the packaged `.app` while
+`runtime/agent/PermissionBridge.kt` is a loopback `com.sun.net.httpserver` server plus a generated
+settings file, hooking Claude Code's tool calls back into the app for inline approval. The three
+deadlines are nested on purpose and must stay ordered: the UI has 540s to answer, the curl in the
+hook gives up at 570s, and the hook itself times out at 600s — each layer must fail before the one
+outside it, or the outer layer reports a timeout for a decision that was actually made. The banner a
+prompt raises is the innermost layer again: it is asked with the UI's own 540s, so it withdraws
+itself exactly when the thing it was asking about stops being answerable. This is also why
+`jdk.httpserver` is in `desktopApp`'s jlink module list; without it every agent node fails in the
+packaged `.app` while
 working perfectly under `:desktopApp:run`.
 
 **The archive follows the run rather than the engine remembering to write it**: a collector on
@@ -182,19 +192,19 @@ record on every settle pass so a watched run reads as running, and `isElsewhere`
 isn't ours to stop, clear, take over, delete or close out.
 
 Everything zopf posts goes through one generated bundle, `zopf-notify.app`, built by
-`runtime/MacNotifier.kt` because **`UNUserNotificationCenter` refuses a process with no bundle
-identifier**, which `:desktopApp:run` under Gradle is. `runtime/Notifier.kt` is the seam, so a
+`runtime/macos/MacNotifier.kt` because **`UNUserNotificationCenter` refuses a process with no bundle
+identifier**, which `:desktopApp:run` under Gradle is. `runtime/macos/Notifier.kt` is the seam, so a
 headless run and a test get `SilentNotifier` and neither has to have a Mac in it.
 
 ## Providers
 
-An agent node is a provider behind `runtime/AgentProvider.kt`: `ClaudeProvider`, `CodexProvider` and
-`DshProvider` build an argv, turn a line of the CLI's output into an `AgentEvent`, and say how to
-reopen a session in a terminal. Everything the CLIs disagree about is declared once, as data, in
-`model/AgentCapabilities.kt`. The UI reads capabilities to decide what to offer, and
-`ignoredFields()` reads the same table to warn about a field set on a node whose provider will
-ignore it. Adding a provider means a new `AgentProvider` and a new row in that table; it should not
-mean an `if (codex)` anywhere in `:shared`.
+An agent node is a provider behind `runtime/agent/AgentProvider.kt`: `ClaudeProvider`,
+`CodexProvider` and `DshProvider` build an argv, turn a line of the CLI's output into an
+`AgentEvent`, and say how to reopen a session in a terminal. Everything the CLIs disagree about is
+declared once, as data, in `model/AgentCapabilities.kt`. The UI reads capabilities to decide what to
+offer, and `ignoredFields()` reads the same table to warn about a field set on a node whose provider
+will ignore it. Adding a provider means a new `AgentProvider` and a new row in that table; it should
+not mean an `if (codex)` anywhere in `:shared`.
 
 A provider's `AgentProviderId` serial name is the executable it runs — `claude`, `codex`, `dsh` — so
 `provider:` in a workflow, `--provider` on the CLI and the binary on your PATH are all one word.
@@ -205,7 +215,7 @@ closes is the node's result, the way a shell node's stdout is. No `Result` event
 token count.
 
 Subprocesses get the **login shell's** environment and PATH, resolved once in
-`runtime/CommandLookup.kt` via `zsh -lic`, because a `.app` launched from Finder inherits almost
+`runtime/exec/CommandLookup.kt` via `zsh -lic`, because a `.app` launched from Finder inherits almost
 nothing and `claude` would not be found. The `-i` is load-bearing: a non-interactive login shell
 never sources `.zshrc`, which is where a PATH usually gets built. That makes the probe untrusted
 output, hence the sentinel and the watchdog. Shell nodes run `zsh -lc <command>` with stdin at
@@ -244,16 +254,17 @@ YAML round-trips through kotaml with `encodeDefaults = false` (`store/Serializat
 hand-written file that omits everything default comes back byte-identical after the editor saves it.
 kotaml is the maintained fork of the archived kaml and keeps the `com.charleskorn.kaml` package, so
 those imports are not a leftover.
-`strictMode = false` keeps an unknown key from making a file unopenable; `store/UnknownKey.kt` then
-reports those keys as warnings against the serializer descriptors. Files are written through
-`store/AtomicWrite.kt`.
+`strictMode = false` keeps an unknown key from making a file unopenable;
+`store/workflow/UnknownKey.kt` then reports those keys as warnings against the serializer
+descriptors. Files are written through `store/AtomicWrite.kt`.
 
 ## The workflow format version
 
 A workflow's optional `version:` says which format it was written in. Three cases:
 
 - **absent** — read as the current format. This is the normal case.
-- **older** — `store/WorkflowMigrations.kt` carries the file forward to current before it is parsed.
+- **older** — `store/workflow/WorkflowMigrations.kt` carries the file forward to current before it
+  is parsed.
 - **newer** — `isFromTheFuture`, which is a validation error *and* a refusal from
   `WorkflowEngine.start`. It has to be in both: the front ends' gate doesn't cover `startNode` or
   `retry`.
@@ -263,19 +274,19 @@ and `store/BuildInfo.kt`, like the app's version. Bump it in the same commit as 
 
 Migrations rewrite **the parsed YAML, not the decoded model**. By the time a `Workflow` exists,
 `strictMode = false` has already dropped any key the current model lacks, so a rename or removal
-could never see it. `store/WorkflowStore.kt` clears `version:` after migrating, so the editor keeps
-writing current, unversioned files.
+could never see it. `store/workflow/WorkflowStore.kt` clears `version:` after migrating, so the
+editor keeps writing current, unversioned files.
 
 Prefer a legacy alias in the serializer — the way `NodeTypeSerializer` reads `claude` as `agent` —
 and bump the version only when a change alters what an existing file *means*. An alias fixes
 unversioned files too; a migration only reaches files that pin themselves.
 
-`store/Discovery.kt` finds skills across the workflow's repos, the enclosing git repo, the workspace
-and `~/.claude/skills`, first name wins. `runtime/SkillPlan.kt` passes each selected skill as its own
-`--plugin-dir`, except ones already ambient in the session.
+`store/workspace/Discovery.kt` finds skills across the workflow's repos, the enclosing git repo, the
+workspace and `~/.claude/skills`, first name wins. `runtime/agent/SkillPlan.kt` passes each selected
+skill as its own `--plugin-dir`, except ones already ambient in the session.
 
-Secrets (`runtime/Secrets.kt`) resolve from the environment first, then the macOS keychain, into the
-connector process's environment — never into a file and never into the log.
+Secrets (`runtime/exec/Secrets.kt`) resolve from the environment first, then the macOS keychain, into
+the connector process's environment — never into a file and never into the log.
 
 ## The editor canvas
 
@@ -295,7 +306,7 @@ kuiver (`io.github.justdeko:kuiver`) is a **viewer, not an editor**. zopf owns w
   `ui/theme/KuiverBridge.kt`.
 
 `ui/editor/SourcePane.kt` is a second way into the same workflow, editing it as YAML through
-`store/WorkflowText.kt` — the encode and decode `WorkflowStore` itself uses, so there is one
+`store/workflow/WorkflowText.kt` — the encode and decode `WorkflowStore` itself uses, so there is one
 serializer path and not two. It replaces the canvas rather than sitting beside it, palette and
 inspector included, because a draft can't be reconciled with something else editing the model. The
 open editor also polls its own file, so an edit made outside it isn't silently overwritten.
@@ -365,12 +376,13 @@ reason. A file with one test in it is a file to merge somewhere.
 ## Tests worth knowing about
 
 These guard things a normal unit test wouldn't:
-
-- `store/DogfoodWorkspaceTest.kt` parses and validates this repo's own `.zopf/` workspace, so a
-  model change that breaks the committed workflows fails the build. CI runs `zopf validate` on it too.
-  It also re-encodes every fenced YAML workflow in `plugins/zopf/skills/**` and asserts it is
-  byte-identical to what the editor would write, so the skill docs cannot drift from the serializer.
-- `store/EditorRoundTripTest.kt` (in `:shared`) drives editor commands and asserts the file on disk.
+- `store/workspace/DogfoodWorkspaceTest.kt` parses and validates this repo's own `.zopf/` workspace,
+  so a model change that breaks the committed workflows fails the build. CI runs `zopf validate` on
+  it too. It also re-encodes every fenced YAML workflow in `plugins/zopf/skills/**` and asserts it
+  is byte-identical to what the editor would write, so the skill docs cannot drift from the
+  serializer.
+- `ui/editor/EditorRoundTripTest.kt` (in `:shared`) drives editor commands and asserts the file on
+  disk.
 - `RunConsoleTest` streams deltas into a real composition and `RunsScreenTest` advances a run to its
   next node, both asserting the screen repainted. Nothing else catches one that renders a run without
   having subscribed to it.

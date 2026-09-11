@@ -28,14 +28,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.dk.zopf.runtime.NodeRun
-import com.dk.zopf.runtime.NodeRunState
-import com.dk.zopf.runtime.RunRegistry
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.runtime.WorkflowRun
-import com.dk.zopf.runtime.WorkflowRunState
-import com.dk.zopf.runtime.format
+import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.NodeRunState
+import com.dk.zopf.runtime.run.RunRegistry
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.runtime.run.WorkflowRun
+import com.dk.zopf.runtime.run.WorkflowRunState
 import com.dk.zopf.ui.theme.ZopfIcons
+import com.dk.zopf.util.format
 import java.time.Instant
 
 private val RunListWidth = 280.dp

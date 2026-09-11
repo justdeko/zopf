@@ -50,7 +50,7 @@ import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.label
-import com.dk.zopf.runtime.RunStatus
+import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.runs.color
 import com.dk.zopf.ui.theme.KuiverBridge

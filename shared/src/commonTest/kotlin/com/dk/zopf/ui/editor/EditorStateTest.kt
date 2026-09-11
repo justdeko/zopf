@@ -7,9 +7,9 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.exampleWorkflow
-import com.dk.zopf.store.Connector
-import com.dk.zopf.store.WorkflowStore
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.store.workflow.WorkflowStore
+import com.dk.zopf.store.workspace.Connector
+import com.dk.zopf.store.workspace.Workspace
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths

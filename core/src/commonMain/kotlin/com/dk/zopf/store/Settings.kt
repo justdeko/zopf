@@ -1,6 +1,7 @@
 package com.dk.zopf.store
 
 import com.dk.zopf.model.AgentProviderId
+import com.dk.zopf.store.workflow.with
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

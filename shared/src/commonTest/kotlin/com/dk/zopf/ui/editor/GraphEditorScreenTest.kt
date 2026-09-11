@@ -40,8 +40,8 @@ import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.blurb
 import com.dk.zopf.model.modelOptions
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.ui.LocalTitleBarInset
 import com.dk.zopf.ui.theme.ZopfTheme
 import java.nio.file.Files

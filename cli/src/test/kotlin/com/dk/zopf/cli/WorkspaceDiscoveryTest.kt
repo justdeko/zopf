@@ -1,7 +1,7 @@
 package com.dk.zopf.cli
 
-import com.dk.zopf.store.WORKSPACE_FILE
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.store.workspace.WORKSPACE_FILE
+import com.dk.zopf.store.workspace.Workspace
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories

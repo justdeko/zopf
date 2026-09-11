@@ -25,9 +25,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.isTraySupported
-import com.dk.zopf.runtime.RunSnapshot
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.runtime.WorkflowRun
+import com.dk.zopf.runtime.run.RunSnapshot
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.ui.AppState
 import com.dk.zopf.ui.Screen
 

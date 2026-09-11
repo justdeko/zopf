@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import com.dk.zopf.model.NodeType
-import com.dk.zopf.runtime.RunStatus
+import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.store.ThemePreference
 import kotlin.math.abs
 import kotlin.math.max

@@ -36,8 +36,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.capabilities
-import com.dk.zopf.runtime.ASKABLE_TOOLS
 import com.dk.zopf.runtime.Release
+import com.dk.zopf.runtime.agent.ASKABLE_TOOLS
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.BuildInfo

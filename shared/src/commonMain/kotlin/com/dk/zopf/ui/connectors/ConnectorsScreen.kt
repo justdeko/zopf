@@ -48,11 +48,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.dk.zopf.model.NodeType
-import com.dk.zopf.store.BrokenConnector
-import com.dk.zopf.store.Connector
-import com.dk.zopf.store.ConnectorListing
-import com.dk.zopf.store.ConnectorStore
-import com.dk.zopf.store.OpenWorkspace
+import com.dk.zopf.store.workspace.BrokenConnector
+import com.dk.zopf.store.workspace.Connector
+import com.dk.zopf.store.workspace.ConnectorListing
+import com.dk.zopf.store.workspace.ConnectorStore
+import com.dk.zopf.store.workspace.OpenWorkspace
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme

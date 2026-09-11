@@ -44,11 +44,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.dk.zopf.model.Workflow
-import com.dk.zopf.store.BrokenWorkflow
-import com.dk.zopf.store.OpenWorkspace
-import com.dk.zopf.store.Templates
-import com.dk.zopf.store.WorkflowListing
-import com.dk.zopf.store.WorkflowStore
+import com.dk.zopf.store.workflow.BrokenWorkflow
+import com.dk.zopf.store.workflow.Templates
+import com.dk.zopf.store.workflow.WorkflowListing
+import com.dk.zopf.store.workflow.WorkflowStore
+import com.dk.zopf.store.workspace.OpenWorkspace
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme

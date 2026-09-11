@@ -1,5 +1,6 @@
 package com.dk.zopf.runtime
 
+import com.dk.zopf.runtime.macos.Browser
 import java.net.UnknownHostException
 import java.nio.file.Files
 import java.nio.file.Path

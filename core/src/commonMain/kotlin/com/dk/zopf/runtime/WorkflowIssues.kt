@@ -6,10 +6,11 @@ import com.dk.zopf.model.RepoRef
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.model.validate
-import com.dk.zopf.store.ConnectorStore
-import com.dk.zopf.store.DiscoveredSkill
-import com.dk.zopf.store.Workspace
-import com.dk.zopf.store.availableSkills
+import com.dk.zopf.runtime.agent.AgentProviders
+import com.dk.zopf.store.workspace.ConnectorStore
+import com.dk.zopf.store.workspace.DiscoveredSkill
+import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.store.workspace.availableSkills
 import kotlin.io.path.exists
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText

@@ -32,7 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.dk.zopf.runtime.RunActivity
+import com.dk.zopf.runtime.run.RunActivity
 import com.dk.zopf.ui.connectors.ConnectorsScreen
 import com.dk.zopf.ui.editor.GraphEditorScreen
 import com.dk.zopf.ui.runs.RunConsole

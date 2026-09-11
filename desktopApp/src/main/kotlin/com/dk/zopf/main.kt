@@ -20,6 +20,7 @@ import com.dk.zopf.platform.toWindowState
 import com.dk.zopf.store.Log
 import com.dk.zopf.ui.AppState
 import com.dk.zopf.ui.Screen
+import com.dk.zopf.ui.ZopfApp
 import java.awt.Desktop
 import java.awt.Dimension
 
@@ -113,7 +114,7 @@ fun main() {
                 },
             )
             WithFullWindowContent(windowState.placement) {
-                App(app)
+                ZopfApp(app)
             }
         }
     }

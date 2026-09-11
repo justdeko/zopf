@@ -6,12 +6,12 @@ import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.runtime.NodeExecution
 import com.dk.zopf.runtime.NodeExecutor
-import com.dk.zopf.runtime.RunRegistry
-import com.dk.zopf.runtime.RunStatus
+import com.dk.zopf.runtime.run.RunRegistry
+import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.LiveSettings
 import com.dk.zopf.store.RunArchive
-import com.dk.zopf.store.WorkspaceRegistry
+import com.dk.zopf.store.workspace.WorkspaceRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
