@@ -5,6 +5,10 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose-stability.conf"))
+}
+
 ktlint {
     // skip compose generated source
     filter {

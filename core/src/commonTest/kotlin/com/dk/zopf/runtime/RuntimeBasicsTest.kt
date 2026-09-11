@@ -525,7 +525,7 @@ class RunSummaryTest {
     private fun run(vararg titles: String): WorkflowRun =
         WorkflowRun(id = "r-1", workflowName = "pace", workspaceRoot = null, isInteractive = true).apply {
             titles.forEach { title ->
-                nodes +=
+                add(
                     NodeRun(
                         id = "r-1:$title",
                         workflowName = "pace",
@@ -533,14 +533,15 @@ class RunSummaryTest {
                         nodeTitle = title,
                         nodeType = NodeType.SHELL,
                         cwd = null,
-                    )
+                    ),
+                )
             }
         }
 
     @Test
     fun `the count is the step being run`() {
         val run = run("one", "two", "three", "four")
-        run.nodes[0].status = RunStatus.RUNNING
+        run.nodes[0].update { copy(status = RunStatus.RUNNING) }
 
         assertEquals("Running · 1/4 · one", run.summary())
     }
@@ -548,9 +549,9 @@ class RunSummaryTest {
     @Test
     fun `a fan out counts both arms and names the first`() {
         val run = run("a", "b", "c", "d")
-        run.nodes[0].status = RunStatus.SUCCEEDED
-        run.nodes[1].status = RunStatus.RUNNING
-        run.nodes[2].status = RunStatus.RUNNING
+        run.nodes[0].update { copy(status = RunStatus.SUCCEEDED) }
+        run.nodes[1].update { copy(status = RunStatus.RUNNING) }
+        run.nodes[2].update { copy(status = RunStatus.RUNNING) }
 
         assertEquals("Running · 3/4 · b", run.summary())
     }

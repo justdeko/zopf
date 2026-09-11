@@ -18,6 +18,7 @@ import com.dk.zopf.runtime.RunRegistry
 import com.dk.zopf.runtime.TerminalLauncher
 import com.dk.zopf.runtime.UpdateCheck
 import com.dk.zopf.runtime.WorkflowRun
+import com.dk.zopf.runtime.WorkflowRunState
 import com.dk.zopf.runtime.errors
 import com.dk.zopf.runtime.issues
 import com.dk.zopf.store.AppPaths
@@ -433,7 +434,4 @@ internal fun prunedRunsMessage(
 
 internal fun RunRegistry.runForEditor(workflowName: String): WorkflowRun? = selectedRun?.takeIf { it.workflowName == workflowName }
 
-internal fun RunRegistry.runOnCanvas(
-    workflowName: String,
-    panelOpen: Boolean,
-): WorkflowRun? = runForEditor(workflowName)?.takeIf { panelOpen || it.isActive }
+internal fun WorkflowRunState?.onCanvas(panelOpen: Boolean): WorkflowRunState? = this?.takeIf { panelOpen || it.isActive }

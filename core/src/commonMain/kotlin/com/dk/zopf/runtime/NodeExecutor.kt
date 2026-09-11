@@ -121,10 +121,13 @@ class ProcessNodeExecutor(
             )
         val session = agents.start(provider, invocation)
         run.live = AgentLive(session)
-        run.sessionId = session.sessionId
-        run.command = session.command
-        run.model = invocation.model
-        run.status = RunStatus.RUNNING
+        run.update {
+            launched(
+                sessionId = session.sessionId,
+                command = session.command,
+                model = invocation.model,
+            )
+        }
         if (sandbox != null) run.notice("Sandbox: ${sandbox.cliValue}")
 
         if (provider.promptChannel == PromptChannel.STDIN) {
@@ -166,8 +169,7 @@ class ProcessNodeExecutor(
                 .text
         val session = shell.start(ShellInvocation(command, cwd))
         run.live = ShellLive(session)
-        run.command = listOf(command)
-        run.status = RunStatus.RUNNING
+        run.update { launched(sessionId = null, command = listOf(command)) }
         run.notice("$ $command")
 
         val exit =
@@ -186,7 +188,6 @@ class ProcessNodeExecutor(
                 },
                 awaitExit = session::awaitExit,
             )
-        run.exitCode = exit
         run.finish(outcome(run, exit), exit)
     }
 
@@ -239,8 +240,7 @@ class ProcessNodeExecutor(
             )
         val session = connector.start(invocation)
         run.live = ConnectorLive(session)
-        run.command = session.command
-        run.status = RunStatus.RUNNING
+        run.update { launched(sessionId = null, command = session.command) }
         run.notice("${manifest.name} ← ${invocation.stdinJson()}")
 
         val exit =
@@ -269,7 +269,7 @@ class ProcessNodeExecutor(
         }
         output.error?.let {
             run.notice(it, isWarning = true)
-            run.status = RunStatus.FAILED
+            run.update { copy(status = RunStatus.FAILED) }
         }
 
         manifest.outputs
@@ -285,7 +285,6 @@ class ProcessNodeExecutor(
             }
 
         run.produce(output.result, output.fields)
-        run.exitCode = exit
         run.finish(outcome(run, exit), exit)
     }
 

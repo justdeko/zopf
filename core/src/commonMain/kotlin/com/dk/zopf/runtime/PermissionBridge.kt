@@ -1,6 +1,5 @@
 package com.dk.zopf.runtime
 
-import androidx.compose.runtime.Stable
 import com.dk.zopf.model.PermissionMode
 import com.dk.zopf.store.AppPaths
 import com.sun.net.httpserver.HttpExchange
@@ -41,7 +40,6 @@ data class PermissionRequest(
     val sessionId: String,
 )
 
-@Stable
 class PendingPermission(
     val request: PermissionRequest,
     private val answer: CompletableFuture<Boolean>,

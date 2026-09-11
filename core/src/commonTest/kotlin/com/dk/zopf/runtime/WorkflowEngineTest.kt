@@ -835,7 +835,7 @@ private class FakeExecutor(
 
         peak.accumulateAndGet(running.incrementAndGet()) { a, b -> maxOf(a, b) }
         try {
-            execution.run.status = RunStatus.RUNNING
+            execution.run.update { copy(status = RunStatus.RUNNING) }
             work()
         } finally {
             running.decrementAndGet()

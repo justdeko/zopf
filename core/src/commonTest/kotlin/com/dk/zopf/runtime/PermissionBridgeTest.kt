@@ -46,8 +46,8 @@ class PermissionBridgeTest {
             nodeType = NodeType.AGENT,
             cwd = Paths.get("/tmp"),
         ).also {
-            it.sessionId = sessionId
-            it.status = RunStatus.RUNNING
+            it.update { observed(sessionId = sessionId) }
+            it.update { copy(status = RunStatus.RUNNING) }
         }
 
     private fun bridge(

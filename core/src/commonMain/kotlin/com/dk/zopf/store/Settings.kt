@@ -1,10 +1,9 @@
 package com.dk.zopf.store
 
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import com.dk.zopf.model.AgentProviderId
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -160,18 +159,20 @@ class SettingsStore(
         }
 }
 
-@Stable
 class LiveSettings(
     initial: AppSettings = AppSettings(),
     private val store: SettingsStore? = null,
 ) {
-    var current: AppSettings by mutableStateOf(initial.sanitized())
-        private set
+    private val _state = MutableStateFlow(initial.sanitized())
+
+    val state: StateFlow<AppSettings> = _state.asStateFlow()
+
+    val current: AppSettings get() = _state.value
 
     fun update(change: (AppSettings) -> AppSettings): Result<Unit> {
         val next = change(current).sanitized()
         if (next == current) return Result.success(Unit)
-        current = next
+        _state.value = next
         return store?.save(next) ?: Result.success(Unit)
     }
 }

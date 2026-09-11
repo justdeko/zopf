@@ -1,10 +1,5 @@
 package com.dk.zopf.runtime
 
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.descendantsOf
@@ -13,7 +8,18 @@ import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.Workspace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.nio.file.Path
@@ -27,7 +33,26 @@ private const val WAITING_SOUND = "Ping"
 private const val FAILURE_SOUND = "Basso"
 private const val SUCCESS_SOUND = "Glass"
 
-@Stable
+data class RunsState(
+    val runs: List<WorkflowRun> = emptyList(),
+    val selected: WorkflowRun? = null,
+    val selectedNodeId: String? = null,
+) {
+    val shownNode: NodeRun? get() = selected?.nodeShown(selectedNodeId)
+}
+
+data class RunSnapshot(
+    val run: WorkflowRun,
+    val state: WorkflowRunState,
+)
+
+data class RunActivity(
+    val total: Int = 0,
+    val active: Int = 0,
+    val waiting: Int = 0,
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
 class RunRegistry(
     private val scope: CoroutineScope,
     private val settings: LiveSettings = LiveSettings(),
@@ -37,12 +62,35 @@ class RunRegistry(
     private val isForeground: () -> Boolean = { false },
     private val onActivate: (String) -> Unit = {},
 ) {
-    val runs = mutableStateListOf<WorkflowRun>()
+    private val _state = MutableStateFlow(RunsState())
 
-    var selectedRunId by mutableStateOf<String?>(null)
+    val state: StateFlow<RunsState> = _state.asStateFlow()
 
-    var selectedNodeId by mutableStateOf<String?>(null)
-        private set
+    val runs: List<WorkflowRun> get() = _state.value.runs
+
+    val selectedRun: WorkflowRun? get() = _state.value.selected
+
+    val live: StateFlow<List<RunSnapshot>> =
+        _state
+            .flatMapLatest { open ->
+                when {
+                    open.runs.isEmpty() -> flowOf(emptyList())
+                    else ->
+                        combine(open.runs.map { it.state }) { states ->
+                            open.runs.mapIndexed { index, run -> RunSnapshot(run, states[index]) }
+                        }
+                }
+            }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    val activity: StateFlow<RunActivity> =
+        live
+            .map { snapshots ->
+                RunActivity(
+                    total = snapshots.size,
+                    active = snapshots.count { it.state.status.isActive },
+                    waiting = snapshots.count { it.state.status == RunStatus.WAITING },
+                )
+            }.stateIn(scope, SharingStarted.Eagerly, RunActivity())
 
     private val asked = ConcurrentHashMap<String, NotificationHandle>()
 
@@ -62,19 +110,7 @@ class RunRegistry(
             onWaiting = ::announceQuestion,
         )
 
-    val selectedRun: WorkflowRun? get() = runs.firstOrNull { it.id == selectedRunId }
-
-    val selectedNode: NodeRun?
-        get() =
-            selectedRun?.let { run ->
-                run.nodes.firstOrNull { it.id == selectedNodeId } ?: run.focusNode
-            }
-
     val terminalApp: String get() = settings.current.terminalApp
-
-    val activeCount: Int get() = runs.count { it.isActive }
-
-    val waitingCount: Int get() = runs.count { it.status == RunStatus.WAITING }
 
     fun startWorkflow(
         workspace: Workspace?,
@@ -134,10 +170,14 @@ class RunRegistry(
 
     private fun ours(): List<WorkflowRun> = runs.filter { it.isActive && !it.isElsewhere }
 
+    fun add(run: WorkflowRun) {
+        _state.update { it.copy(runs = it.runs + run) }
+    }
+
     fun remove(run: WorkflowRun) {
         if (run.isActive) stop(run)
-        runs.remove(run)
-        if (selectedRunId == run.id) select(runs.firstOrNull())
+        _state.update { it.copy(runs = it.runs - run) }
+        if (_state.value.selected == run) select(runs.firstOrNull())
     }
 
     fun approve(
@@ -157,16 +197,27 @@ class RunRegistry(
     }
 
     val awaitingPermission: List<Pair<WorkflowRun, NodeRun>>
-        get() = runs.flatMap { run -> run.nodes.filter { it.isAwaitingPermission }.map { run to it } }
+        get() =
+            runs.flatMap { run ->
+                run.state.value.awaitingPermission
+                    .map { run to it }
+            }
 
     val awaitingInput: List<Pair<WorkflowRun, NodeRun>>
-        get() = runs.flatMap { run -> run.nodes.filter { it.isAwaitingInput }.map { run to it } }
+        get() =
+            runs.flatMap { run ->
+                run.state.value.awaitingInput
+                    .map { run to it }
+            }
 
     val awaitingApproval: List<Pair<WorkflowRun, NodeRun>>
         get() =
             runs
                 .filterNot { it.isElsewhere }
-                .flatMap { run -> run.nodes.filter { it.isAwaitingApproval }.map { run to it } }
+                .flatMap { run ->
+                    run.state.value.awaitingApproval
+                        .map { run to it }
+                }
 
     fun decide(
         node: NodeRun,
@@ -285,7 +336,7 @@ class RunRegistry(
     ) {
         val live = node.live ?: return
         node.echoFollowUp(text)
-        node.status = RunStatus.RUNNING
+        node.update { copy(status = RunStatus.RUNNING) }
         live.send(text).onFailure { node.notice("Couldn't send that: ${it.message}", isWarning = true) }
     }
 
@@ -322,14 +373,12 @@ class RunRegistry(
             .onSuccess {
                 val resume = (listOf(provider.executable) + provider.terminalArgs(sessionId)).joinToString(" ")
                 node.notice("Taken over in $terminal. Continue there with $resume")
-                if (live == null) node.status = RunStatus.DETACHED
+                if (live == null) node.update { copy(status = RunStatus.DETACHED) }
             }.onFailure { node.notice("Couldn't open $terminal: ${it.message}", isWarning = true) }
     }
 
     fun select(run: WorkflowRun?) {
-        selectedRunId = run?.id
-
-        selectedNodeId = null
+        _state.update { it.copy(selected = run, selectedNodeId = null) }
         run?.let(::readTranscript)
     }
 
@@ -337,8 +386,7 @@ class RunRegistry(
         run: WorkflowRun,
         node: NodeRun,
     ) {
-        selectedRunId = run.id
-        selectedNodeId = node.id
+        _state.update { it.copy(selected = run, selectedNodeId = node.id) }
         readTranscript(run)
     }
 
@@ -361,7 +409,7 @@ class RunRegistry(
         val known = runs.mapTo(mutableSetOf()) { it.id }
         val arrived = RunHistory.list(archiveRoot).filterNot { it.id in known }
 
-        runs.addAll(0, arrived)
+        _state.update { it.copy(runs = arrived + it.runs) }
         arrived.filterNot { it.isActive }.forEach(::announceElsewhere)
         watched.forEach(::follow)
     }
@@ -371,7 +419,7 @@ class RunRegistry(
         run.refreshFrom(record, record.restoreAs())
         if (run.isActive) return
         announceElsewhere(run)
-        if (run.id == selectedRunId) readTranscript(run)
+        if (run == _state.value.selected) readTranscript(run)
     }
 
     private fun announceElsewhere(run: WorkflowRun) {
@@ -395,7 +443,7 @@ class RunRegistry(
     fun loadHistory() {
         val known = runs.mapTo(mutableSetOf()) { it.id }
         val archived = RunHistory.list(archiveRoot).filterNot { it.id in known }
-        if (archived.isNotEmpty()) runs.addAll(archived)
+        if (archived.isNotEmpty()) _state.update { it.copy(runs = it.runs + archived) }
     }
 
     fun forget(run: WorkflowRun): Result<Unit> {
@@ -414,7 +462,7 @@ class RunRegistry(
     fun reconcile() {
         scope.launch(Dispatchers.IO) {
             val found = SessionReconciler.reconcile(archiveRoot)
-            if (found.orphans.isNotEmpty()) runs.addAll(0, found.orphans)
+            if (found.orphans.isNotEmpty()) _state.update { it.copy(runs = found.orphans + it.runs) }
             loadHistory()
 
             if (found.orphans.isEmpty()) return@launch
@@ -435,7 +483,7 @@ class RunRegistry(
     }
 
     private fun adopt(run: WorkflowRun) {
-        runs.add(0, run)
+        _state.update { it.copy(runs = listOf(run) + it.runs) }
         select(run)
     }
 

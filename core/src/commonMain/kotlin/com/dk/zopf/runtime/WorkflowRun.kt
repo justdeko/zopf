@@ -1,16 +1,18 @@
 package com.dk.zopf.runtime
 
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.store.NodeRunRecord
 import com.dk.zopf.store.RunRecord
 import com.dk.zopf.store.Workspace
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
@@ -22,7 +24,6 @@ enum class Restore {
     LIVE,
 }
 
-@Stable
 class WorkflowRun(
     val id: String,
     val workflowName: String,
@@ -30,13 +31,38 @@ class WorkflowRun(
     val isInteractive: Boolean,
     val startedAt: Instant = Instant.now(),
 ) {
-    val nodes = mutableStateListOf<NodeRun>()
+    private val _state = MutableStateFlow(WorkflowRunState())
 
-    var outcome by mutableStateOf<RunStatus?>(null)
-        internal set
+    val state: StateFlow<WorkflowRunState> = _state.asStateFlow()
 
-    var finishedAt by mutableStateOf<Instant?>(null)
-        internal set
+    private fun update(transform: WorkflowRunState.() -> WorkflowRunState) {
+        _state.update(transform)
+    }
+
+    internal fun add(node: NodeRun) {
+        node.owner = this
+        update { copy(nodes = nodes + node, nodeStates = nodeStates + (node.id to node.state.value)) }
+    }
+
+    internal fun nodeChanged(
+        id: String,
+        state: NodeRunState,
+    ) {
+        update { copy(nodeStates = nodeStates + (id to state)) }
+    }
+
+    internal fun settle(
+        outcome: RunStatus?,
+        finishedAt: Instant?,
+    ) {
+        update { copy(outcome = outcome, finishedAt = finishedAt) }
+    }
+
+    val nodes: List<NodeRun> get() = _state.value.nodes
+
+    val outcome: RunStatus? get() = _state.value.outcome
+
+    val finishedAt: Instant? get() = _state.value.finishedAt
 
     var job: Job? = null
         internal set
@@ -56,50 +82,33 @@ class WorkflowRun(
 
     internal var transcriptLoaded: Boolean = false
 
-    val status: RunStatus
-        get() =
-            outcome ?: when {
-                nodes.any { it.status == RunStatus.WAITING } -> RunStatus.WAITING
-                nodes.any { it.status.showsProgress } -> RunStatus.RUNNING
-                else -> RunStatus.STARTING
-            }
+    val status: RunStatus get() = _state.value.status
 
-    val isActive: Boolean get() = outcome == null
+    internal fun records(): Flow<RunRecord> = state.map { record() }.distinctUntilChanged()
 
-    val isElsewhere: Boolean get() = fromArchive && isActive
+    val isActive: Boolean get() = _state.value.isActive
 
-    val focusNode: NodeRun?
-        get() =
-            nodes.firstOrNull { it.status == RunStatus.WAITING }
-                ?: nodes.lastOrNull { it.status.showsProgress }
-                ?: nodes.lastOrNull { it.status.isFinished && it.status != RunStatus.SKIPPED }
-                ?: nodes.firstOrNull()
+    fun isElsewhere(state: WorkflowRunState): Boolean = fromArchive && state.isActive
+
+    val isElsewhere: Boolean get() = isElsewhere(_state.value)
+
+    val focusNode: NodeRun? get() = _state.value.focusNode
+
+    fun nodeShown(selectedId: String?): NodeRun? = nodes.firstOrNull { it.id == selectedId } ?: focusNode
 
     fun node(nodeId: String): NodeRun? = nodes.firstOrNull { it.nodeId == nodeId }
 
-    val costUsd: Double?
-        get() = nodes.mapNotNull { it.costUsd }.takeIf { it.isNotEmpty() }?.sum()
+    val costUsd: Double? get() = _state.value.costUsd
 
-    val tokens: Int?
-        get() = nodes.mapNotNull { it.tokens }.takeIf { it.isNotEmpty() }?.sum()
+    val tokens: Int? get() = _state.value.tokens
 
-    val settledCount: Int get() = nodes.count { it.status.isFinished }
+    val settledCount: Int get() = _state.value.settledCount
 
-    val reachedCount: Int get() = nodes.count { it.status != RunStatus.QUEUED }
+    val reachedCount: Int get() = _state.value.reachedCount
 
-    fun elapsed(now: Instant = Instant.now()): Duration = Duration.between(startedAt, finishedAt ?: now)
+    fun elapsed(now: Instant = Instant.now()): Duration = _state.value.elapsed(startedAt, now)
 
-    fun summary(): String =
-        buildString {
-            append(status.label)
-            if (nodes.size > 1) append(" · $reachedCount/${nodes.size}")
-            if (isActive) {
-                nodes
-                    .firstOrNull { it.status == RunStatus.WAITING || it.status.showsProgress }
-                    ?.let { append(" · ${it.nodeTitle}") }
-            }
-            spend(costUsd, tokens)?.let { append(" · $it") }
-        }
+    fun summary(): String = _state.value.summary()
 
     internal fun record(): RunRecord =
         RunRecord(
@@ -135,16 +144,22 @@ class WorkflowRun(
     ) {
         record.nodes.forEach { archived ->
             val node = node(archived.nodeId) ?: return@forEach
-            node.sessionId = archived.sessionId
-            node.model = archived.model
-            node.costUsd = archived.costUsd
-            node.exitCode = archived.exitCode
-            node.command = archived.command
-            node.finishedAt = archived.finishedAt?.let(::parseInstant)
-            node.status = statusOf(archived.status, restore)
+            node.update {
+                archived(
+                    status = statusOf(archived.status, restore),
+                    sessionId = archived.sessionId,
+                    model = archived.model,
+                    costUsd = archived.costUsd,
+                    exitCode = archived.exitCode,
+                    command = archived.command,
+                    finishedAt = archived.finishedAt?.let(::parseInstant),
+                )
+            }
         }
-        finishedAt = record.finishedAt?.let(::parseInstant)
-        outcome = statusOf(record.status, restore).takeIf { it.isFinished }
+        settle(
+            outcome = statusOf(record.status, restore).takeIf { it.isFinished },
+            finishedAt = record.finishedAt?.let(::parseInstant),
+        )
         if (!isActive && transcriptLoaded) {
             nodes.forEach { it.reset() }
             transcriptLoaded = false
@@ -166,7 +181,7 @@ class WorkflowRun(
                 )
             run.fromArchive = true
             record.nodes.forEach { node ->
-                run.nodes +=
+                run.add(
                     NodeRun(
                         id = "${record.id}:${node.nodeId}",
                         workflowName = record.workflow,
@@ -176,7 +191,8 @@ class WorkflowRun(
                         cwd = node.cwd?.let { Paths.get(it) },
                         startedAt = parseInstant(node.startedAt),
                         provider = node.provider,
-                    )
+                    ),
+                )
             }
             run.refreshFrom(record, restore)
             if (restore == Restore.ORPHANED) {

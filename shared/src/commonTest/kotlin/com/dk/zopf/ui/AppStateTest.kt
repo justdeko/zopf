@@ -133,6 +133,8 @@ class EditorRunPanelTest {
             nodes = listOf(WorkflowNode("only", NodeType.GATE)),
         )
 
+    private fun RunRegistry.editorRunState(workflowName: String) = runForEditor(workflowName)?.state?.value
+
     private fun settling() =
         Workflow(
             name = "alpha",
@@ -177,7 +179,7 @@ class EditorRunPanelTest {
         val runs = registry()
         runs.startWorkflow(null, workflow("alpha")).getOrThrow()
 
-        assertNotNull(runs.runOnCanvas("alpha", panelOpen = false))
+        assertNotNull(runs.editorRunState("alpha").onCanvas(panelOpen = false))
     }
 
     @Test
@@ -187,8 +189,8 @@ class EditorRunPanelTest {
             val alpha = runs.startWorkflow(null, settling()).getOrThrow()
             withTimeout(10.seconds) { alpha.job?.join() }
 
-            assertNotNull(runs.runOnCanvas("alpha", panelOpen = true))
-            assertNull(runs.runOnCanvas("alpha", panelOpen = false))
+            assertNotNull(runs.editorRunState("alpha").onCanvas(panelOpen = true))
+            assertNull(runs.editorRunState("alpha").onCanvas(panelOpen = false))
         }
 
     @Test

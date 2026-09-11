@@ -149,7 +149,7 @@ internal object PreviewFixtures {
         )
 
         if (withTranscript) {
-            run.entries.add(
+            run.add(
                 ConsoleEntry.Message(
                     0,
                     "Reading the workflow engine before making changes.",
@@ -157,17 +157,17 @@ internal object PreviewFixtures {
                     isStreaming = false,
                 ),
             )
-            run.entries.add(
+            run.add(
                 ConsoleEntry.Message(1, "I'll check WorkflowEngine.kt and NodeRun.kt first.", isStreaming = false),
             )
-            run.entries.add(
+            run.add(
                 ConsoleEntry.ToolCall(2, "tool-1", "Read", "core/.../WorkflowEngine.kt", result = "398 lines"),
             )
-            run.entries.add(ConsoleEntry.ToolCall(3, "tool-2", "Bash", "./gradlew :core:jvmTest"))
-            run.entries.add(ConsoleEntry.Output(4, "BUILD SUCCESSFUL in 42s", isError = false))
-            run.entries.add(ConsoleEntry.Notice(5, "Denied: Bash rm -rf build", isWarning = true))
+            run.add(ConsoleEntry.ToolCall(3, "tool-2", "Bash", "./gradlew :core:jvmTest"))
+            run.add(ConsoleEntry.Output(4, "BUILD SUCCESSFUL in 42s", isError = false))
+            run.add(ConsoleEntry.Notice(5, "Denied: Bash rm -rf build", isWarning = true))
             if (status.isFinished) {
-                run.entries.add(
+                run.add(
                     ConsoleEntry.Summary(
                         key = 6,
                         text = "Plan is ready in the transcript above.",
@@ -192,8 +192,8 @@ internal object PreviewFixtures {
             startedAt = Instant.now().minusSeconds(12),
         ).showing(status = RunStatus.WAITING)
             .also {
-                it.entries.add(ConsoleEntry.Notice(0, "Apply these fixes?"))
-                it.entries.add(ConsoleEntry.Prompt(1, GATE_FINDINGS))
+                it.add(ConsoleEntry.Notice(0, "Apply these fixes?"))
+                it.add(ConsoleEntry.Prompt(1, GATE_FINDINGS))
             }
 
     fun pendingQuestion(): PendingQuestion =

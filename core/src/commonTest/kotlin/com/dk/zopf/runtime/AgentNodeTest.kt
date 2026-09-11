@@ -311,7 +311,7 @@ class NodeRunTest {
             )
 
         rows.forEach { (run, expected) ->
-            assertEquals(expected, run.agentLabel, "${run.nodeType} ${run.provider}")
+            assertEquals(expected, run.agentLabel(run.state.value), "${run.nodeType} ${run.provider}")
         }
     }
 
@@ -492,9 +492,8 @@ class NodeRunTest {
 
     @Test
     fun `a watcher gets each entry once and a message when complete`() {
-        val settled = mutableListOf<ConsoleEntry>()
         val run = run()
-        run.onEntrySettled = { settled.add(it) }
+        val settled = run.watch()
 
         run.consume(AgentEvent.TextDelta("s1", "Hel", isThinking = false))
         run.consume(AgentEvent.TextDelta("s1", "lo", isThinking = false))
@@ -516,12 +515,18 @@ class NodeRunTest {
     @Test
     fun `a watcher sees a real stream in order without repeats`() {
         val text = checkNotNull(javaClass.getResourceAsStream("/claude-stream.jsonl")).bufferedReader().readText()
-        val settled = mutableListOf<ConsoleEntry>()
-        val run = run().apply { onEntrySettled = { settled.add(it) } }
+        val run = run()
+        val settled = run.watch()
 
         ClaudeEvents.parseAll(text).forEach(run::consume)
 
         assertEquals(run.entries.toList(), settled)
+    }
+
+    private fun NodeRun.watch(): List<ConsoleEntry> {
+        val seen = mutableListOf<ConsoleEntry>()
+        onEntrySettled = { seen.add(it) }
+        return seen
     }
 
     private fun describe(entry: ConsoleEntry): String =
@@ -559,23 +564,23 @@ class NodeRunTest {
 
     @Test
     fun `a node blocked on a tool call is waiting and still active`() {
-        val run = run().apply { status = RunStatus.RUNNING }
+        val run = run().apply { update { copy(status = RunStatus.RUNNING) } }
         run.beginPermission(pending())
 
         assertEquals(RunStatus.WAITING, run.status)
 
         assertTrue(run.status.isActive)
-        assertTrue(run.isAwaitingPermission)
+        assertTrue(run.state.value.isAwaitingPermission)
     }
 
     @Test
     fun `answering puts the node back to work`() {
-        val run = run().apply { status = RunStatus.RUNNING }
+        val run = run().apply { update { copy(status = RunStatus.RUNNING) } }
         run.beginPermission(pending())
         run.endPermission(allowed = true, request = pending().request)
 
         assertEquals(RunStatus.RUNNING, run.status)
-        assertFalse(run.isAwaitingPermission)
+        assertFalse(run.state.value.isAwaitingPermission)
 
         run.consume(ClaudeEvents.parse("""{"type":"assistant","session_id":"s1"}""")!!)
         assertEquals(RunStatus.RUNNING, run.status)
@@ -587,7 +592,7 @@ class NodeRunTest {
         run.beginPermission(pending())
         run.finish(RunStatus.STOPPED)
 
-        assertFalse(run.isAwaitingPermission)
+        assertFalse(run.state.value.isAwaitingPermission)
     }
 
     @Test

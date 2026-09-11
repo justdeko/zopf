@@ -70,9 +70,10 @@ class RunHistoryTest {
     @Test
     fun `an archived agent node comes back with its cli and model`() {
         val run = WorkflowRun("run-1", "demo", null, isInteractive = false)
-        run.nodes +=
+        run.add(
             NodeRun("run-1:analyze", "demo", "analyze", "Analyze", NodeType.AGENT, null, provider = AgentProviderId.CODEX)
-                .showing(status = RunStatus.SUCCEEDED, model = "gpt-5.5")
+                .showing(status = RunStatus.SUCCEEDED, model = "gpt-5.5"),
+        )
 
         val restored = WorkflowRun.restored(run.record(), Restore.SETTLED).node("analyze")
 
