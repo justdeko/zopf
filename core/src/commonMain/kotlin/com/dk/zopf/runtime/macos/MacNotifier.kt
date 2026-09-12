@@ -58,7 +58,7 @@ class MacNotifier(
         onAnswer: (String) -> Unit,
     ): NotificationHandle {
         val binary = helper
-        if (binary == null || notification.actions.isEmpty()) {
+        if (binary == null) {
             post(notification)
             return SilentNotifier.ask(notification, timeoutSeconds, onAnswer)
         }
@@ -86,8 +86,8 @@ class MacNotifier(
 
         return object : NotificationHandle {
             override fun cancel() {
-                process.destroy()
                 withdraw(notification.key)
+                process.destroy()
             }
         }
     }
