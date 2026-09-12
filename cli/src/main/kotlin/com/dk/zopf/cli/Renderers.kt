@@ -1,11 +1,11 @@
 package com.dk.zopf.cli
 
-import com.dk.zopf.runtime.ConsoleEntry
-import com.dk.zopf.runtime.NodeRun
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.runtime.WorkflowRun
-import com.dk.zopf.runtime.format
-import com.dk.zopf.runtime.spend
+import com.dk.zopf.runtime.run.ConsoleEntry
+import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.runtime.run.WorkflowRun
+import com.dk.zopf.util.format
+import com.dk.zopf.util.spend
 import java.io.PrintStream
 import java.time.Duration
 

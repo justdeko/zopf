@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,18 +54,19 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.dk.zopf.runtime.ConsoleEntry
-import com.dk.zopf.runtime.NodeRun
-import com.dk.zopf.runtime.PendingPermission
 import com.dk.zopf.runtime.PendingQuestion
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.runtime.format
-import com.dk.zopf.runtime.spend
+import com.dk.zopf.runtime.agent.PendingPermission
+import com.dk.zopf.runtime.run.ConsoleEntry
+import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.NodeRunState
+import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.store.DEFAULT_TERMINAL_APP
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
 import com.dk.zopf.ui.theme.colors
+import com.dk.zopf.util.format
+import com.dk.zopf.util.spend
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -88,18 +90,19 @@ fun RunConsole(
     terminalApp: String = DEFAULT_TERMINAL_APP,
     isElsewhere: Boolean = false,
 ) {
+    val state by run.state.collectAsState()
     Column(modifier.fillMaxSize()) {
-        RunHeader(run, onStop, onTakeOver, onClose, terminalApp, isElsewhere)
+        RunHeader(run, state, onStop, onTakeOver, onClose, terminalApp, isElsewhere)
         HorizontalDivider()
-        Transcript(run, Modifier.weight(1f))
+        Transcript(run, state.status, Modifier.weight(1f))
         when {
-            run.isAwaitingPermission -> PermissionBar(run.pendingPermission, onDecide)
+            state.isAwaitingPermission -> PermissionBar(state.pendingPermission, onDecide)
 
-            run.isAwaitingApproval -> GateBar(title = run.nodeTitle, onApprove = onApprove)
+            run.isAwaitingApproval(state) -> GateBar(title = run.nodeTitle, onApprove = onApprove)
 
-            run.isAwaitingInput -> InputBar(run.pendingQuestion, onAnswer)
+            state.isAwaitingInput -> InputBar(state.pendingQuestion, onAnswer)
 
-            run.status == RunStatus.WAITING && run.canFollowUp -> {
+            state.status == RunStatus.WAITING && run.canFollowUp -> {
                 HorizontalDivider()
                 FollowUpBar(onSend = onSend, onFinish = onFinish)
             }
@@ -110,6 +113,7 @@ fun RunConsole(
 @Composable
 private fun RunHeader(
     run: NodeRun,
+    state: NodeRunState,
     onStop: () -> Unit,
     onTakeOver: () -> Unit,
     onClose: (() -> Unit)?,
@@ -117,8 +121,8 @@ private fun RunHeader(
     isElsewhere: Boolean = false,
 ) {
     var now by remember(run.id) { mutableStateOf(Instant.now()) }
-    LaunchedEffect(run.id, run.status) {
-        while (run.status.isActive) {
+    LaunchedEffect(run.id, state.status) {
+        while (state.status.isActive) {
             delay(1.seconds)
             now = Instant.now()
         }
@@ -129,7 +133,7 @@ private fun RunHeader(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StatusDot(run.status)
+            StatusDot(state.status)
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -141,13 +145,13 @@ private fun RunHeader(
                 Text(
                     buildString {
                         append(run.workflowName)
-                        run.agentLabel?.let { append(" · $it") }
+                        run.agentLabel(state)?.let { append(" · $it") }
                         append(" · ")
-                        append(run.status.label)
+                        append(state.status.label)
                         append(" · ")
-                        append(format(run.elapsed(now)))
-                        spend(run.costUsd, run.tokens)?.let { append(" · $it") }
-                        run.exitCode?.takeIf { it != 0 }?.let { append(" · exit $it") }
+                        append(format(state.elapsed(run.startedAt, now)))
+                        spend(state.costUsd, state.tokens)?.let { append(" · $it") }
+                        state.exitCode?.takeIf { it != 0 }?.let { append(" · exit $it") }
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -156,7 +160,7 @@ private fun RunHeader(
                 )
             }
 
-            if (run.canTakeOver && !isElsewhere) {
+            if (run.canTakeOver(state) && !isElsewhere) {
                 TextButton(onClick = onTakeOver) {
                     Icon(ZopfIcons.Terminal, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
@@ -164,7 +168,7 @@ private fun RunHeader(
                     Text("Take over in $terminalApp")
                 }
             }
-            if (run.status.isActive && !isElsewhere) {
+            if (state.status.isActive && !isElsewhere) {
                 TextButton(onClick = onStop) {
                     Icon(ZopfIcons.Stop, contentDescription = null, Modifier.size(14.dp))
                     Spacer(Modifier.width(8.dp))
@@ -183,6 +187,7 @@ private fun RunHeader(
 @Composable
 private fun Transcript(
     run: NodeRun,
+    status: RunStatus,
     modifier: Modifier = Modifier,
 ) {
     val listState = remember(run.id) { LazyListState() }
@@ -198,16 +203,18 @@ private fun Transcript(
             last == null || last.index >= listState.layoutInfo.totalItemsCount - 2
         }
     }
-    LaunchedEffect(run.entries.size) {
-        if (atBottom && run.entries.isNotEmpty()) listState.scrollToItem(run.entries.lastIndex)
+    val count by run.transcript.collectAsState()
+
+    LaunchedEffect(count) {
+        if (atBottom && count > 0) listState.scrollToItem(count - 1)
     }
 
     LaunchedEffect(run.id) {
-        if (run.entries.isNotEmpty()) listState.scrollToItem(run.entries.lastIndex)
+        if (count > 0) listState.scrollToItem(count - 1)
     }
 
     Box(modifier) {
-        if (run.entries.isEmpty() && run.status.isActive) {
+        if (count == 0 && status.isActive) {
             Column(
                 Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
@@ -230,14 +237,15 @@ private fun Transcript(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 contentPadding = PaddingValues(vertical = 10.dp),
             ) {
-                items(run.entries, key = { it.key }) { entry ->
-                    when (entry) {
+                items(count, key = { run.entryAt(it)?.key ?: -it.toLong() }) { index ->
+                    when (val entry = run.entryAt(index)) {
                         is ConsoleEntry.Message -> MessageRow(entry)
                         is ConsoleEntry.ToolCall -> ToolCallRow(entry)
                         is ConsoleEntry.Output -> OutputRow(entry)
                         is ConsoleEntry.Notice -> NoticeRow(entry)
                         is ConsoleEntry.Prompt -> PromptRow(entry)
                         is ConsoleEntry.Summary -> SummaryRow(entry)
+                        null -> Unit
                     }
                 }
             }
@@ -246,7 +254,7 @@ private fun Transcript(
             canScrollUp = listState.canScrollBackward,
             canScrollDown = listState.canScrollForward,
             onTop = { jumpTo(0) },
-            onBottom = { jumpTo(run.entries.lastIndex.coerceAtLeast(0)) },
+            onBottom = { jumpTo((count - 1).coerceAtLeast(0)) },
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 12.dp),
         )
     }
@@ -286,8 +294,9 @@ private fun ScrollControls(
 
 @Composable
 private fun MessageRow(entry: ConsoleEntry.Message) {
+    val live by entry.live.collectAsState()
     Text(
-        entry.text,
+        live.text,
         style = MaterialTheme.typography.bodyMedium,
         fontStyle = if (entry.isThinking) FontStyle.Italic else FontStyle.Normal,
         color =
@@ -302,7 +311,8 @@ private fun MessageRow(entry: ConsoleEntry.Message) {
 @Composable
 private fun ToolCallRow(entry: ConsoleEntry.ToolCall) {
     var expanded by remember(entry.key) { mutableStateOf(false) }
-    val result = entry.result
+    val outcome by entry.outcome.collectAsState()
+    val result = outcome.result
 
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -315,7 +325,7 @@ private fun ToolCallRow(entry: ConsoleEntry.ToolCall) {
                     entry.name,
                     style = MaterialTheme.typography.labelMedium,
                     color =
-                        if (entry.isError) {
+                        if (outcome.isError) {
                             MaterialTheme.colorScheme.error
                         } else {
                             MaterialTheme.colorScheme.primary
@@ -647,7 +657,7 @@ private fun TranscriptPreview() {
     ZopfTheme {
         Surface {
             Box(Modifier.size(480.dp, 420.dp)) {
-                Transcript(PreviewFixtures.nodeRun(status = RunStatus.RUNNING))
+                Transcript(PreviewFixtures.nodeRun(status = RunStatus.RUNNING), RunStatus.RUNNING)
             }
         }
     }
@@ -659,6 +669,7 @@ private fun RunHeaderPreview() {
     ZopfTheme {
         RunHeader(
             run = PreviewFixtures.nodeRun(status = RunStatus.RUNNING),
+            state = NodeRunState(status = RunStatus.RUNNING),
             onStop = {},
             onTakeOver = {},
             onClose = {},

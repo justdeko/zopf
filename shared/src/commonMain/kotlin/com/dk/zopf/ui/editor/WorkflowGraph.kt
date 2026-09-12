@@ -13,7 +13,7 @@ import com.dk.zopf.model.Position
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.outgoingEdges
-import com.dk.zopf.runtime.RunStatus
+import com.dk.zopf.runtime.run.RunStatus
 
 const val InAnchor = "left"
 const val OutAnchor = "right"

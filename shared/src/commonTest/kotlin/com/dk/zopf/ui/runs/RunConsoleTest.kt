@@ -11,13 +11,14 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
-import com.dk.zopf.runtime.ConsoleEntry
-import com.dk.zopf.runtime.NodeRun
-import com.dk.zopf.runtime.PendingPermission
 import com.dk.zopf.runtime.PendingQuestion
-import com.dk.zopf.runtime.PermissionRequest
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.runtime.showing
+import com.dk.zopf.runtime.agent.AgentEvent
+import com.dk.zopf.runtime.agent.PendingPermission
+import com.dk.zopf.runtime.agent.PermissionRequest
+import com.dk.zopf.runtime.run.ConsoleEntry
+import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.runtime.run.showing
 import com.dk.zopf.ui.theme.ZopfTheme
 import java.nio.file.Paths
 import java.util.concurrent.CompletableFuture
@@ -77,7 +78,7 @@ class RunConsoleTest {
 
     private fun printing(lines: Int) =
         node(NodeType.SHELL, "build", RunStatus.SUCCEEDED).also { run ->
-            repeat(lines) { i -> run.entries.add(ConsoleEntry.Output(i.toLong(), "line $i", isError = false)) }
+            repeat(lines) { i -> run.add(ConsoleEntry.Output(i.toLong(), "line $i", isError = false)) }
         }
 
     @OptIn(ExperimentalTestApi::class)
@@ -92,6 +93,50 @@ class RunConsoleTest {
 
     @OptIn(ExperimentalTestApi::class)
     private fun ComposeUiTest.isMissing(text: String) = runCatching { onNodeWithText(text).assertIsDisplayed() }.isFailure
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the console repaints as an agent streams`() =
+        runDesktopComposeUiTest {
+            val streaming = node(NodeType.AGENT, "analyze", RunStatus.RUNNING)
+            console(streaming)
+
+            streaming.consume(AgentEvent.TextDelta(sessionId = null, text = "Reading ", isThinking = false))
+            waitForIdle()
+            onNodeWithText("Reading", substring = true).assertIsDisplayed()
+
+            streaming.consume(AgentEvent.TextDelta(sessionId = null, text = "the engine.", isThinking = false))
+            waitForIdle()
+            onNodeWithText("Reading the engine.", substring = true).assertIsDisplayed()
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the console repaints when a node settles`() =
+        runDesktopComposeUiTest {
+            val running = node(NodeType.AGENT, "analyze", RunStatus.RUNNING)
+            console(running)
+            onNodeWithText(RunStatus.RUNNING.label, substring = true).assertIsDisplayed()
+
+            running.showing(status = RunStatus.SUCCEEDED)
+            waitForIdle()
+
+            onNodeWithText(RunStatus.SUCCEEDED.label, substring = true).assertIsDisplayed()
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `an empty transcript stops waiting when its node settles`() =
+        runDesktopComposeUiTest {
+            val queued = node(NodeType.AGENT, "analyze", RunStatus.QUEUED)
+            console(queued)
+            onNodeWithText("Waiting for the first event…").assertIsDisplayed()
+
+            queued.showing(status = RunStatus.STOPPED)
+            waitForIdle()
+
+            assertTrue(isMissing("Waiting for the first event…"), "a settled node with no output kept spinning")
+        }
 
     @OptIn(ExperimentalTestApi::class)
     @Test

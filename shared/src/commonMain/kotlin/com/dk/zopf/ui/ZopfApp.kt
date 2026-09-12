@@ -23,6 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.dk.zopf.runtime.run.RunActivity
 import com.dk.zopf.ui.connectors.ConnectorsScreen
 import com.dk.zopf.ui.editor.GraphEditorScreen
 import com.dk.zopf.ui.runs.RunConsole
@@ -43,7 +46,10 @@ import com.dk.zopf.ui.workspace.WorkspaceSwitcher
 
 private val RunPanelHeight = 300.dp
 
-private fun subtitleFor(state: AppState): String =
+private fun subtitleFor(
+    state: AppState,
+    activity: RunActivity,
+): String =
     when (state.screen) {
         Screen.WORKFLOWS -> {
             val listing = state.listing
@@ -64,8 +70,8 @@ private fun subtitleFor(state: AppState): String =
         }
 
         Screen.RUNS -> {
-            val active = state.runs.activeCount
-            val total = state.runs.runs.size
+            val active = activity.active
+            val total = activity.total
             when {
                 total == 0 -> "Nothing has run yet"
                 active == 0 -> "${count(total, "run")}, none active"
@@ -98,6 +104,7 @@ private fun subtitleFor(state: AppState): String =
 
 @Composable
 private fun TopBar(state: AppState) {
+    val activity by state.runs.activity.collectAsState()
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.zIndex(1f),
@@ -115,7 +122,7 @@ private fun TopBar(state: AppState) {
                         style = MaterialTheme.typography.headlineSmallEmphasized,
                     )
                     Text(
-                        subtitleFor(state),
+                        subtitleFor(state, activity),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -143,6 +150,9 @@ private fun count(
 
 @Composable
 fun ZopfApp(state: AppState = remember { AppState() }) {
+    val activity by state.runs.activity.collectAsState()
+    val settings by state.settings.state.collectAsState()
+    val open by state.runs.state.collectAsState()
     LaunchedEffect(Unit) { state.start() }
 
     val snackbar = remember { SnackbarHostState() }
@@ -162,16 +172,18 @@ fun ZopfApp(state: AppState = remember { AppState() }) {
         }
     }
 
-    ZopfTheme(
-        darkTheme =
-            state.settings.current.theme
-                .isDark(),
-    ) {
+    ZopfTheme(darkTheme = settings.theme.isDark()) {
         Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
 
             if (editor != null) {
                 Column(Modifier.fillMaxSize().padding(padding)) {
-                    val workflowRun = state.runs.runForEditor(editor.workflow.name)
+                    val workflowRun = open.selected?.takeIf { it.workflowName == editor.workflow.name }
+                    val canvasState =
+                        workflowRun
+                            ?.state
+                            ?.collectAsState()
+                            ?.value
+                            .onCanvas(state.showRunPanel)
                     GraphEditorScreen(
                         state = editor,
                         workspace = state.activeWorkspace?.workspace,
@@ -179,15 +191,15 @@ fun ZopfApp(state: AppState = remember { AppState() }) {
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         onRunNode = state::runNode,
                         onRunWorkflow = { state.runWorkflow() },
-                        runningNodes =
-                            state.runs
-                                .runOnCanvas(editor.workflow.name, state.showRunPanel)
-                                ?.nodes
-                                .orEmpty(),
+                        runStatuses =
+                            canvasState
+                                ?.let { snapshot ->
+                                    snapshot.nodes.associate { it.nodeId to snapshot.of(it).status }
+                                }.orEmpty(),
                         onCommands = { state.editorCommands = it },
                     )
 
-                    val node = workflowRun?.let { state.runs.selectedNode }
+                    val node = workflowRun?.let { open.shownNode }
                     if (state.showRunPanel && workflowRun != null && node != null) {
                         HorizontalDivider()
                         RunConsole(
@@ -221,7 +233,7 @@ fun ZopfApp(state: AppState = remember { AppState() }) {
                         selected = state.screen == Screen.RUNS,
                         onClick = { state.screen = Screen.RUNS },
                         icon = {
-                            val active = state.runs.activeCount
+                            val active = activity.active
                             BadgedBox(
                                 badge = { if (active > 0) Badge { Text("$active") } },
                             ) {
@@ -290,7 +302,7 @@ fun ZopfApp(state: AppState = remember { AppState() }) {
 
                         Screen.SETTINGS -> {
                             SettingsScreen(
-                                settings = state.settings.current,
+                                settings = settings,
                                 onChange = state::updateSettings,
                                 update = state.update,
                                 onOpenRelease = state::openRelease,

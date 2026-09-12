@@ -8,33 +8,34 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.providerFor
-import com.dk.zopf.runtime.AgentProviders
-import com.dk.zopf.runtime.Browser
-import com.dk.zopf.runtime.ConnectorScaffold
-import com.dk.zopf.runtime.Finder
-import com.dk.zopf.runtime.MacNotifier
 import com.dk.zopf.runtime.Release
-import com.dk.zopf.runtime.RunRegistry
-import com.dk.zopf.runtime.TerminalLauncher
 import com.dk.zopf.runtime.UpdateCheck
-import com.dk.zopf.runtime.WorkflowRun
+import com.dk.zopf.runtime.agent.AgentProviders
 import com.dk.zopf.runtime.errors
+import com.dk.zopf.runtime.exec.ConnectorScaffold
 import com.dk.zopf.runtime.issues
+import com.dk.zopf.runtime.macos.Browser
+import com.dk.zopf.runtime.macos.Finder
+import com.dk.zopf.runtime.macos.MacNotifier
+import com.dk.zopf.runtime.macos.TerminalLauncher
+import com.dk.zopf.runtime.run.RunRegistry
+import com.dk.zopf.runtime.run.WorkflowRun
+import com.dk.zopf.runtime.run.WorkflowRunState
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.AppSettings
-import com.dk.zopf.store.BrokenConnector
-import com.dk.zopf.store.Connector
-import com.dk.zopf.store.ConnectorListing
-import com.dk.zopf.store.ConnectorStore
 import com.dk.zopf.store.LiveSettings
 import com.dk.zopf.store.Log
-import com.dk.zopf.store.OpenWorkspace
 import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.SettingsStore
 import com.dk.zopf.store.WindowFrame
-import com.dk.zopf.store.WorkflowListing
-import com.dk.zopf.store.WorkflowStore
-import com.dk.zopf.store.WorkspaceRegistry
+import com.dk.zopf.store.workflow.WorkflowListing
+import com.dk.zopf.store.workflow.WorkflowStore
+import com.dk.zopf.store.workspace.BrokenConnector
+import com.dk.zopf.store.workspace.Connector
+import com.dk.zopf.store.workspace.ConnectorListing
+import com.dk.zopf.store.workspace.ConnectorStore
+import com.dk.zopf.store.workspace.OpenWorkspace
+import com.dk.zopf.store.workspace.WorkspaceRegistry
 import com.dk.zopf.ui.editor.EditorCommands
 import com.dk.zopf.ui.editor.EditorState
 import com.dk.zopf.ui.workspace.chooseDirectory
@@ -433,7 +434,4 @@ internal fun prunedRunsMessage(
 
 internal fun RunRegistry.runForEditor(workflowName: String): WorkflowRun? = selectedRun?.takeIf { it.workflowName == workflowName }
 
-internal fun RunRegistry.runOnCanvas(
-    workflowName: String,
-    panelOpen: Boolean,
-): WorkflowRun? = runForEditor(workflowName)?.takeIf { panelOpen || it.isActive }
+internal fun WorkflowRunState?.onCanvas(panelOpen: Boolean): WorkflowRunState? = this?.takeIf { panelOpen || it.isActive }

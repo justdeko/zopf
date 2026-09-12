@@ -101,9 +101,8 @@ import com.dk.zopf.model.label
 import com.dk.zopf.model.modelFor
 import com.dk.zopf.model.providerFor
 import com.dk.zopf.model.validate
-import com.dk.zopf.runtime.NodeRun
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.ui.LocalTitleBarInset
 import com.dk.zopf.ui.LocalWindowDragArea
 import com.dk.zopf.ui.preview.PreviewFixtures
@@ -149,7 +148,7 @@ fun GraphEditorScreen(
     modifier: Modifier = Modifier,
     onRunNode: (WorkflowNode) -> Unit = {},
     onRunWorkflow: () -> Unit = {},
-    runningNodes: List<NodeRun> = emptyList(),
+    runStatuses: Map<String, RunStatus> = emptyMap(),
     onCommands: (EditorCommands?) -> Unit = {},
     canvas: EditorCanvas = rememberEditorCanvas(state.workflow),
 ) {
@@ -339,7 +338,7 @@ fun GraphEditorScreen(
                     state,
                     canvas,
                     nodeDragEnabled,
-                    runningNodes,
+                    runStatuses,
                     onRunNode,
                     onDropOnCanvas = { pendingDrop = it },
                     takeKeys = { runCatching { editorFocus.requestFocus() } },
@@ -460,7 +459,7 @@ private fun Canvas(
     state: EditorState,
     canvas: EditorCanvas,
     nodeDragEnabled: Boolean,
-    runningNodes: List<NodeRun>,
+    runStatuses: Map<String, RunStatus>,
     onRunNode: (WorkflowNode) -> Unit,
     onDropOnCanvas: (ConnectDrop) -> Unit,
     takeKeys: () -> Unit = {},
@@ -485,7 +484,7 @@ private fun Canvas(
 
     val sources = remember(workflow.edges) { workflow.edges.map { it.from }.toSet() }
 
-    val dashPhase = if (runningNodes.any { it.status.holdsTheRun }) rememberDashPhase() else null
+    val dashPhase = if (runStatuses.values.any { it.holdsTheRun }) rememberDashPhase() else null
 
     KuiverBridge {
         KuiverViewer(
@@ -544,7 +543,7 @@ private fun Canvas(
                                 isDropTarget = node.id == state.connectTarget,
                                 connectMode = connectFrom != null,
                                 onConnectClick = { state.startConnecting(node.id) },
-                                runStatus = runningNodes.firstOrNull { it.nodeId == node.id }?.status,
+                                runStatus = runStatuses[node.id],
                                 provider = provider,
                                 model = model,
                             )
@@ -565,8 +564,8 @@ private fun Canvas(
                 val failure = model?.on == EdgeTrigger.FAILURE
                 val label = model?.let { it.condition?.toString() ?: "failed".takeIf { _ -> failure } }
 
-                val toStatus = runningNodes.firstOrNull { it.nodeId == edge.toId }?.status
-                val flow = edgeFlow(runningNodes.firstOrNull { it.nodeId == edge.fromId }?.status, toStatus, failure)
+                val toStatus = runStatuses[edge.toId]
+                val flow = edgeFlow(runStatuses[edge.fromId], toStatus, failure)
                 val marching = flow == EdgeFlow.TAKEN && toStatus?.holdsTheRun == true
 
                 val resting =
@@ -940,7 +939,7 @@ private fun CanvasPreview() {
     val state = PreviewFixtures.editorState()
     state.select("plan")
     val canvas = rememberEditorCanvas(state.workflow)
-    val runningNodes = listOf(PreviewFixtures.nodeRun(status = RunStatus.RUNNING, nodeId = "tests"))
+    val runStatuses = mapOf("tests" to RunStatus.RUNNING)
     ZopfTheme {
         Surface {
             Box(Modifier.size(760.dp, 420.dp)) {
@@ -948,7 +947,7 @@ private fun CanvasPreview() {
                     state,
                     canvas,
                     nodeDragEnabled = false,
-                    runningNodes = runningNodes,
+                    runStatuses = runStatuses,
                     onRunNode = {},
                     onDropOnCanvas = {},
                 )

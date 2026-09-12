@@ -9,12 +9,16 @@ import com.dk.zopf.model.WORKFLOW_VERSION
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
+import com.dk.zopf.runtime.run.ConsoleEntry
+import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.DEFAULT_CONCURRENCY
 import com.dk.zopf.store.LiveSettings
 import com.dk.zopf.store.RunArchive
-import com.dk.zopf.store.Workspace
-import com.dk.zopf.store.WorkspaceConfig
+import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.store.workspace.WorkspaceConfig
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -835,7 +839,7 @@ private class FakeExecutor(
 
         peak.accumulateAndGet(running.incrementAndGet()) { a, b -> maxOf(a, b) }
         try {
-            execution.run.status = RunStatus.RUNNING
+            execution.run.update { copy(status = RunStatus.RUNNING) }
             work()
         } finally {
             running.decrementAndGet()

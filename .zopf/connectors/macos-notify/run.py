@@ -9,6 +9,7 @@ Editor, so zopf's icon needs a zopf bundle: notifier/ is built into one under Ap
 first use. A machine without swiftc still notifies, through osascript, wearing Script Editor's icon.
 """
 
+import hashlib
 import json
 import os
 import shutil
@@ -25,6 +26,7 @@ SOURCES = [os.path.join(NOTIFIER, name) for name in ("main.swift", "Info.plist",
 INSTALL_ROOT = os.path.expanduser("~/Library/Application Support/zopf")
 APP = os.path.join(INSTALL_ROOT, "zopf-notify.app")
 EXECUTABLE = os.path.join(APP, "Contents", "MacOS", "zopf-notify")
+STAMP = os.path.join(INSTALL_ROOT, "zopf-notify.stamp")
 LSREGISTER = (
     "/System/Library/Frameworks/CoreServices.framework/Frameworks"
     "/LaunchServices.framework/Support/lsregister"
@@ -39,14 +41,25 @@ def run(argv, timeout):
     return subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
 
 
-def is_current():
+def fingerprint():
+    digest = hashlib.sha256()
+    for path in SOURCES:
+        with open(path, "rb") as handle:
+            digest.update(handle.read())
+    return digest.hexdigest()
+
+
+def is_current(wanted):
     if not os.path.isfile(EXECUTABLE):
         return False
-    built = os.path.getmtime(EXECUTABLE)
-    return all(os.path.getmtime(path) <= built for path in SOURCES)
+    try:
+        with open(STAMP) as handle:
+            return handle.read().strip() == wanted
+    except OSError:
+        return False
 
 
-def build():
+def build(wanted):
     swiftc = shutil.which("swiftc")
     if swiftc is None or not all(os.path.isfile(path) for path in SOURCES):
         return None
@@ -72,6 +85,8 @@ def build():
         os.rename(app, APP)
         if os.path.isfile(LSREGISTER):
             run([LSREGISTER, "-f", APP], 15)
+        with open(STAMP, "w") as handle:
+            handle.write(wanted)
     except (OSError, subprocess.SubprocessError):
         return None
     finally:
@@ -80,7 +95,11 @@ def build():
 
 
 def post_bundled(body, title, subtitle, sound):
-    executable = EXECUTABLE if is_current() else build()
+    try:
+        wanted = fingerprint()
+    except OSError:
+        return "the notifier sources are not next to this connector"
+    executable = EXECUTABLE if is_current(wanted) else build(wanted)
     if executable is None:
         return "the notifier bundle would not build"
     try:

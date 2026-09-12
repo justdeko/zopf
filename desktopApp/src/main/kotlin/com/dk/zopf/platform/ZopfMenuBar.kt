@@ -1,6 +1,8 @@
 package com.dk.zopf.platform
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyShortcut
 import androidx.compose.ui.window.FrameWindowScope
@@ -103,7 +105,12 @@ private fun MenuScope.FileMenu(
 @Composable
 private fun MenuScope.WorkflowMenu(app: AppState) {
     val editing = app.editing
-    val selectedRun = app.runs.selectedRun
+    val activity by app.runs.activity.collectAsState()
+    val selectedRun =
+        app.runs.state
+            .collectAsState()
+            .value.selected
+    val selectedState = selectedRun?.state?.collectAsState()?.value
 
     Item(
         "Run Workflow",
@@ -124,12 +131,12 @@ private fun MenuScope.WorkflowMenu(app: AppState) {
     Item(
         "Stop Run",
         shortcut = KeyShortcut(Key.Period, meta = true),
-        enabled = selectedRun?.isActive == true,
+        enabled = selectedState?.isActive == true,
     ) { selectedRun?.let(app.runs::stop) }
     Item(
         "Stop Everything",
         shortcut = KeyShortcut(Key.Period, meta = true, alt = true),
-        enabled = app.runs.activeCount > 0,
+        enabled = activity.active > 0,
     ) { app.runs.stopAll() }
     Separator()
 

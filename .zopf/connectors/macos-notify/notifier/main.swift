@@ -72,6 +72,16 @@ if !options.withdraw.isEmpty {
     exit(0)
 }
 
+let responder = Responder()
+center.delegate = responder
+
+// launchservices relaunches the bundle argv-less to hand over a click whose helper has gone;
+// take it and leave quietly, or it reports that this app is not open any more
+if CommandLine.arguments.count == 1 {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 5) { exit(0) }
+    NSApplication.shared.run()
+}
+
 guard options.positional.count >= 2 else {
     die("usage: zopf-notify [options] <body> <title> [subtitle] [sound]", 2)
 }
@@ -100,14 +110,13 @@ final class Responder: NSObject, UNUserNotificationCenterDelegate {
         }
         if let answer = answer {
             print(answer)
+            fflush(stdout)
         }
         completionHandler()
-        exit(0)
+        // macos activates this app to deliver a click, so answer before exiting, never as it exits
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { exit(0) }
     }
 }
-
-let responder = Responder()
-center.delegate = responder
 
 // blocking the run loop makes center.add report a delivery that never happens
 var delivered = false
@@ -120,9 +129,11 @@ center.requestAuthorization(options: [.alert, .sound]) { granted, error in
         die("not allowed to send notifications — System Settings > Notifications > zopf", 1)
     }
 
-    if !options.actions.isEmpty {
+    // an actionless --respond still needs the category, for .customDismissAction
+    if options.respond {
+        // .foreground would launch a second instance; there is no window to raise
         let actions = options.actions.map {
-            UNNotificationAction(identifier: $0.id, title: $0.label, options: [.foreground])
+            UNNotificationAction(identifier: $0.id, title: $0.label, options: [])
         }
         center.setNotificationCategories([
             UNNotificationCategory(
@@ -140,7 +151,7 @@ center.requestAuthorization(options: [.alert, .sound]) { granted, error in
     if !options.thread.isEmpty {
         content.threadIdentifier = options.thread
     }
-    if !options.actions.isEmpty {
+    if options.respond {
         content.categoryIdentifier = category
     }
     if !sound.isEmpty {

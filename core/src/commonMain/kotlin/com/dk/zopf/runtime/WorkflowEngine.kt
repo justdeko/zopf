@@ -8,18 +8,27 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.label
 import com.dk.zopf.model.withDefaultsFrom
-import com.dk.zopf.store.ConnectorStore
+import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.runtime.run.WorkflowRun
+import com.dk.zopf.runtime.run.needsProcess
 import com.dk.zopf.store.LiveSettings
 import com.dk.zopf.store.RunArchive
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.store.workspace.ConnectorStore
+import com.dk.zopf.store.workspace.Workspace
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
@@ -97,7 +106,7 @@ class WorkflowEngine(
         run.workflow = workflow
         run.workspace = workspace
         plan.forEach { node ->
-            run.nodes +=
+            run.add(
                 NodeRun(
                     id = "${run.id}:${node.id}",
                     workflowName = workflow.name,
@@ -109,7 +118,8 @@ class WorkflowEngine(
                         node.takeIf { it.type == NodeType.AGENT }?.let {
                             resolveProvider(it, workflow, settings.current)
                         },
-                )
+                ),
+            )
         }
 
         run.nodes.forEach(onNodeReady)
@@ -118,11 +128,14 @@ class WorkflowEngine(
         val archive = RunArchive.create(run.id, RunArchive.workspaceId(workspace?.root), archiveRoot, onRaw)
         archive.write(run.record())
 
+        val recorder = scope.launch(Dispatchers.IO) { run.records().conflate().collect(archive::write) }
+
         run.job =
             scope.launch {
                 try {
                     schedule(run, workflow, workspace, plan, placements, archive, inherited)
                 } finally {
+                    withContext(NonCancellable) { recorder.cancelAndJoin() }
                     finalize(run, archive)
                 }
             }
@@ -184,11 +197,9 @@ class WorkflowEngine(
                     launch {
                         runNode(run, nodeRun, node, workflow, workspace, outputs, branches, placements, archive, permits)
                         onProgress(run)
-                        archive.write(run.record())
                         completions.send(Unit)
                     }
                 }
-                if (ready.isNotEmpty()) archive.write(run.record())
 
                 if (inFlight == 0) break
                 completions.receive()
@@ -233,7 +244,7 @@ class WorkflowEngine(
                     arrivals.any { it == Arrival.PENDING } -> Unit
 
                     incoming.isEmpty() || arrivals.any { it == Arrival.ARRIVED } -> {
-                        nodeRun.status = RunStatus.STARTING
+                        nodeRun.update { copy(status = RunStatus.STARTING) }
                         ready += node
                     }
 
@@ -318,7 +329,7 @@ class WorkflowEngine(
     ) {
         val approval = CompletableDeferred<Boolean>()
         nodeRun.approval = approval
-        nodeRun.status = RunStatus.WAITING
+        nodeRun.update { copy(status = RunStatus.WAITING) }
         when (val asked = node.prompt.takeIf { it.isNotBlank() }) {
             null -> nodeRun.notice(node.title.ifBlank { "Waiting for you" })
             else -> nodeRun.prompt(outputs.interpolate(asked).also { warnUnresolved(nodeRun, it) }.text)
@@ -343,14 +354,13 @@ class WorkflowEngine(
                 choices = node.choices,
                 default = node.default,
             )
-        nodeRun.pendingQuestion = pending
-        nodeRun.status = RunStatus.WAITING
+        nodeRun.update { asking(pending) }
         nodeRun.notice(question)
         onWaiting(nodeRun)
 
         val answer = pending.await()
 
-        nodeRun.pendingQuestion = null
+        nodeRun.update { answered() }
         if (answer == null) {
             nodeRun.notice("Cancelled. The rest of the run is skipped.")
             nodeRun.finish(RunStatus.STOPPED)
@@ -382,14 +392,14 @@ class WorkflowEngine(
         run.nodes.filter { it.status.isActive }.forEach {
             it.finish(if (run.stopping) RunStatus.STOPPED else RunStatus.FAILED)
         }
-        run.finishedAt = Instant.now()
-        run.outcome =
+        val outcome =
             when {
                 run.nodes.any { it.status == RunStatus.FAILED && !run.isHandled(it) } -> RunStatus.FAILED
                 run.stopping || run.nodes.any { it.status == RunStatus.STOPPED } -> RunStatus.STOPPED
                 run.nodes.any { it.status == RunStatus.DETACHED } -> RunStatus.DETACHED
                 else -> RunStatus.SUCCEEDED
             }
+        run.settle(outcome = outcome, finishedAt = Instant.now())
         archive.write(run.record())
         archive.close()
         onFinished(run)

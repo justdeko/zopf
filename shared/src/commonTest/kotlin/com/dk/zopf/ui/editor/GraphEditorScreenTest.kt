@@ -40,10 +40,8 @@ import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.blurb
 import com.dk.zopf.model.modelOptions
-import com.dk.zopf.runtime.NodeRun
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.runtime.showing
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.ui.LocalTitleBarInset
 import com.dk.zopf.ui.theme.ZopfTheme
 import java.nio.file.Files
@@ -119,7 +117,7 @@ class GraphEditorScreenTest {
         onSave: (Workflow) -> Unit = {},
         onClose: () -> Unit = {},
         onCommands: (EditorCommands?) -> Unit = {},
-        runningNodes: List<NodeRun> = emptyList(),
+        runStatuses: Map<String, RunStatus> = emptyMap(),
         titleBarInset: Dp? = null,
     ): Pair<EditorState, EditorCanvas> {
         val state =
@@ -141,7 +139,7 @@ class GraphEditorScreenTest {
                             onClose = onClose,
                             onCommands = onCommands,
                             canvas = canvas,
-                            runningNodes = runningNodes,
+                            runStatuses = runStatuses,
                         )
                     }
                 if (titleBarInset == null) {
@@ -797,17 +795,7 @@ class GraphEditorScreenTest {
     @Test
     fun `a node keeps its type icon during a run`() =
         runDesktopComposeUiTest(width = 1400, height = 900) {
-            val waiting =
-                NodeRun(
-                    id = "n1",
-                    workflowName = "w",
-                    nodeId = "only",
-                    nodeTitle = "only",
-                    nodeType = NodeType.GATE,
-                    cwd = null,
-                ).showing(status = RunStatus.WAITING)
-
-            editor(oneNode, runningNodes = listOf(waiting))
+            editor(oneNode, runStatuses = mapOf("only" to RunStatus.WAITING))
 
             onNodeWithContentDescription("Gate").assertIsDisplayed()
         }

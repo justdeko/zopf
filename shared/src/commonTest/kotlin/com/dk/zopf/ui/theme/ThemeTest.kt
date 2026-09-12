@@ -2,15 +2,11 @@ package com.dk.zopf.ui.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.InternalComposeUiApi
-import androidx.compose.ui.LocalSystemTheme
-import androidx.compose.ui.SystemTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import com.dk.zopf.model.NodeType
-import com.dk.zopf.runtime.RunStatus
+import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.store.ThemePreference
 import kotlin.math.abs
 import kotlin.math.max
@@ -184,33 +180,16 @@ class StatusColorsTest {
 }
 
 class ThemePreferenceTest {
-    @OptIn(ExperimentalTestApi::class, InternalComposeUiApi::class)
-    private fun resolve(
-        preference: ThemePreference,
-        system: SystemTheme,
-    ): Boolean {
-        var dark = false
-        runDesktopComposeUiTest(10, 10) {
-            setContent {
-                CompositionLocalProvider(LocalSystemTheme provides system) {
-                    dark = preference.isDark()
-                }
-            }
-            waitForIdle()
-        }
-        return dark
-    }
-
     @Test
     fun `the default theme follows the system`() {
-        assertEquals(true, resolve(ThemePreference.SYSTEM, SystemTheme.Dark))
-        assertEquals(false, resolve(ThemePreference.SYSTEM, SystemTheme.Light))
+        assertEquals(true, ThemePreference.SYSTEM.isDark(systemDark = true))
+        assertEquals(false, ThemePreference.SYSTEM.isDark(systemDark = false))
     }
 
     @Test
     fun `an override wins over the system`() {
-        assertEquals(true, resolve(ThemePreference.DARK, SystemTheme.Light))
-        assertEquals(false, resolve(ThemePreference.LIGHT, SystemTheme.Dark))
+        assertEquals(true, ThemePreference.DARK.isDark(systemDark = false))
+        assertEquals(false, ThemePreference.LIGHT.isDark(systemDark = true))
     }
 
     @Test

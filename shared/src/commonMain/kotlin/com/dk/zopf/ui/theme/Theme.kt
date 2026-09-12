@@ -124,13 +124,15 @@ private val DarkStatusAccents =
         detached = Color(0xFFC6ADFF),
     )
 
-@Composable
-fun ThemePreference.isDark(): Boolean =
+fun ThemePreference.isDark(systemDark: Boolean): Boolean =
     when (this) {
-        ThemePreference.SYSTEM -> isSystemInDarkTheme()
+        ThemePreference.SYSTEM -> systemDark
         ThemePreference.LIGHT -> false
         ThemePreference.DARK -> true
     }
+
+@Composable
+fun ThemePreference.isDark(): Boolean = isDark(isSystemInDarkTheme())
 
 @Composable
 fun ZopfTheme(

@@ -9,14 +9,33 @@ import com.dk.zopf.model.ignoredFields
 import com.dk.zopf.model.modelFor
 import com.dk.zopf.model.providerFor
 import com.dk.zopf.model.toJsonSchema
+import com.dk.zopf.runtime.agent.AgentInvocation
+import com.dk.zopf.runtime.agent.AgentProviders
+import com.dk.zopf.runtime.agent.AgentRunner
+import com.dk.zopf.runtime.agent.AgentSession
+import com.dk.zopf.runtime.agent.PermissionBridge
+import com.dk.zopf.runtime.agent.PromptChannel
+import com.dk.zopf.runtime.agent.SkillPlan
+import com.dk.zopf.runtime.agent.askableTools
+import com.dk.zopf.runtime.agent.planSkills
+import com.dk.zopf.runtime.exec.ConnectorInvocation
+import com.dk.zopf.runtime.exec.ConnectorRunner
+import com.dk.zopf.runtime.exec.ConnectorSession
+import com.dk.zopf.runtime.exec.SecretResolver
+import com.dk.zopf.runtime.exec.ShellInvocation
+import com.dk.zopf.runtime.exec.ShellRunner
+import com.dk.zopf.runtime.exec.ShellSession
+import com.dk.zopf.runtime.run.LiveProcess
+import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.store.AppSettings
-import com.dk.zopf.store.ConnectorStore
-import com.dk.zopf.store.DiscoveredSkill
 import com.dk.zopf.store.LiveSettings
 import com.dk.zopf.store.RunArchive
-import com.dk.zopf.store.Workspace
-import com.dk.zopf.store.availableSkills
-import com.dk.zopf.store.resolvePathAgainst
+import com.dk.zopf.store.workspace.ConnectorStore
+import com.dk.zopf.store.workspace.DiscoveredSkill
+import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.store.workspace.availableSkills
+import com.dk.zopf.store.workspace.resolvePathAgainst
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -121,10 +140,13 @@ class ProcessNodeExecutor(
             )
         val session = agents.start(provider, invocation)
         run.live = AgentLive(session)
-        run.sessionId = session.sessionId
-        run.command = session.command
-        run.model = invocation.model
-        run.status = RunStatus.RUNNING
+        run.update {
+            launched(
+                sessionId = session.sessionId,
+                command = session.command,
+                model = invocation.model,
+            )
+        }
         if (sandbox != null) run.notice("Sandbox: ${sandbox.cliValue}")
 
         if (provider.promptChannel == PromptChannel.STDIN) {
@@ -166,8 +188,7 @@ class ProcessNodeExecutor(
                 .text
         val session = shell.start(ShellInvocation(command, cwd))
         run.live = ShellLive(session)
-        run.command = listOf(command)
-        run.status = RunStatus.RUNNING
+        run.update { launched(sessionId = null, command = listOf(command)) }
         run.notice("$ $command")
 
         val exit =
@@ -186,7 +207,6 @@ class ProcessNodeExecutor(
                 },
                 awaitExit = session::awaitExit,
             )
-        run.exitCode = exit
         run.finish(outcome(run, exit), exit)
     }
 
@@ -239,8 +259,7 @@ class ProcessNodeExecutor(
             )
         val session = connector.start(invocation)
         run.live = ConnectorLive(session)
-        run.command = session.command
-        run.status = RunStatus.RUNNING
+        run.update { launched(sessionId = null, command = session.command) }
         run.notice("${manifest.name} ← ${invocation.stdinJson()}")
 
         val exit =
@@ -269,7 +288,7 @@ class ProcessNodeExecutor(
         }
         output.error?.let {
             run.notice(it, isWarning = true)
-            run.status = RunStatus.FAILED
+            run.update { copy(status = RunStatus.FAILED) }
         }
 
         manifest.outputs
@@ -285,7 +304,6 @@ class ProcessNodeExecutor(
             }
 
         run.produce(output.result, output.fields)
-        run.exitCode = exit
         run.finish(outcome(run, exit), exit)
     }
 

@@ -27,11 +27,11 @@ import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
-import com.dk.zopf.store.OpenWorkspace
-import com.dk.zopf.store.Templates
-import com.dk.zopf.store.WorkflowListing
-import com.dk.zopf.store.Workspace
-import com.dk.zopf.store.WorkspaceConfig
+import com.dk.zopf.store.workflow.Templates
+import com.dk.zopf.store.workflow.WorkflowListing
+import com.dk.zopf.store.workspace.OpenWorkspace
+import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.store.workspace.WorkspaceConfig
 import com.dk.zopf.ui.theme.ZopfColors
 import com.dk.zopf.ui.theme.ZopfTheme
 import java.nio.file.Files

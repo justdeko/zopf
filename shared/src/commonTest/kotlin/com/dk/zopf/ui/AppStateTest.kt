@@ -6,12 +6,12 @@ import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.runtime.NodeExecution
 import com.dk.zopf.runtime.NodeExecutor
-import com.dk.zopf.runtime.RunRegistry
-import com.dk.zopf.runtime.RunStatus
+import com.dk.zopf.runtime.run.RunRegistry
+import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.LiveSettings
 import com.dk.zopf.store.RunArchive
-import com.dk.zopf.store.WorkspaceRegistry
+import com.dk.zopf.store.workspace.WorkspaceRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -133,6 +133,8 @@ class EditorRunPanelTest {
             nodes = listOf(WorkflowNode("only", NodeType.GATE)),
         )
 
+    private fun RunRegistry.editorRunState(workflowName: String) = runForEditor(workflowName)?.state?.value
+
     private fun settling() =
         Workflow(
             name = "alpha",
@@ -177,7 +179,7 @@ class EditorRunPanelTest {
         val runs = registry()
         runs.startWorkflow(null, workflow("alpha")).getOrThrow()
 
-        assertNotNull(runs.runOnCanvas("alpha", panelOpen = false))
+        assertNotNull(runs.editorRunState("alpha").onCanvas(panelOpen = false))
     }
 
     @Test
@@ -187,8 +189,8 @@ class EditorRunPanelTest {
             val alpha = runs.startWorkflow(null, settling()).getOrThrow()
             withTimeout(10.seconds) { alpha.job?.join() }
 
-            assertNotNull(runs.runOnCanvas("alpha", panelOpen = true))
-            assertNull(runs.runOnCanvas("alpha", panelOpen = false))
+            assertNotNull(runs.editorRunState("alpha").onCanvas(panelOpen = true))
+            assertNull(runs.editorRunState("alpha").onCanvas(panelOpen = false))
         }
 
     @Test

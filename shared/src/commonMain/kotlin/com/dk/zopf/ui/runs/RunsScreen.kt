@@ -22,16 +22,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.dk.zopf.runtime.NodeRun
-import com.dk.zopf.runtime.RunRegistry
-import com.dk.zopf.runtime.RunStatus
-import com.dk.zopf.runtime.WorkflowRun
-import com.dk.zopf.runtime.format
+import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.NodeRunState
+import com.dk.zopf.runtime.run.RunRegistry
+import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.runtime.run.WorkflowRun
+import com.dk.zopf.runtime.run.WorkflowRunState
 import com.dk.zopf.ui.theme.ZopfIcons
+import com.dk.zopf.util.format
 import java.time.Instant
 
 private val RunListWidth = 280.dp
@@ -42,7 +46,14 @@ fun RunsScreen(
     modifier: Modifier = Modifier,
     onMessage: (String) -> Unit = {},
 ) {
-    if (registry.runs.isEmpty()) {
+    val open by registry.state.collectAsState()
+    val runs = open.runs
+
+    val selectedRun = open.selected
+    val selectedState = selectedRun?.state?.collectAsState()?.value ?: WorkflowRunState()
+    val shownNode = open.shownNode
+
+    if (runs.isEmpty()) {
         Box(modifier.fillMaxSize().padding(48.dp)) {
             Text(
                 "Open a workflow and press Run, or run one node from the editor.",
@@ -59,8 +70,8 @@ fun RunsScreen(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             LazyColumn(Modifier.fillMaxSize()) {
-                registry.runs.forEach { run ->
-                    val isSelected = run.id == registry.selectedRunId
+                runs.forEach { run ->
+                    val isSelected = run.id == selectedRun?.id
                     item(key = run.id) {
                         ContextMenuArea(
                             items = {
@@ -102,9 +113,9 @@ fun RunsScreen(
                         }
                     }
 
-                    if (isSelected && run.nodes.size > 1) {
-                        items(run.nodes.size, key = { run.nodes[it].id }) { index ->
-                            val node = run.nodes[index]
+                    if (isSelected && selectedState.nodes.size > 1) {
+                        items(selectedState.nodes.size, key = { selectedState.nodes[it].id }) { index ->
+                            val node = selectedState.nodes[index]
                             val retry =
                                 {
                                     registry
@@ -112,7 +123,9 @@ fun RunsScreen(
                                         .onSuccess { retried -> registry.select(retried) }
                                         .onFailure { onMessage(it.message ?: "Couldn't retry that run") }
                                     Unit
-                                }.takeIf { !run.isActive && node.status.isFinished && run.workflow != null }
+                                }.takeIf {
+                                    !selectedState.isActive && selectedState.of(node).status.isFinished && run.workflow != null
+                                }
                             ContextMenuArea(
                                 items = {
                                     buildList {
@@ -132,7 +145,8 @@ fun RunsScreen(
                             ) {
                                 NodeRow(
                                     node = node,
-                                    isSelected = node.id == registry.selectedNode?.id,
+                                    state = selectedState.of(node),
+                                    isSelected = node.id == shownNode?.id,
                                     onClick = { registry.select(run, node) },
                                     onRetry = retry,
                                 )
@@ -144,8 +158,8 @@ fun RunsScreen(
         }
         VerticalDivider()
 
-        val run = registry.selectedRun
-        val node = registry.selectedNode
+        val run = selectedRun
+        val node = shownNode
         if (run == null || node == null) {
             Box(Modifier.fillMaxSize().padding(32.dp)) {
                 Text(
@@ -159,7 +173,7 @@ fun RunsScreen(
                 run = node,
                 onStop = { registry.stop(run) },
                 onTakeOver = { registry.takeOver(node) },
-                isElsewhere = run.isElsewhere,
+                isElsewhere = run.isElsewhere(selectedState),
                 onSend = { registry.send(node, it) },
                 onFinish = { registry.finishInput(node) },
                 onApprove = { registry.approve(node, it) },
@@ -180,6 +194,7 @@ private fun RunRow(
     onStop: () -> Unit,
     onRemove: () -> Unit,
 ) {
+    val state by run.state.collectAsState()
     val background =
         if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
 
@@ -191,7 +206,7 @@ private fun RunRow(
             .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusDot(run.status, size = 8)
+        StatusDot(state.status, size = 8)
         Spacer(Modifier.width(10.dp))
         val now = Instant.now()
         Column(Modifier.weight(1f)) {
@@ -212,7 +227,7 @@ private fun RunRow(
                 )
             }
             Text(
-                "${run.summary()} · ${format(run.elapsed(now))}",
+                "${state.summary()} · ${format(state.elapsed(run.startedAt, now))}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -220,8 +235,8 @@ private fun RunRow(
             )
         }
         when {
-            run.isElsewhere -> Unit
-            run.isActive ->
+            run.isElsewhere(state) -> Unit
+            state.isActive ->
                 IconButton(onClick = onStop) {
                     Icon(ZopfIcons.Stop, contentDescription = "Stop run", Modifier.size(12.dp))
                 }
@@ -237,6 +252,7 @@ private fun RunRow(
 @Composable
 private fun NodeRow(
     node: NodeRun,
+    state: NodeRunState,
     isSelected: Boolean,
     onClick: () -> Unit,
     onRetry: (() -> Unit)? = null,
@@ -254,13 +270,13 @@ private fun NodeRow(
             .padding(start = 34.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusDot(node.status, size = 6)
+        StatusDot(state.status, size = 6)
         Spacer(Modifier.width(10.dp))
         Text(
             node.nodeTitle,
             style = MaterialTheme.typography.labelMedium,
             color =
-                if (node.status == RunStatus.SKIPPED) {
+                if (state.status == RunStatus.SKIPPED) {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 } else {
                     MaterialTheme.colorScheme.onSurface
@@ -270,7 +286,7 @@ private fun NodeRow(
             modifier = Modifier.weight(1f),
         )
         Text(
-            node.status.label,
+            state.status.label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,

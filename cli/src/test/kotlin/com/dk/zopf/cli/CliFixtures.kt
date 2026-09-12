@@ -7,9 +7,9 @@ import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.runtime.NodeExecution
 import com.dk.zopf.runtime.NodeExecutor
-import com.dk.zopf.runtime.ShellLine
-import com.dk.zopf.store.WorkflowStore
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.runtime.exec.ShellLine
+import com.dk.zopf.store.workflow.WorkflowStore
+import com.dk.zopf.store.workspace.Workspace
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.file.Files

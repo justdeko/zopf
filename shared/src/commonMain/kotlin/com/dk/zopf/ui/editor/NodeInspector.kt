@@ -54,7 +54,7 @@ import com.dk.zopf.model.modelOptions
 import com.dk.zopf.model.outgoingEdges
 import com.dk.zopf.model.outputFields
 import com.dk.zopf.model.providerFor
-import com.dk.zopf.store.Workspace
+import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme

@@ -1,8 +1,8 @@
 package com.dk.zopf.cli
 
 import com.dk.zopf.store.AppPaths
-import com.dk.zopf.store.Workspace
-import com.dk.zopf.store.resolvePathAgainst
+import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.store.workspace.resolvePathAgainst
 import java.nio.file.Path
 import java.nio.file.Paths
 

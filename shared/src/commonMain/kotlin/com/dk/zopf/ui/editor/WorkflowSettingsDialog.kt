@@ -36,8 +36,8 @@ import com.dk.zopf.model.Sandbox
 import com.dk.zopf.model.addRepo
 import com.dk.zopf.model.capabilities
 import com.dk.zopf.model.removeRepo
-import com.dk.zopf.store.Workspace
-import com.dk.zopf.store.knownRepoPaths
+import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.store.workspace.knownRepoPaths
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
