@@ -2,14 +2,14 @@
 aboutLibraries = "15.0.4"
 androidx-lifecycle = "2.11.0-beta01"
 composeHotReload = "1.2.0"
-composeMultiplatform = "1.11.1"
+composeMultiplatform = "1.12.0"
 kotaml = "0.110.0"
 kotlin = "2.4.10"
 kotlinx-coroutines = "1.11.0"
 kotlinx-serialization = "1.9.0"
 ktlint-gradle = "14.2.0"
-kuiver = "0.4.1"
-material3 = "1.11.0-alpha07"
+kuiver = "0.4.2"
+material3 = "1.12.0-alpha03"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

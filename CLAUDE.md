@@ -49,14 +49,17 @@ cli/build/install/zopf-cli/bin/zopf validate --workspace .zopf   # what CI runs 
 would also drag in Compose's resource tasks for no gain — name the three test tasks.
 
 CI (`.github/workflows/check.yml`) runs ktlint, those three test tasks, and `zopf validate` against
-the committed `.zopf` workspace, on macos-14 — the same runner the release builds on.
+the committed `.zopf` workspace, on macos-14 — the same runner the release builds on. It also
+re-runs `exportLibraryDefinitions` and fails on `git diff`, so adding a dependency breaks the build
+until its license is one of the three the `aboutLibraries` block allows and the regenerated
+`aboutlibraries.json` is committed alongside it.
 
 ## Modules
 
 ```
 core        model + runtime + store. No Compose, no window. The CLI is built on this alone.
 shared      every screen, as Compose Multiplatform. api(":core").
-desktopApp  main(), the window, the tray, the menu bar. Only macOS-specific AWT lives here.
+desktopApp  main(), the window, the tray, the menu bar. Only what owns the window lives here.
 cli         argument parsing and text rendering over :core.
 ```
 
@@ -65,9 +68,10 @@ document and the rules about it; `store` is what's on disk, split into `store/wo
 and `store/workspace` for the directory around it, with machine-local state left at the root;
 `runtime` is the scheduler, split into `runtime/run` for the run model, `runtime/agent` for the
 providers and what they need, `runtime/exec` for spawning a node's subprocess and `runtime/macos`
-for what only exists because this is a Mac. `util` is small enough to be worth naming: it holds only
-what both front ends render with, so nothing in `:shared` or `:cli` reaches into `runtime` for a
-duration string.
+for what only exists because this is a Mac. `util` is small enough to be worth naming:
+`Formatting.kt` is what both front ends render with, so nothing in `:shared` or `:cli` reaches into
+`runtime` for a duration string, and `JsonFields.kt` is the lenient JSON reading every provider's
+event parser shares, `internal` so it stays that.
 
 The layering rule is that **`:core` must stay runnable headlessly**. `zopf run` starts an engine
 with no composition around it, so anything in `:core` that needs a window is a bug, and `:core`
@@ -245,12 +249,12 @@ in `WorkflowStore` — the editor loads through it and would write workspace def
 workflow file. The editor folds for display only, in `EditorState.resolvedWorkflow`.
 
 The split is deliberate: **a workspace holds only things worth committing.** Workflow YAML, connector
-manifests and scripts — that's it. Everything machine-local goes to `store/AppPaths.kt`:
-`settings.json`, `workspaces.json`, `update.json`, the generated `zopf-notify.app` and the run
-archive under Application Support, logs under `~/Library/Logs/zopf`. Nothing writes a machine-specific
-file into a workspace, so `git status` stays clean in a repo that has a `.zopf/` in it. Node positions
-are the edge case and they do go in the YAML — a canvas layout is part of the document, not of this
-machine.
+manifests and scripts, prompt files and a `skills/` directory — that's it. Everything machine-local
+goes to `store/AppPaths.kt`: `settings.json`, `workspaces.json`, `update.json`, the generated
+`zopf-notify.app` and the run archive under Application Support, logs under `~/Library/Logs/zopf`.
+Nothing writes a machine-specific file into a workspace, so `git status` stays clean in a repo that
+has a `.zopf/` in it. Node positions are the edge case and they do go in the YAML — a canvas layout
+is part of the document, not of this machine.
 
 YAML round-trips through kotaml with `encodeDefaults = false` (`store/Serialization.kt`), so a
 hand-written file that omits everything default comes back byte-identical after the editor saves it.
@@ -276,8 +280,9 @@ and `store/BuildInfo.kt`, like the app's version. Bump it in the same commit as 
 
 Migrations rewrite **the parsed YAML, not the decoded model**. By the time a `Workflow` exists,
 `strictMode = false` has already dropped any key the current model lacks, so a rename or removal
-could never see it. `store/workflow/WorkflowStore.kt` clears `version:` after migrating, so the
-editor keeps writing current, unversioned files.
+could never see it. `decodeWorkflow` in `store/workflow/WorkflowText.kt` then clears `version:` on
+the way in — unless the file is from the future, which has to keep the number that makes it a
+refusal — so the editor keeps writing current, unversioned files.
 
 Prefer a legacy alias in the serializer — the way `NodeTypeSerializer` reads `claude` as `agent` —
 and bump the version only when a change alters what an existing file *means*. An alias fixes
@@ -316,7 +321,7 @@ open editor also polls its own file, so an edit made outside it isn't silently o
 When touching the canvas, read kuiver's sources rather than its README:
 
 ```bash
-unzip ~/.gradle/caches/modules-2/files-2.1/io.github.justdeko/kuiver-jvm/*/*/core-jvm-*-sources.jar
+unzip ~/.gradle/caches/modules-2/files-2.1/io.github.justdeko/kuiver-jvm/*/*/kuiver-jvm-*-sources.jar
 ```
 
 Material 3's experimental and expressive APIs are opted into once for the whole `:shared` source set
