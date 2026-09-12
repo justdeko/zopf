@@ -4,8 +4,6 @@ import com.dk.zopf.runtime.exec.CommandLookup
 import com.dk.zopf.runtime.run.RunNotification
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.Log
-import com.dk.zopf.util.format
-import com.dk.zopf.util.stamp
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest

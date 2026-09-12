@@ -12,7 +12,6 @@ import com.dk.zopf.runtime.agent.PendingPermission
 import com.dk.zopf.runtime.agent.PermissionRequest
 import com.dk.zopf.runtime.exec.ShellLine
 import com.dk.zopf.util.toFields
-import com.dk.zopf.util.tokens
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -202,15 +201,15 @@ class NodeRun(
 
     private val log = ArrayList<ConsoleEntry>()
 
+    private val logLock = Any()
+
     private val _transcript = MutableStateFlow(0)
 
     val transcript: StateFlow<Int> = _transcript.asStateFlow()
 
-    @get:Synchronized
-    val entries: List<ConsoleEntry> get() = log.toList()
+    val entries: List<ConsoleEntry> get() = synchronized(logLock) { log.toList() }
 
-    @Synchronized
-    fun entryAt(index: Int): ConsoleEntry? = log.getOrNull(index)
+    fun entryAt(index: Int): ConsoleEntry? = synchronized(logLock) { log.getOrNull(index) }
 
     var onEntrySettled: ((ConsoleEntry) -> Unit)? = null
 
@@ -270,7 +269,9 @@ class NodeRun(
     @Synchronized
     fun consume(event: AgentEvent) {
         if (status == RunStatus.QUEUED || status == RunStatus.STARTING) update { copy(status = RunStatus.RUNNING) }
-        event.sessionId?.let { session -> update { observed(sessionId = session) } }
+        event.sessionId?.let { session ->
+            if (session != _state.value.sessionId) update { observed(sessionId = session) }
+        }
 
         when (event) {
             is AgentEvent.SystemInit -> {
@@ -373,7 +374,7 @@ class NodeRun(
 
     @Synchronized
     internal fun reset() {
-        log.clear()
+        synchronized(logLock) { log.clear() }
         _transcript.value = 0
         outputBuffer.setLength(0)
         outputFields = emptyMap()
@@ -422,7 +423,7 @@ class NodeRun(
     }
 
     private fun repeatsLastSummary(event: AgentEvent.Result): Boolean {
-        val last = log.lastOrNull() as? ConsoleEntry.Summary ?: return false
+        val last = synchronized(logLock) { log.lastOrNull() } as? ConsoleEntry.Summary ?: return false
         return last.isError && event.isError && last.text == event.text
     }
 
@@ -460,7 +461,7 @@ class NodeRun(
         text: String,
         isThinking: Boolean,
     ) {
-        val live = log.lastOrNull() as? ConsoleEntry.Message
+        val live = synchronized(logLock) { log.lastOrNull() } as? ConsoleEntry.Message
         if (live != null && live.isStreaming && live.isThinking == isThinking) {
             live.append(text)
         } else {
@@ -474,7 +475,7 @@ class NodeRun(
         finalText: String?,
         isThinking: Boolean,
     ) {
-        val live = log.lastOrNull() as? ConsoleEntry.Message
+        val live = synchronized(logLock) { log.lastOrNull() } as? ConsoleEntry.Message
         if (live != null && live.isStreaming) {
             live.settle(finalText)
             if (!live.isThinking) outputBuffer.appendLine(live.text)
@@ -488,18 +489,22 @@ class NodeRun(
     @Synchronized
     private fun attachResult(block: ContentBlock.ToolResult) {
         val call =
-            log
-                .asReversed()
-                .filterIsInstance<ConsoleEntry.ToolCall>()
-                .firstOrNull { it.toolUseId == block.toolUseId }
-                ?: return
+            synchronized(logLock) {
+                log
+                    .asReversed()
+                    .filterIsInstance<ConsoleEntry.ToolCall>()
+                    .firstOrNull { it.toolUseId == block.toolUseId }
+            } ?: return
         call.complete(block.text, block.isError)
     }
 
     @Synchronized
     fun add(entry: ConsoleEntry) {
-        log.add(entry)
-        _transcript.value = log.size
+        _transcript.value =
+            synchronized(logLock) {
+                log.add(entry)
+                log.size
+            }
         if (entry !is ConsoleEntry.Message || !entry.isStreaming) onEntrySettled?.invoke(entry)
     }
 }

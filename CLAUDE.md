@@ -101,7 +101,9 @@ reaches it.
 folding `entries` into an immutable state is quadratic in something nothing bounds. It is a plain
 list published as a count, read by index. The `entries` snapshot copies, so nothing on the delta path
 takes it — the archive reads `state` and `output()` its own buffer. What is mutable inside an entry
-carries its own flow instead, so a delta repaints one row.
+carries its own flow instead, so a delta repaints one row. The list has a lock of its own rather than
+the node's monitor, because a screen reads it by index once per visible row while an event holds the
+node for its whole turn.
 
 `:shared` declares `api(project(":core"))` rather than `implementation`, because `:desktopApp`'s tray
 and menu bar name `RunRegistry`, `RunStatus`, `NodeRun` and `NodeType` directly; hiding `:core` would
@@ -187,8 +189,8 @@ screen, and finishes with a notification, while the app is already open. It read
 else wrote; it starts nothing.
 
 An active record is either a run in flight elsewhere or one that died with whatever wrote it.
-`RunRecord.pid` says which, and `restoreAs()` is the only place that asks. The engine writes the
-record on every settle pass so a watched run reads as running, and `isElsewhere` marks one that
+`RunRecord.pid` says which, and `restoreAs()` is the only place that asks. The record is rewritten
+whenever the run's state moves, so a watched run reads as running, and `isElsewhere` marks one that
 isn't ours to stop, clear, take over, delete or close out.
 
 Everything zopf posts goes through one generated bundle, `zopf-notify.app`, built by
