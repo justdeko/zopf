@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1
+
+- fix background notification issues
+- drop compose dependency in core
+
 ## 1.3.0
 
 - Watch a run move across the canvas: the edge being taken thickens and flows, arms the run passed over fade back, and every node carries a badge that spins while it works and settles into a tick, a warning or a stop.
