@@ -14,6 +14,9 @@ import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
+import com.dk.zopf.runtime.Release
+import com.dk.zopf.runtime.Version
+import com.dk.zopf.runtime.macos.UpdateInstall
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.MAX_CONCURRENCY
 import com.dk.zopf.store.ThemePreference
@@ -118,6 +121,81 @@ class SettingsChoicesTest {
             onNodeWithText(ThemePreference.DARK.label).performScrollTo().performClick()
             waitForIdle()
             assertEquals(listOf(ThemePreference.DARK), written.map { it.theme })
+        }
+    }
+}
+
+@OptIn(ExperimentalTestApi::class)
+class SettingsUpdatesTest {
+    private val release = Release(Version(1, 4, 0), "https://github.com/justdeko/zopf/releases/tag/v1.4.0")
+
+    private fun runUpdates(
+        settings: AppSettings = AppSettings(),
+        update: Release? = release,
+        install: UpdateInstall = UpdateInstall.Idle,
+        blocker: String? = null,
+        body: suspend DesktopComposeUiTest.(MutableList<String>) -> Unit,
+    ) {
+        val pressed = mutableListOf<String>()
+        runDesktopComposeUiTest(900, 700) {
+            setContent {
+                ZopfTheme(darkTheme = false) {
+                    Box(Modifier.size(900.dp, 700.dp)) {
+                        SettingsScreen(
+                            settings = settings,
+                            onChange = {},
+                            settingsFile = Path.of("/tmp/settings.json"),
+                            update = update,
+                            install = install,
+                            blocker = blocker,
+                            onInstall = { pressed += "install" },
+                            onRestart = { pressed += "restart" },
+                        )
+                    }
+                }
+            }
+            waitForIdle()
+            body(pressed)
+        }
+    }
+
+    @Test
+    fun `a release zopf can install offers to install it`() {
+        runUpdates { pressed ->
+            onNodeWithText("Install it").performScrollTo().performClick()
+            assertEquals(listOf("install"), pressed)
+        }
+    }
+
+    @Test
+    fun `a copy that can't replace itself says why and offers the release instead`() {
+        runUpdates(blocker = "zopf can't write to /Applications, so it can't replace itself there.") {
+            onNodeWithText("zopf can't write to /Applications, so it can't replace itself there.").assertExists()
+            onNodeWithText("Open the release").assertExists()
+            onNodeWithText("Install it").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun `a staged release offers a restart`() {
+        runUpdates(install = UpdateInstall.Ready(Version(1, 4, 0))) { pressed ->
+            onNodeWithText("Restart now").performScrollTo().performClick()
+            assertEquals(listOf("restart"), pressed)
+        }
+    }
+
+    @Test
+    fun `nothing about installing shows while no release is waiting`() {
+        runUpdates(update = null) {
+            onNodeWithText("Install it").assertDoesNotExist()
+            onNodeWithText("Restart now").assertDoesNotExist()
+        }
+    }
+
+    @Test
+    fun `turning the check off takes the automatic switch with it`() {
+        runUpdates(settings = AppSettings(checkForUpdates = false, autoUpdate = false)) {
+            onNodeWithText("Install them on its own").assertDoesNotExist()
         }
     }
 }

@@ -17,7 +17,7 @@ import kotlin.io.path.readText
 
 const val ZOPF_REPO = "justdeko/zopf"
 
-private const val CHECK_EVERY_HOURS = 24L
+private const val CHECK_EVERY_DAYS = 7L
 
 private const val REACH_TIMEOUT_MILLIS = 5_000
 
@@ -43,6 +43,8 @@ data class Version(
 data class Release(
     val version: Version,
     val url: String,
+    val app: String = "",
+    val cli: String = "",
 )
 
 fun interface ReleaseSource {
@@ -54,6 +56,8 @@ data class UpdateState(
     val checkedAt: String = "",
     val latest: String = "",
     val url: String = "",
+    val app: String = "",
+    val cli: String = "",
     val announced: String = "",
 )
 
@@ -85,7 +89,15 @@ class UpdateCheck(
         source
             .latest()
             .onSuccess { release ->
-                write(read().copy(checkedAt = now().toString(), latest = release.version.toString(), url = release.url))
+                write(
+                    read().copy(
+                        checkedAt = now().toString(),
+                        latest = release.version.toString(),
+                        url = release.url,
+                        app = release.app,
+                        cli = release.cli,
+                    ),
+                )
             }.onFailure { Log.warn("update check couldn't reach $ZOPF_REPO: ${it.message}") }
 
     fun announceOnce(release: Release): Boolean {
@@ -99,12 +111,12 @@ class UpdateCheck(
 
     private fun newer(state: UpdateState): Release? {
         val latest = Version.parse(state.latest) ?: return null
-        return newerThanRunning(Release(latest, state.url))
+        return newerThanRunning(Release(latest, state.url, state.app, state.cli))
     }
 
     private fun stale(state: UpdateState): Boolean {
         val last = runCatching { Instant.parse(state.checkedAt) }.getOrNull() ?: return true
-        return Duration.between(last, now()) >= Duration.ofHours(CHECK_EVERY_HOURS)
+        return Duration.between(last, now()) >= Duration.ofDays(CHECK_EVERY_DAYS)
     }
 
     private fun read(): UpdateState =
@@ -123,10 +135,14 @@ class UpdateCheck(
 class GitHubReleases(
     private val repo: String = ZOPF_REPO,
 ) : ReleaseSource {
-    override fun latest(): Result<Release> =
+    override fun latest(): Result<Release> = read("https://api.github.com/repos/$repo/releases/latest")
+
+    fun tagged(version: Version): Result<Release> = read("https://api.github.com/repos/$repo/releases/tags/v$version")
+
+    private fun read(endpoint: String): Result<Release> =
         runCatching {
             val connection =
-                (URI("https://api.github.com/repos/$repo/releases/latest").toURL().openConnection() as HttpURLConnection).apply {
+                (URI(endpoint).toURL().openConnection() as HttpURLConnection).apply {
                     setRequestProperty("Accept", "application/vnd.github+json")
                     setRequestProperty("User-Agent", "zopf/${BuildInfo.version}")
                     connectTimeout = REACH_TIMEOUT_MILLIS
@@ -144,14 +160,39 @@ class GitHubReleases(
         runCatching {
             val release = zopfJson.decodeFromString(GitHubRelease.serializer(), payload)
             val version = Version.parse(release.tagName) ?: error("\"${release.tagName}\" doesn't name a version")
-            Release(version, release.htmlUrl.takeIf { it.startsWith("https://") } ?: releasesPage)
+            Release(
+                version = version,
+                url = release.htmlUrl.takeIf { it.startsWith("https://") } ?: releasesPage,
+                app = release.asset(appAsset(version)),
+                cli = release.asset(cliAsset(version)),
+            )
         }
+
+    private fun GitHubRelease.asset(name: String): String =
+        assets
+            .firstOrNull { it.name == name }
+            ?.url
+            ?.takeIf { it.startsWith(downloads) }
+            .orEmpty()
+
+    private val downloads: String get() = "https://github.com/$repo/releases/download/"
 
     private val releasesPage: String get() = "https://github.com/$repo/releases/latest"
 }
+
+fun appAsset(version: Version): String = "zopf-$version.dmg"
+
+fun cliAsset(version: Version): String = "zopf-cli-$version.tar.gz"
 
 @Serializable
 private data class GitHubRelease(
     @SerialName("tag_name") val tagName: String = "",
     @SerialName("html_url") val htmlUrl: String = "",
+    val assets: List<GitHubAsset> = emptyList(),
+)
+
+@Serializable
+private data class GitHubAsset(
+    val name: String = "",
+    @SerialName("browser_download_url") val url: String = "",
 )

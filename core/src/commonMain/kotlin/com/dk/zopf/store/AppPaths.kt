@@ -14,6 +14,10 @@ object AppPaths {
     val updateFile: Path get() = appSupport.resolve("update.json")
     val runsDir: Path by lazy { appSupport.resolve("runs").also { it.createDirectories() } }
 
+    val cacheDir: Path by lazy {
+        homeDir().resolve("Library/Caches/zopf").also { it.createDirectories() }
+    }
+
     val logsDir: Path by lazy {
         homeDir().resolve("Library/Logs/zopf").also { it.createDirectories() }
     }

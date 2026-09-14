@@ -307,7 +307,11 @@ fun ZopfApp(state: AppState = remember { AppState() }) {
                                 settings = settings,
                                 onChange = state::updateSettings,
                                 update = state.update,
+                                install = state.updateInstall,
+                                blocker = state.updateBlocker,
                                 onOpenRelease = state::openRelease,
+                                onInstall = state::installUpdate,
+                                onRestart = state::restartForUpdate,
                             )
                         }
                     }

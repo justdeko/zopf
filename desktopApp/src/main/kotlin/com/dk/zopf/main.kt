@@ -50,6 +50,7 @@ fun main() {
             Log.info("quitting")
             app.rememberWindow(windowState.toFrame())
             app.shutdown()
+            app.finishUpdate()
             exitApplication()
         }
 
@@ -66,6 +67,7 @@ fun main() {
         }
 
         remember {
+            app.onQuit = { quit() }
             app.onActivateRun = { runId ->
                 app.runs.runs
                     .firstOrNull { it.id == runId }

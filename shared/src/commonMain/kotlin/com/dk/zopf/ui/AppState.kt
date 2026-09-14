@@ -19,10 +19,12 @@ import com.dk.zopf.runtime.agent.WorkflowAuthor
 import com.dk.zopf.runtime.errors
 import com.dk.zopf.runtime.exec.ConnectorScaffold
 import com.dk.zopf.runtime.issues
+import com.dk.zopf.runtime.macos.AppUpdate
 import com.dk.zopf.runtime.macos.Browser
 import com.dk.zopf.runtime.macos.Finder
 import com.dk.zopf.runtime.macos.MacNotifier
 import com.dk.zopf.runtime.macos.TerminalLauncher
+import com.dk.zopf.runtime.macos.UpdateInstall
 import com.dk.zopf.runtime.run.RunRegistry
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
@@ -107,8 +109,17 @@ class AppState(
 
     var onActivateRun: (String) -> Unit = {}
 
+    var onQuit: () -> Unit = {}
+
     var update by mutableStateOf<Release?>(null)
         private set
+
+    var updateInstall by mutableStateOf<UpdateInstall>(UpdateInstall.Idle)
+        private set
+
+    private val appUpdate = AppUpdate()
+
+    private var reopenAfterUpdate = false
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -160,6 +171,7 @@ class AppState(
 
         runs.reconcile()
         runs.watchArchive()
+        scope.launch { appUpdate.state.collect { updateInstall = it } }
         checkAgent()
         checkUpdate()
         housekeep()
@@ -198,8 +210,37 @@ class AppState(
             val release = check.refresh() ?: return@launch
             update = release
             Log.info("zopf ${release.version} is out")
-            if (check.announceOnce(release)) message = "zopf ${release.version} is out. Settings has the link."
+            if (settings.current.autoUpdate && updateBlocker == null) {
+                install(release)
+                return@launch
+            }
+            if (check.announceOnce(release)) message = "zopf ${release.version} is out. Settings has it."
         }
+    }
+
+    val updateBlocker: String? get() = appUpdate.blocker()
+
+    fun installUpdate() {
+        val release = update ?: return
+        if (updateInstall is UpdateInstall.Downloading || updateInstall is UpdateInstall.Verifying) return
+        scope.launch(Dispatchers.IO) { install(release) }
+    }
+
+    private fun install(release: Release) {
+        appUpdate
+            .install(release)
+            .onSuccess { message = "zopf ${release.version} is ready. Restart zopf to use it." }
+            .onFailure { message = it.message }
+    }
+
+    fun restartForUpdate() {
+        reopenAfterUpdate = true
+        onQuit()
+    }
+
+    fun finishUpdate() {
+        if (updateInstall !is UpdateInstall.Ready) return
+        appUpdate.swap(reopenAfterUpdate).onFailure { Log.warn("the update wouldn't swap in: ${it.message}") }
     }
 
     fun openRelease() {

@@ -154,7 +154,7 @@ fun printVersion(
     out.println("zopf ${BuildInfo.version}")
     if (!notify) return
     val release = check.cached() ?: return
-    err.println("zopf ${release.version} is out. ${release.url}")
+    err.println("zopf ${release.version} is out. Run zopf upgrade to install it.")
 }
 
 fun checkForUpdate(
@@ -167,7 +167,7 @@ fun checkForUpdate(
             val running = check.running
             if (running != null && release.version > running) {
                 out.println("zopf ${release.version} is out. You have $running.")
-                out.println(release.url)
+                out.println("Run zopf upgrade to install it, or read ${release.url}")
             } else {
                 out.println("zopf ${BuildInfo.version} is the latest release")
             }

@@ -266,7 +266,7 @@ class CommandsTest {
         assertContains(streams.output(), "zopf ")
         assertFalse(streams.output().contains("9.9.9"), "the notice belongs on stderr")
         assertContains(streams.errors(), "zopf 9.9.9 is out")
-        assertContains(streams.errors(), "https://example.test/9.9.9")
+        assertContains(streams.errors(), "zopf upgrade")
     }
 
     @Test

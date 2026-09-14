@@ -119,6 +119,7 @@ data class AppSettings(
     val theme: ThemePreference = ThemePreference.SYSTEM,
     val keepRuns: Int = DEFAULT_KEEP_RUNS,
     val checkForUpdates: Boolean = true,
+    val autoUpdate: Boolean = false,
     val window: WindowFrame? = null,
 ) {
     fun sanitized(): AppSettings =
@@ -132,6 +133,7 @@ data class AppSettings(
             theme = theme,
             keepRuns = keepRuns.coerceIn(0, MAX_KEEP_RUNS),
             checkForUpdates = checkForUpdates,
+            autoUpdate = autoUpdate && checkForUpdates,
             window = window?.takeIf { it.width > 0 && it.height > 0 },
         )
 }

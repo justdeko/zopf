@@ -83,7 +83,7 @@ class UpdateCheckTest {
     }
 
     @Test
-    fun `the check runs once a day`() {
+    fun `the check runs once a week`() {
         var asked = 0
         val source =
             ReleaseSource {
@@ -93,10 +93,11 @@ class UpdateCheckTest {
 
         check(source = source).refresh()
         check(source = source, now = morning.plusSeconds(3600)).refresh()
+        check(source = source, now = morning.plusSeconds(3 * 24 * 3600)).refresh()
 
-        assertEquals(1, asked, "a second launch an hour later must not ask again")
+        assertEquals(1, asked, "a launch inside the week must not ask again")
 
-        check(source = source, now = morning.plusSeconds(25 * 3600)).refresh()
+        check(source = source, now = morning.plusSeconds(8 * 24 * 3600)).refresh()
         assertEquals(2, asked)
     }
 
@@ -107,7 +108,7 @@ class UpdateCheckTest {
         val release =
             check(
                 source = { Result.failure(UnknownHostException("api.github.com")) },
-                now = morning.plusSeconds(5 * 24 * 3600),
+                now = morning.plusSeconds(9 * 24 * 3600),
             ).refresh()
 
         assertEquals(Version(1, 1, 0), release?.version, "a failed check falls back on the last answer")
@@ -121,7 +122,7 @@ class UpdateCheckTest {
         assertTrue(checker.announceOnce(release))
         assertFalse(checker.announceOnce(release), "the same version must never interrupt twice")
 
-        val next = check(latest = "1.2.0", now = morning.plusSeconds(48 * 3600))
+        val next = check(latest = "1.2.0", now = morning.plusSeconds(8 * 24 * 3600))
         assertTrue(next.announceOnce(next.refresh()!!), "but a further release is worth saying once")
     }
 
@@ -151,7 +152,20 @@ class GitHubReleasesTest {
           "draft": false,
           "prerelease": false,
           "html_url": "https://github.com/justdeko/zopf/releases/tag/v1.1.0",
-          "assets": [{ "name": "zopf-1.1.0.dmg" }, { "name": "zopf-cli-1.1.0.tar.gz" }]
+          "assets": [
+            {
+              "name": "zopf-1.1.0.dmg",
+              "browser_download_url": "https://github.com/justdeko/zopf/releases/download/v1.1.0/zopf-1.1.0.dmg"
+            },
+            {
+              "name": "zopf-cli-1.1.0.tar.gz",
+              "browser_download_url": "https://github.com/justdeko/zopf/releases/download/v1.1.0/zopf-cli-1.1.0.tar.gz"
+            },
+            {
+              "name": "zopf-macos-arm64.dmg",
+              "browser_download_url": "https://github.com/justdeko/zopf/releases/download/v1.1.0/zopf-macos-arm64.dmg"
+            }
+          ]
         }
         """.trimIndent()
 
@@ -161,6 +175,35 @@ class GitHubReleasesTest {
 
         assertEquals(Version(1, 1, 0), release.version)
         assertEquals("https://github.com/justdeko/zopf/releases/tag/v1.1.0", release.url)
+    }
+
+    @Test
+    fun `the versioned assets are what gets downloaded`() {
+        val release = GitHubReleases().parse(payload).getOrThrow()
+
+        assertEquals("https://github.com/justdeko/zopf/releases/download/v1.1.0/zopf-1.1.0.dmg", release.app)
+        assertEquals("https://github.com/justdeko/zopf/releases/download/v1.1.0/zopf-cli-1.1.0.tar.gz", release.cli)
+    }
+
+    @Test
+    fun `an asset hosted somewhere else is dropped`() {
+        val elsewhere =
+            """
+            {
+              "tag_name": "v1.1.0",
+              "assets": [{ "name": "zopf-1.1.0.dmg", "browser_download_url": "https://evil.test/zopf-1.1.0.dmg" }]
+            }
+            """.trimIndent()
+
+        assertEquals("", GitHubReleases().parse(elsewhere).getOrThrow().app)
+    }
+
+    @Test
+    fun `a release with no assets asks for nothing`() {
+        val release = GitHubReleases().parse("""{"tag_name":"v1.1.0"}""").getOrThrow()
+
+        assertEquals("", release.app)
+        assertEquals("", release.cli)
     }
 
     @Test

@@ -219,7 +219,7 @@ Two things are a bit different in the cli vs. the app:
 zopf runs on your laptop under your own account and logins. Every step is a subprocess with your file permissions.
 
 There are no external tools or connections other than what you build yourself using connectors, scripts, and so on. The
-app checks this GitHub page once a day to determine whether a newer release exists. To silence update checks:
+app checks this GitHub page once a week to determine whether a newer release exists. To silence update checks:
 `ZOPF_NO_UPDATE_CHECK=1` or `DO_NOT_TRACK=1`.
 
 Point workflows at locations you'd already be willing to run from, and only ingest agent output into shell execution if

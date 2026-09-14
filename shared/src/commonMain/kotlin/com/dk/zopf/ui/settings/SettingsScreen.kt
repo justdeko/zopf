@@ -19,6 +19,7 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -38,6 +39,7 @@ import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.capabilities
 import com.dk.zopf.runtime.Release
 import com.dk.zopf.runtime.agent.ASKABLE_TOOLS
+import com.dk.zopf.runtime.macos.UpdateInstall
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.BuildInfo
@@ -69,7 +71,11 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     settingsFile: Path = AppPaths.settingsFile,
     update: Release? = null,
+    install: UpdateInstall = UpdateInstall.Idle,
+    blocker: String? = null,
     onOpenRelease: () -> Unit = {},
+    onInstall: () -> Unit = {},
+    onRestart: () -> Unit = {},
 ) {
     var showLicenses by remember { mutableStateOf(false) }
     if (showLicenses) {
@@ -147,10 +153,15 @@ fun SettingsScreen(
             SectionLabel("Updates")
             Gap(4)
             UpdateField(
-                value = settings.checkForUpdates,
+                settings = settings,
                 update = update,
+                install = install,
+                blocker = blocker,
                 onOpenRelease = onOpenRelease,
-            ) { on -> onChange { it.copy(checkForUpdates = on) } }
+                onInstall = onInstall,
+                onRestart = onRestart,
+                onChange = onChange,
+            )
 
             Gap()
             HorizontalDivider()
@@ -250,35 +261,86 @@ private fun ApprovalField(
 
 @Composable
 private fun UpdateField(
-    value: Boolean,
+    settings: AppSettings,
     update: Release?,
+    install: UpdateInstall,
+    blocker: String?,
     onOpenRelease: () -> Unit,
-    onChange: (Boolean) -> Unit,
+    onInstall: () -> Unit,
+    onRestart: () -> Unit,
+    onChange: ((AppSettings) -> AppSettings) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text("Check for new releases", style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Once a day, zopf asks GitHub for the latest release and says so here. It sends its " +
-                    "own version and nothing else, and never installs anything.",
+                "Once a week, zopf asks GitHub for the latest release and says so here. It sends its " +
+                    "own version and nothing else.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Spacer(Modifier.width(16.dp))
-        Switch(checked = value, onCheckedChange = onChange)
+        Switch(checked = settings.checkForUpdates, onCheckedChange = { on -> onChange { it.copy(checkForUpdates = on) } })
     }
-    if (update != null) {
-        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "zopf ${update.version} is out. You have ${BuildInfo.version}.",
-                style = MaterialTheme.typography.bodyMedium,
+    if (settings.checkForUpdates) {
+        Gap(4)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Install them on its own", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "zopf downloads the release, refuses anything not signed by the developer who signed this " +
+                        "copy, and swaps it in the next time you quit.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Switch(
+                checked = settings.autoUpdate,
+                enabled = blocker == null,
+                onCheckedChange = { on -> onChange { it.copy(autoUpdate = on) } },
             )
-            Spacer(Modifier.width(8.dp))
-            TextButton(onClick = onOpenRelease) { Text("Open the release") }
         }
     }
-    Hint("ZOPF_NO_UPDATE_CHECK=1 turns it off for `zopf` in a terminal too. `zopf check-update` asks on demand.")
+    blocker?.let { Hint(it) }
+    if (update != null) {
+        Gap(8)
+        Text("zopf ${update.version} is out. You have ${BuildInfo.version}.", style = MaterialTheme.typography.bodyMedium)
+        when (install) {
+            is UpdateInstall.Downloading -> {
+                Gap(8)
+                LinearProgressIndicator({ install.fraction.toFloat() }, Modifier.fillMaxWidth())
+                Hint("Downloading ${(install.fraction * 100).toInt()}%")
+            }
+
+            UpdateInstall.Verifying -> Hint("Checking who signed it")
+
+            is UpdateInstall.Ready ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${install.version} is ready.", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = onRestart) { Text("Restart now") }
+                }
+
+            is UpdateInstall.Failed ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(install.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = onOpenRelease) { Text("Open the release") }
+                }
+
+            UpdateInstall.Idle ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (blocker == null) {
+                        TextButton(onClick = onInstall) { Text("Install it") }
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    TextButton(onClick = onOpenRelease) { Text("Open the release") }
+                }
+        }
+    }
+    Hint("ZOPF_NO_UPDATE_CHECK=1 turns it off for `zopf` in a terminal too. `zopf upgrade` installs the new one there.")
 }
 
 @Composable

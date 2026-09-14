@@ -52,6 +52,10 @@ private fun dispatch(
             checkForUpdate(out, err)
         }
 
+        "upgrade" -> {
+            upgradeCli(Options.parse(rest, UPGRADE_OPTIONS, UPGRADE_SWITCHES), out, err)
+        }
+
         "run" -> {
             runWorkflow(Options.parse(rest, RUN_OPTIONS, RUN_SWITCHES), out, err)
         }
@@ -75,7 +79,7 @@ private fun dispatch(
         }
 
         else -> {
-            throw UsageError("No \"$command\" command. Try run, list, validate, runs, prune or check-update")
+            throw UsageError("No \"$command\" command. Try run, list, validate, runs, prune, check-update or upgrade")
         }
     }
 }
@@ -117,6 +121,10 @@ fun usage(out: PrintStream) {
         zopf version              print the version of this build, and any newer one already known
 
         zopf check-update         ask GitHub whether a newer zopf has been released
+
+        zopf upgrade              install the newest release over this one and relink zopf
+          --version <x.y.z>       a specific release, rather than the newest published one
+          --dry-run               say what it would install, download nothing
 
         The workspace is either the .zopf dir, the nearest parent that has one, or
         ~/.zopf. Use zopf.yaml for workspace-wide defaults.
