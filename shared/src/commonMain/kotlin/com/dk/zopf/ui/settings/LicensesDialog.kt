@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.dk.zopf.util.Strings
 import com.mikepenz.aboutlibraries.Libs
 import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
 import zopf.shared.generated.resources.Res
@@ -40,9 +41,9 @@ fun LicensesDialog(onDismiss: () -> Unit) {
             tonalElevation = 3.dp,
         ) {
             Column(Modifier.padding(24.dp)) {
-                Text("Open source licenses", style = MaterialTheme.typography.titleMedium)
+                Text(Strings.Settings.OPEN_SOURCE_LICENSES, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Select an entry to show its full license.",
+                    Strings.Settings.LICENSES_HINT,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
@@ -59,7 +60,7 @@ fun LicensesDialog(onDismiss: () -> Unit) {
                     }
                 }
                 TextButton(onDismiss, Modifier.align(Alignment.End).padding(top = 8.dp)) {
-                    Text("Done")
+                    Text(Strings.Settings.LICENSES_DONE)
                 }
             }
         }

@@ -59,7 +59,7 @@ Inside `:core`, a file goes by concern, not by caller:
 - `runtime` — the scheduler. `run` the run model, `agent` providers, `exec` subprocesses, `macos`
   what exists only because this is a Mac.
 - `util` — `Formatting.kt`, so neither front end reaches into `runtime` for a duration string;
-  `JsonFields.kt`, the lenient JSON every provider parser shares, `internal`.
+  `JsonFields.kt`, the lenient JSON every provider parser shares, `internal`; `Strings.kt` for user facing strings.
 
 Layering:
 
@@ -268,8 +268,7 @@ version is pinned in the root build, its own `prefer` constraint predating `hotM
   restatement of the line, never a paragraph copied from here.
 - Test names: backticked, lowercase, one clause, subject first — `a cycle fails the nodes in it`,
   `run --format quiet prints only the verdict`. No reasons, no second fact after a comma.
-- User-facing strings: what to do next, one sentence, never error codes — `"Repo \"app\" isn't at
-  ~/dev/app any more"`. House style in `model/WorkflowValidation.kt`.
+- User-facing strings: in `util/Strings.kt`, nested by surface.
 - ktlint everywhere. `.editorconfig` disables three rules on purpose: PascalCase composables,
   PascalCase constants (`ArrowSize`, `TitleBarHeight`), the filename rule on `main.kt`.
 

@@ -30,6 +30,7 @@ import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.ui.AppState
 import com.dk.zopf.ui.Screen
+import com.dk.zopf.util.Strings
 
 @Composable
 fun ApplicationScope.ZopfTray(
@@ -59,7 +60,7 @@ fun ApplicationScope.ZopfTray(
         tooltip = tooltip(active),
         onAction = { show() },
     ) {
-        Item("Show zopf", onClick = { show() })
+        Item(Strings.Tray.SHOW_ZOPF, onClick = { show() })
         Separator()
 
         val pending = live.flatMap { snapshot -> snapshot.state.awaitingPermission.map { snapshot to it } }
@@ -68,16 +69,16 @@ fun ApplicationScope.ZopfTray(
                 val run = snapshot.run
                 val asking = snapshot.state.of(node)
                 val request = asking.pendingPermission?.request
-                Menu("${run.workflowName} · ${request?.toolName ?: "needs you"}") {
+                Menu(Strings.Tray.runLine(run.workflowName, request?.toolName ?: Strings.Tray.NEEDS_YOU)) {
                     request?.summary?.takeIf { it.isNotBlank() }?.let {
                         Item(it.take(60), enabled = false, onClick = {})
                         Separator()
                     }
-                    Item("Allow", onClick = { runs.decide(node, allow = true) })
-                    Item("Allow for this run", onClick = { runs.decide(node, allow = true, forRestOfRun = true) })
-                    Item("Deny", onClick = { runs.decide(node, allow = false) })
+                    Item(Strings.Tray.ALLOW, onClick = { runs.decide(node, allow = true) })
+                    Item(Strings.Tray.ALLOW_FOR_THIS_RUN, onClick = { runs.decide(node, allow = true, forRestOfRun = true) })
+                    Item(Strings.Tray.DENY, onClick = { runs.decide(node, allow = false) })
                     Separator()
-                    Item("Show", onClick = { show(run) })
+                    Item(Strings.Tray.SHOW, onClick = { show(run) })
                 }
             }
             Separator()
@@ -89,11 +90,11 @@ fun ApplicationScope.ZopfTray(
                 .flatMap { snapshot -> snapshot.state.awaitingApproval.map { snapshot.run to it } }
         if (gates.isNotEmpty()) {
             gates.forEach { (run, node) ->
-                Menu("${run.workflowName} · ${node.nodeTitle}") {
-                    Item("Approve", onClick = { runs.approve(node, true) })
-                    Item("Reject", onClick = { runs.approve(node, false) })
+                Menu(Strings.Tray.runLine(run.workflowName, node.nodeTitle)) {
+                    Item(Strings.Tray.APPROVE, onClick = { runs.approve(node, true) })
+                    Item(Strings.Tray.REJECT, onClick = { runs.approve(node, false) })
                     Separator()
-                    Item("Show", onClick = { show(run) })
+                    Item(Strings.Tray.SHOW, onClick = { show(run) })
                 }
             }
             Separator()
@@ -104,65 +105,64 @@ fun ApplicationScope.ZopfTray(
             questions.forEach { (snapshot, node) ->
                 val run = snapshot.run
                 val question = snapshot.state.of(node).pendingQuestion
-                Menu("${run.workflowName} · ${question?.question?.take(40) ?: "needs an answer"}") {
+                Menu(Strings.Tray.runLine(run.workflowName, question?.question?.take(40) ?: Strings.Tray.NEEDS_AN_ANSWER)) {
                     if (question != null && question.choices.isNotEmpty()) {
                         question.choices.forEach { choice ->
                             Item(choice, onClick = { runs.answer(node, choice) })
                         }
                     } else {
-                        Item("Type an answer in zopf…", onClick = { show(run) })
+                        Item(Strings.Tray.TYPE_AN_ANSWER, onClick = { show(run) })
                     }
                     Separator()
-                    Item("Cancel run", onClick = { runs.answer(node, null) })
-                    Item("Show", onClick = { show(run) })
+                    Item(Strings.Tray.CANCEL_RUN, onClick = { runs.answer(node, null) })
+                    Item(Strings.Tray.SHOW, onClick = { show(run) })
                 }
             }
             Separator()
         }
 
         if (active.isEmpty()) {
-            Item("Nothing running", enabled = false, onClick = {})
+            Item(Strings.Tray.NOTHING_RUNNING, enabled = false, onClick = {})
         } else {
             active.forEach { (run, state) ->
-                Menu("${run.workflowName} · ${state.summary()}") {
-                    Item("Show", onClick = { show(run) })
-                    Item("Stop", onClick = { runs.stop(run) })
+                Menu(Strings.Tray.runLine(run.workflowName, state.summary())) {
+                    Item(Strings.Tray.SHOW, onClick = { show(run) })
+                    Item(Strings.Tray.STOP, onClick = { runs.stop(run) })
 
                     val handover =
                         state.nodes.firstOrNull { state.of(it).status.isActive && it.canTakeOver(state.of(it)) }
                     handover?.let { node ->
-                        Item("Take over in ${runs.terminalApp}", onClick = { runs.takeOver(node) })
+                        Item(Strings.Tray.takeOverIn(runs.terminalApp), onClick = { runs.takeOver(node) })
                     }
                 }
             }
-            Item("Stop everything", onClick = { runs.stopAll() })
+            Item(Strings.Tray.STOP_EVERYTHING, onClick = { runs.stopAll() })
         }
 
         Separator()
-        Menu("Run", enabled = app.listing.workflows.isNotEmpty()) {
+        Menu(Strings.Tray.RUN, enabled = app.listing.workflows.isNotEmpty()) {
             app.listing.workflows.forEach { workflow ->
                 Item(workflow.name, onClick = { app.runWorkflowNamed(workflow.name) })
             }
         }
 
         Separator()
-        Item("Quit zopf", onClick = onQuit)
+        Item(Strings.Tray.QUIT_ZOPF, onClick = onQuit)
     }
 }
 
 private fun tooltip(active: List<RunSnapshot>): String =
     when {
         active.isEmpty() -> {
-            "zopf · nothing running"
+            Strings.Tray.IDLE
         }
 
         active.size == 1 -> {
-            "zopf · ${active.first().run.workflowName}: ${active.first().state.summary()}"
+            Strings.Tray.oneActive(active.first().run.workflowName, active.first().state.summary())
         }
 
         else -> {
-            "zopf · ${active.size} runs, " +
-                "${active.count { it.state.status == RunStatus.WAITING }} waiting for you"
+            Strings.Tray.manyActive(active.size, active.count { it.state.status == RunStatus.WAITING })
         }
     }
 

@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.dk.zopf.ui.theme.ZopfIcons
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -54,7 +55,7 @@ internal fun SourcePane(
                 error = null
                 mirrored = state.workflow
                 onApplied()
-            }.onFailure { error = it.message ?: "This isn't YAML zopf can read." }
+            }.onFailure { error = it.message ?: Strings.Editor.NOT_YAML }
         applied = draft
     }
 
@@ -77,7 +78,7 @@ internal fun SourcePane(
             ) {
                 Icon(
                     ZopfIcons.Warning,
-                    contentDescription = "This YAML doesn't parse",
+                    contentDescription = Strings.Editor.SOURCE_UNPARSEABLE,
                     Modifier.size(15.dp),
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )

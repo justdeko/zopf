@@ -57,6 +57,7 @@ import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
 import com.dk.zopf.ui.theme.colors
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 
 @Composable
@@ -96,9 +97,9 @@ fun ConnectorsScreen(
                     ContextMenuArea(
                         items = {
                             listOf(
-                                ContextMenuItem("Change in $agent") { onChange(connector) },
-                                ContextMenuItem("Show in Finder") { onReveal(connector.dir) },
-                                ContextMenuItem("Delete…") { deleting = connector.name to connector.dir },
+                                ContextMenuItem(Strings.Connectors.changeIn(agent)) { onChange(connector) },
+                                ContextMenuItem(Strings.Connectors.SHOW_IN_FINDER) { onReveal(connector.dir) },
+                                ContextMenuItem(Strings.Connectors.DELETE_MENU) { deleting = connector.name to connector.dir },
                             )
                         },
                     ) {
@@ -115,7 +116,7 @@ fun ConnectorsScreen(
                     item {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Can't be read",
+                            Strings.Connectors.UNREADABLE,
                             style = MaterialTheme.typography.labelLargeEmphasized,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -124,9 +125,9 @@ fun ConnectorsScreen(
                         ContextMenuArea(
                             items = {
                                 listOf(
-                                    ContextMenuItem("Fix in $agent") { onFixBroken(broken) },
-                                    ContextMenuItem("Show in Finder") { onReveal(broken.dir) },
-                                    ContextMenuItem("Delete…") { deleting = broken.name to broken.dir },
+                                    ContextMenuItem(Strings.Connectors.fixIn(agent)) { onFixBroken(broken) },
+                                    ContextMenuItem(Strings.Connectors.SHOW_IN_FINDER) { onReveal(broken.dir) },
+                                    ContextMenuItem(Strings.Connectors.DELETE_MENU) { deleting = broken.name to broken.dir },
                                 )
                             },
                         ) {
@@ -148,13 +149,13 @@ fun ConnectorsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onRefresh) {
-                Icon(ZopfIcons.Refresh, contentDescription = "Refresh connectors")
+                Icon(ZopfIcons.Refresh, contentDescription = Strings.Connectors.REFRESH)
             }
             Spacer(Modifier.width(8.dp))
             ExtendedFloatingActionButton(
                 onClick = { creating = true },
                 icon = { Icon(ZopfIcons.Add, contentDescription = null) },
-                text = { Text("New connector") },
+                text = { Text(Strings.Connectors.NEW) },
             )
         }
     }
@@ -173,15 +174,15 @@ fun ConnectorsScreen(
     deleting?.let { (name, dir) ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Delete $name?") },
-            text = { Text("Deletes $dir and everything in it. Workflows that call it will fail.") },
+            title = { Text(Strings.Connectors.deleteTitle(name)) },
+            text = { Text(Strings.Connectors.deleteBody(dir)) },
             confirmButton = {
                 TextButton(onClick = {
                     deleting = null
                     onDelete(dir)
-                }) { Text("Delete") }
+                }) { Text(Strings.Connectors.DELETE) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(Strings.Connectors.CANCEL) } },
         )
     }
 }
@@ -235,13 +236,13 @@ private fun ConnectorCard(
                 TextButton(onClick = onChange) {
                     Icon(ZopfIcons.NodeAgent, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Change in $agent")
+                    Text(Strings.Connectors.changeIn(agent))
                 }
                 IconButton(onClick = onReveal) {
-                    Icon(ZopfIcons.Folder, contentDescription = "Show in Finder", Modifier.size(18.dp))
+                    Icon(ZopfIcons.Folder, contentDescription = Strings.Connectors.SHOW_IN_FINDER, Modifier.size(18.dp))
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(ZopfIcons.Delete, contentDescription = "Delete", Modifier.size(18.dp))
+                    Icon(ZopfIcons.Delete, contentDescription = Strings.Connectors.DELETE, Modifier.size(18.dp))
                 }
             }
 
@@ -250,23 +251,23 @@ private fun ConnectorCard(
                 HorizontalDivider(color = scheme.outlineVariant)
                 Spacer(Modifier.height(12.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    DetailRow("Inputs", manifest.inputs.isNotEmpty()) {
+                    DetailRow(Strings.Connectors.INPUTS, manifest.inputs.isNotEmpty()) {
                         manifest.inputs.forEach { input ->
                             Tag(
-                                input.name + if (input.required) " *" else "",
+                                input.name + if (input.required) Strings.Connectors.REQUIRED_MARKER else "",
                                 monospace = true,
                                 filled = input.required,
                             )
                         }
                     }
-                    DetailRow("Outputs", manifest.outputs.isNotEmpty()) {
+                    DetailRow(Strings.Connectors.OUTPUTS, manifest.outputs.isNotEmpty()) {
                         manifest.outputs.forEach { Tag(it.name, monospace = true) }
                     }
 
-                    DetailRow("Secrets", manifest.env.isNotEmpty()) {
+                    DetailRow(Strings.Connectors.SECRETS, manifest.env.isNotEmpty()) {
                         manifest.env.forEach { secret ->
                             Tag(
-                                secret.name + if (!secret.required) " (optional)" else "",
+                                secret.name + if (!secret.required) Strings.Connectors.OPTIONAL_MARKER else "",
                                 monospace = true,
                                 filled = secret.required,
                             )
@@ -285,14 +286,14 @@ private fun ConnectorCard(
                         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                             fromKeychain.forEach { secret ->
                                 Text(
-                                    "${secret.name} · ${secret.sourceLabel}",
+                                    Strings.Connectors.secretRow(secret.name, secret.sourceLabel),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = scheme.onSurfaceVariant,
                                 )
                             }
                             fromKeychain.mapNotNull { it.keychain }.distinct().forEach { keychain ->
                                 Text(
-                                    "security add-generic-password -a \"\$USER\" -s $keychain -w",
+                                    Strings.Connectors.keychainHint(keychain),
                                     style =
                                         MaterialTheme.typography.labelSmall
                                             .copy(fontFamily = FontFamily.Monospace),
@@ -306,7 +307,7 @@ private fun ConnectorCard(
 
             Spacer(Modifier.height(12.dp))
             Text(
-                "${connector.source} · ${manifest.run} · ${manifest.timeoutSeconds}s timeout",
+                Strings.Connectors.detail(connector.source, manifest.run, manifest.timeoutSeconds),
                 style = MaterialTheme.typography.labelSmall,
                 color = scheme.onSurfaceVariant,
             )
@@ -406,17 +407,17 @@ private fun BrokenCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            TextButton(onClick = onFix) { Text("Fix in $agent") }
+            TextButton(onClick = onFix) { Text(Strings.Connectors.fixIn(agent)) }
             IconButton(onClick = onReveal) {
                 Icon(
                     ZopfIcons.Folder,
-                    contentDescription = "Show in Finder",
+                    contentDescription = Strings.Connectors.SHOW_IN_FINDER,
                     Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
             IconButton(onClick = onDelete) {
-                Icon(ZopfIcons.Delete, contentDescription = "Delete", Modifier.size(18.dp))
+                Icon(ZopfIcons.Delete, contentDescription = Strings.Connectors.DELETE, Modifier.size(18.dp))
             }
         }
     }
@@ -433,30 +434,29 @@ private fun NewConnectorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New connector") },
+        title = { Text(Strings.Connectors.NEW) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    label = { Text("Name") },
-                    supportingText = { Text("Becomes the folder name: lower-cased and hyphenated.") },
+                    label = { Text(Strings.Connectors.NAME_LABEL) },
+                    supportingText = { Text(Strings.Connectors.NAME_HINT) },
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = shared, onCheckedChange = { shared = it })
                     Column {
-                        Text("Share across workspaces", style = MaterialTheme.typography.bodyMedium)
+                        Text(Strings.Connectors.SHARE_ACROSS_WORKSPACES, style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            "Writes it to ${ConnectorStore.defaultSharedRoot} instead of this workspace.",
+                            Strings.Connectors.shareHint(ConnectorStore.defaultSharedRoot),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
                 Text(
-                    "zopf creates the folder and opens $agent in it, in your terminal. It knows " +
-                        "the connector contract and will ask what this one should do.",
+                    Strings.Connectors.createHint(agent),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -466,9 +466,9 @@ private fun NewConnectorDialog(
             TextButton(
                 onClick = { onConfirm(name, shared) },
                 enabled = name.isNotBlank(),
-            ) { Text("Create") }
+            ) { Text(Strings.Connectors.CREATE) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Connectors.CANCEL) } },
     )
 }
 
@@ -482,18 +482,17 @@ private fun EmptyState(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("No connectors yet", style = MaterialTheme.typography.titleMedium)
+        Text(Strings.Connectors.NONE_YET, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(8.dp))
         Text(
-            "A connector is a folder with a manifest and a script. zopf pipes JSON into it and reads " +
-                "JSON back. Name one and $agent opens in its folder to write it with you.",
+            Strings.Connectors.emptyBody(agent),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            workspace?.workspace?.let { "They live in ${it.connectorsDir} or ${ConnectorStore.defaultSharedRoot}." }
-                ?: "Open a workspace first.",
+            workspace?.workspace?.let { Strings.Connectors.emptyWhere(it.connectorsDir, ConnectorStore.defaultSharedRoot) }
+                ?: Strings.Workspaces.OPEN_FIRST,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

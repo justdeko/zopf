@@ -1,5 +1,7 @@
 package com.dk.zopf.cli
 
+import com.dk.zopf.util.Strings
+
 class UsageError(
     message: String,
 ) : IllegalArgumentException(message)
@@ -17,9 +19,9 @@ class Options(
         range: IntRange,
     ): Int? {
         val raw = one(name) ?: return null
-        val value = raw.toIntOrNull() ?: throw UsageError("--$name takes a number, not \"$raw\"")
+        val value = raw.toIntOrNull() ?: throw UsageError(Strings.Cli.optionNeedsNumber(name, raw))
         if (value !in range) {
-            throw UsageError("--$name has to be between ${range.first} and ${range.last}")
+            throw UsageError(Strings.Cli.optionOutOfRange(name, range.first, range.last))
         }
         return value
     }
@@ -30,13 +32,13 @@ class Options(
     ): T? {
         val raw = one(name) ?: return null
         return values.firstOrNull { it.name.equals(raw, ignoreCase = true) }
-            ?: throw UsageError("--$name takes ${values.joinToString("|") { it.name.lowercase() }}, not \"$raw\"")
+            ?: throw UsageError(Strings.Cli.optionNeedsChoice(name, values.joinToString("|") { it.name.lowercase() }, raw))
     }
 
     fun pairs(name: String): Map<String, String> =
         all(name).associate { raw ->
             val key = raw.substringBefore('=', "")
-            if (key.isBlank() || '=' !in raw) throw UsageError("--$name takes name=value, not \"$raw\"")
+            if (key.isBlank() || '=' !in raw) throw UsageError(Strings.Cli.optionNeedsPair(name, raw))
             key to raw.substringAfter('=')
         }
 
@@ -59,7 +61,7 @@ class Options(
                     val name = arg.removePrefix("--").substringBefore('=')
                     if (name !in known && name !in switches) {
                         val all = (known + switches).sorted().joinToString { "--$it" }
-                        throw UsageError("Unknown option --$name. This command takes $all")
+                        throw UsageError(Strings.Cli.unknownOption(name, all))
                     }
                     val value =
                         when {
@@ -74,7 +76,7 @@ class Options(
                             else -> {
                                 index += 1
                                 args.getOrNull(index)?.takeUnless { it.isAnotherFlag(known, switches) }
-                                    ?: throw UsageError("--$name needs a value")
+                                    ?: throw UsageError(Strings.Cli.optionNeedsValue(name))
                             }
                         }
                     flags.getOrPut(name) { mutableListOf() } += value

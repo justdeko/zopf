@@ -54,6 +54,7 @@ import com.dk.zopf.store.workspace.OpenWorkspace
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 
 private val RowHeight = 92.dp
@@ -96,23 +97,19 @@ fun WorkflowListScreen(
 
     Box(modifier.fillMaxSize()) {
         when {
-            workspace == null -> EmptyMessage("No workspace open", "Open one from the switcher above.")
+            workspace == null -> EmptyMessage(Strings.Nav.NO_WORKSPACE, Strings.Workflows.OPEN_FROM_SWITCHER)
 
             !workspace.isOnline ->
                 EmptyMessage(
-                    title = "${workspace.displayName} is unavailable",
-                    detail =
-                        "${workspace.path} isn't reachable. Reconnect the drive or check out the " +
-                            "branch that has it, then refresh.",
+                    title = Strings.Workflows.unavailableTitle(workspace.displayName),
+                    detail = Strings.Workflows.unavailableBody(workspace.path),
                     isError = true,
                 )
 
             isEmpty ->
                 EmptyMessage(
-                    title = "No workflows yet",
-                    detail =
-                        "New workflow drafts one from a description, or starts you from a template. " +
-                            "They live in ${workspace.workspace?.workflowsDir}.",
+                    title = Strings.Workflows.NONE_YET,
+                    detail = Strings.Workflows.noneYetBody(workspace.workspace?.workflowsDir),
                 )
 
             else ->
@@ -135,7 +132,7 @@ fun WorkflowListScreen(
                         item {
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "Can't be read",
+                                Strings.Workflows.UNREADABLE,
                                 style = MaterialTheme.typography.labelLargeEmphasized,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -152,7 +149,7 @@ fun WorkflowListScreen(
                 onClick = { creating = true },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
                 icon = { Icon(ZopfIcons.Add, contentDescription = null) },
-                text = { Text("New workflow") },
+                text = { Text(Strings.Workflows.NEW) },
             )
         }
     }
@@ -174,9 +171,9 @@ fun WorkflowListScreen(
 
     renaming?.let { workflow ->
         NameDialog(
-            title = "Rename workflow",
+            title = Strings.Workflows.RENAME_TITLE,
             initial = workflow.name,
-            confirmLabel = "Rename",
+            confirmLabel = Strings.Workflows.RENAME,
             onDismiss = { renaming = null },
             onConfirm = {
                 renaming = null
@@ -188,15 +185,15 @@ fun WorkflowListScreen(
     deleting?.let { workflow ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Delete ${workflow.name}?") },
-            text = { Text("Deletes the YAML file from the workspace. zopf can't undo this.") },
+            title = { Text(Strings.Workflows.deleteTitle(workflow.name)) },
+            text = { Text(Strings.Workflows.DELETE_BODY) },
             confirmButton = {
                 TextButton(onClick = {
                     deleting = null
                     onDelete(workflow)
-                }) { Text("Delete") }
+                }) { Text(Strings.Workflows.DELETE) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(Strings.Workflows.CANCEL) } },
         )
     }
 }
@@ -214,11 +211,11 @@ private fun WorkflowRow(
     ContextMenuArea(
         items = {
             listOf(
-                ContextMenuItem("Open") { onOpen() },
-                ContextMenuItem("Run", enabled = workflow.nodes.isNotEmpty()) { onRun() },
-                ContextMenuItem("Rename…") { onRename() },
-                ContextMenuItem("Show in Finder") { onReveal() },
-                ContextMenuItem("Delete…") { onDelete() },
+                ContextMenuItem(Strings.Workflows.OPEN) { onOpen() },
+                ContextMenuItem(Strings.Workflows.RUN, enabled = workflow.nodes.isNotEmpty()) { onRun() },
+                ContextMenuItem(Strings.Workflows.RENAME_MENU) { onRename() },
+                ContextMenuItem(Strings.Workflows.SHOW_IN_FINDER) { onReveal() },
+                ContextMenuItem(Strings.Workflows.DELETE_MENU) { onDelete() },
             )
         },
     ) {
@@ -256,9 +253,10 @@ private fun WorkflowCard(
                 Text(workflow.name, style = MaterialTheme.typography.titleMediumEmphasized)
                 val summary =
                     workflow.description.firstParagraph().ifBlank {
-                        val nodes = workflow.nodes.size
-                        val repos = workflow.repos.size
-                        "$nodes ${plural(nodes, "node")} · $repos ${plural(repos, "repo")}"
+                        Strings.Workflows.summary(
+                            Strings.Words.count(workflow.nodes.size, Strings.Words.NODE),
+                            Strings.Words.count(workflow.repos.size, Strings.Words.REPO),
+                        )
                     }
                 Text(
                     text = summary,
@@ -271,16 +269,16 @@ private fun WorkflowCard(
             TextButton(onClick = onRun, enabled = workflow.nodes.isNotEmpty()) {
                 Icon(ZopfIcons.Play, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Run")
+                Text(Strings.Workflows.RUN)
             }
             IconButton(onClick = onReveal) {
-                Icon(ZopfIcons.Folder, contentDescription = "Show in Finder", modifier = Modifier.size(18.dp))
+                Icon(ZopfIcons.Folder, contentDescription = Strings.Workflows.SHOW_IN_FINDER, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = onRename) {
-                Icon(ZopfIcons.Edit, contentDescription = "Rename", modifier = Modifier.size(18.dp))
+                Icon(ZopfIcons.Edit, contentDescription = Strings.Workflows.RENAME, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = onDelete) {
-                Icon(ZopfIcons.Delete, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                Icon(ZopfIcons.Delete, contentDescription = Strings.Workflows.DELETE, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -326,7 +324,7 @@ private fun BrokenRow(
             IconButton(onClick = onReveal) {
                 Icon(
                     ZopfIcons.Folder,
-                    contentDescription = "Show in Finder",
+                    contentDescription = Strings.Workflows.SHOW_IN_FINDER,
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
@@ -351,7 +349,7 @@ private fun NewWorkflowDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New workflow") },
+        title = { Text(Strings.Workflows.NEW) },
         text = {
             Column(Modifier.width(TemplateGridWidth).verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
@@ -362,13 +360,13 @@ private fun NewWorkflowDialog(
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Name") },
-                    supportingText = { Text("Becomes the filename: lower-cased and hyphenated.") },
+                    label = { Text(Strings.Workflows.NAME_LABEL) },
+                    supportingText = { Text(Strings.Workflows.NAME_HINT) },
                 )
                 FilterChip(
                     selected = describing,
                     onClick = { describing = !describing },
-                    label = { Text("Describe it") },
+                    label = { Text(Strings.Workflows.DESCRIBE_TAB) },
                     leadingIcon = { Icon(ZopfIcons.Edit, contentDescription = null, modifier = Modifier.size(IconSize)) },
                 )
                 AnimatedVisibility(describing) {
@@ -378,16 +376,14 @@ private fun NewWorkflowDialog(
                         minLines = 2,
                         maxLines = 6,
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                        label = { Text("What should it do?") },
-                        supportingText = {
-                            Text("A sentence or two. An agent reads this workspace and drafts the graph for you.")
-                        },
+                        label = { Text(Strings.Workflows.DESCRIPTION_LABEL) },
+                        supportingText = { Text(Strings.Workflows.DESCRIPTION_HINT) },
                     )
                 }
                 if (showTemplates) {
                     Spacer(Modifier.height(20.dp))
                     Text(
-                        "Or start from a template",
+                        Strings.Workflows.TEMPLATE_HEADING,
                         style = MaterialTheme.typography.labelLargeEmphasized,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -397,10 +393,10 @@ private fun NewWorkflowDialog(
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 row.forEach { entry ->
                                     TemplateCard(
-                                        title = entry?.let { Templates.label(it.first) } ?: "Empty",
+                                        title = entry?.let { Templates.label(it.first) } ?: Strings.Workflows.EMPTY_TEMPLATE,
                                         detail =
                                             entry?.second?.description?.firstParagraph()
-                                                ?: "Draw your own graph from nothing.",
+                                                ?: Strings.Workflows.EMPTY_TEMPLATE_BLURB,
                                         workflow = entry?.second,
                                         isSelected = !describing && template == entry?.first,
                                         onClick = {
@@ -422,9 +418,9 @@ private fun NewWorkflowDialog(
             TextButton(
                 onClick = { if (describing) onDescribe(name, description) else onCreate(name, template) },
                 enabled = name.isNotBlank() && (!describing || description.isNotBlank()),
-            ) { Text(if (describing) "Draft it" else "Create") }
+            ) { Text(if (describing) Strings.Workflows.DRAFT else Strings.Workflows.CREATE) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Workflows.CANCEL) } },
     )
 }
 
@@ -510,14 +506,14 @@ private fun NameDialog(
                 value = value,
                 onValueChange = { value = it },
                 singleLine = true,
-                label = { Text("Name") },
-                supportingText = { Text("Becomes the filename: lower-cased and hyphenated.") },
+                label = { Text(Strings.Workflows.NAME_LABEL) },
+                supportingText = { Text(Strings.Workflows.NAME_HINT) },
             )
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Workflows.CANCEL) } },
     )
 }
 
@@ -545,11 +541,6 @@ private fun EmptyMessage(
         )
     }
 }
-
-private fun plural(
-    count: Int,
-    word: String,
-) = if (count == 1) word else "${word}s"
 
 private fun String.firstParagraph(): String = trim().substringBefore('\n').trim()
 

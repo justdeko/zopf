@@ -7,6 +7,7 @@ import com.dk.zopf.runtime.outcome
 import com.dk.zopf.store.NodeRunRecord
 import com.dk.zopf.store.RunRecord
 import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -200,7 +201,7 @@ class WorkflowRun(
             }
             run.refreshFrom(record, restore)
             if (restore == Restore.ORPHANED) {
-                run.nodes.forEach { it.notice("Started before zopf last quit, and is still running outside it.") }
+                run.nodes.forEach { it.notice(Strings.Transcript.STARTED_BEFORE_QUIT) }
             }
             return run
         }

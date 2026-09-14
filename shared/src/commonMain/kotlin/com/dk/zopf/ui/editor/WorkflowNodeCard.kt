@@ -58,6 +58,7 @@ import com.dk.zopf.ui.theme.PathIcon
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
 import com.dk.zopf.ui.theme.colors
+import com.dk.zopf.util.Strings
 
 private val CardWidth = 260.dp
 private val BadgeSize = 15.dp
@@ -257,7 +258,7 @@ private fun ConnectHandle(
     ) {
         PathIcon(
             ZopfIcons.Link,
-            contentDescription = if (isArmed) "Cancel connection" else "Connect from here",
+            contentDescription = if (isArmed) Strings.EditorNodeCard.CANCEL_CONNECTION else Strings.EditorNodeCard.CONNECT_FROM_HERE,
             size = 12.dp,
             tint = if (isArmed) scheme.onPrimary else scheme.onSurfaceVariant,
         )
@@ -296,7 +297,7 @@ private fun WorkflowNode.subtitle(): String =
                 .orEmpty()
         NodeType.CONNECTOR -> connector
         NodeType.BRANCH -> expression
-        NodeType.GATE -> "Waits for approval"
+        NodeType.GATE -> Strings.EditorNodeCard.GATE_SUBTITLE
 
         NodeType.INPUT ->
             prompt

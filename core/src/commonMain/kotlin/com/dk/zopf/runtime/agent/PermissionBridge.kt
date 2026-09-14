@@ -3,6 +3,7 @@ package com.dk.zopf.runtime.agent
 import com.dk.zopf.model.PermissionMode
 import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.store.AppPaths
+import com.dk.zopf.util.Strings
 import com.dk.zopf.util.format
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
@@ -133,13 +134,13 @@ class PermissionBridge(
         val node = sessionId?.let(nodeBySession)
 
         if (payload == null || node == null) {
-            exchange.respond(200, decisionJson(false, "zopf doesn't recognise this session"))
+            exchange.respond(200, decisionJson(false, Strings.RunErrors.PERMISSION_UNKNOWN_SESSION))
             return
         }
 
         val request =
             PermissionRequest(
-                toolName = payload.text("tool_name") ?: "a tool",
+                toolName = payload.text("tool_name") ?: Strings.RunErrors.UNNAMED_TOOL,
                 summary = payload["tool_input"]?.let { summarize(it.jsonObject) }.orEmpty(),
                 toolUseId = payload.text("tool_use_id").orEmpty(),
                 sessionId = sessionId,
@@ -163,7 +164,7 @@ class PermissionBridge(
         val allowed =
             runCatching { answer.get(deadlineSeconds, TimeUnit.SECONDS) }
                 .getOrElse {
-                    node.notice("Nobody answered in time, so ${request.toolName} was denied", isWarning = true)
+                    node.notice(Strings.RunErrors.permissionTimedOut(request.toolName), isWarning = true)
                     false
                 }
         outstanding.remove(answer)
@@ -224,7 +225,7 @@ class PermissionBridge(
     private companion object {
         const val TOKEN_HEADER = "X-Zopf-Token"
 
-        const val DENY_UNREACHABLE = "zopf could not be reached, so the answer is no"
+        val DENY_UNREACHABLE = Strings.RunErrors.PERMISSION_DENIED_UNREACHABLE
 
         val OWNER_ONLY_FILE: Set<java.nio.file.attribute.PosixFilePermission> =
             PosixFilePermissions.fromString("rw-------")

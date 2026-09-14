@@ -2,6 +2,7 @@ package com.dk.zopf.store
 
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.store.workflow.with
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,17 +59,17 @@ enum class NotifyLevel {
     val label: String
         get() =
             when (this) {
-                EVERYTHING -> "Everything"
-                IMPORTANT -> "Important"
-                NOTHING -> "Nothing"
+                EVERYTHING -> Strings.Prefs.NOTIFY_EVERYTHING
+                IMPORTANT -> Strings.Prefs.NOTIFY_IMPORTANT
+                NOTHING -> Strings.Prefs.NOTIFY_NOTHING
             }
 
     val hint: String
         get() =
             when (this) {
-                EVERYTHING -> "Every run that finishes, and every gate, question and permission prompt."
-                IMPORTANT -> "Runs that fail, and every gate, question and permission prompt."
-                NOTHING -> "No notifications. The menu bar icon still counts what's running and waiting."
+                EVERYTHING -> Strings.Prefs.NOTIFY_EVERYTHING_HINT
+                IMPORTANT -> Strings.Prefs.NOTIFY_IMPORTANT_HINT
+                NOTHING -> Strings.Prefs.NOTIFY_NOTHING_HINT
             }
 
     val notifiesOnSuccess: Boolean get() = this == EVERYTHING
@@ -150,7 +151,7 @@ class SettingsStore(
         }
         return runCatching { zopfJson.decodeFromString(AppSettings.serializer(), file.readText()).sanitized() }
             .recoverCatching { failure ->
-                throw IllegalStateException("$file couldn't be read: ${failure.message}", failure)
+                throw IllegalStateException(Strings.RunErrors.settingsUnreadable(file, failure.message), failure)
             }
     }
 

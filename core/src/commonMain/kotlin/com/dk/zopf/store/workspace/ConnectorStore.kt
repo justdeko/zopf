@@ -4,6 +4,7 @@ import com.dk.zopf.model.ConnectorManifest
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.workflow.slugify
 import com.dk.zopf.store.zopfJson
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
@@ -89,12 +90,12 @@ class ConnectorStore(
         shared: Boolean = false,
     ): Result<Path> {
         val slug = slugify(name)
-        if (slug.isBlank()) return Result.failure(IllegalArgumentException("Name cannot be empty"))
+        if (slug.isBlank()) return Result.failure(IllegalArgumentException(Strings.RunErrors.NAME_CANNOT_BE_EMPTY))
 
         val root = if (shared) sharedRoot else workspace?.connectorsDir ?: sharedRoot
         val dir = root.resolve(slug)
         if (dir.resolve(CONNECTOR_MANIFEST).exists()) {
-            return Result.failure(IllegalStateException("A connector named \"$slug\" already exists"))
+            return Result.failure(IllegalStateException(Strings.Connectors.alreadyExists(slug)))
         }
         return runCatching { dir.createDirectories() }
     }

@@ -3,6 +3,7 @@ package com.dk.zopf.runtime.agent
 import com.dk.zopf.model.PermissionMode
 import com.dk.zopf.model.Sandbox
 import com.dk.zopf.runtime.exec.CommandLookup
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -42,7 +43,7 @@ class AgentRunner(
     ): AgentSession {
         val resolved =
             CommandLookup.which(provider.executable)
-                ?: error("Couldn't find \"${provider.executable}\" on your PATH")
+                ?: error(Strings.RunErrors.executableMissing(provider.executable))
         val started = invocation.copy(sessionId = invocation.sessionId ?: provider.newSessionId())
         val command = provider.command(started, resolved.toString())
         return AgentSession(
@@ -92,7 +93,7 @@ class AgentSession internal constructor(
     fun send(text: String): Result<Unit> {
         if (provider.promptChannel != PromptChannel.STDIN) {
             return Result.failure(
-                UnsupportedOperationException("${provider.id.label} takes one turn and doesn't read stdin"),
+                UnsupportedOperationException(Strings.RunErrors.takesOneTurn(provider.id.label)),
             )
         }
         return runCatching {

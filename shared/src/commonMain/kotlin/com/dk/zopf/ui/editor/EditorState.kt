@@ -36,6 +36,7 @@ import com.dk.zopf.store.workspace.Connector
 import com.dk.zopf.store.workspace.DiscoveredSkill
 import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.store.workspace.isSkillDir
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 import kotlin.io.path.name
 
@@ -167,7 +168,7 @@ class EditorState(
         nodeId: String?,
     ): Boolean {
         if (!isSkillDir(path)) {
-            message = "${path.fileName} has no SKILL.md, so the CLI won't load it as a skill"
+            message = Strings.Editor.skillDirWithoutManifest(path.fileName)
             return false
         }
         val raw = path.toString()
@@ -243,8 +244,7 @@ class EditorState(
     ) {
         val stale = lookups.promptTexts.filterValues { from in NodeRefs.referencedNodeIds(it) }.keys
         if (stale.isEmpty()) return
-        message = "Renamed to $to. ${stale.joinToString()} still reads \${$from…}. " +
-            "zopf doesn't edit prompt files, so fix that one by hand."
+        message = Strings.Editor.renamedButPromptsStale(to, from, stale.joinToString())
     }
 
     fun removeNode(id: String) {
@@ -350,7 +350,7 @@ class EditorState(
         runCatching {
             val parsed = decodeWorkflow(text)
             if (parsed.name != saved.name) {
-                error("Rename on the Workflows screen to move the file.")
+                error(Strings.Editor.RENAME_ON_WORKFLOWS_SCREEN)
             }
             workflow = parsed
             canvasPositions = null

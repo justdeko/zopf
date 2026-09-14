@@ -35,6 +35,7 @@ import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.runtime.run.WorkflowRunState
 import com.dk.zopf.ui.theme.ZopfIcons
+import com.dk.zopf.util.Strings
 import com.dk.zopf.util.format
 import java.time.Instant
 
@@ -56,7 +57,7 @@ fun RunsScreen(
     if (runs.isEmpty()) {
         Box(modifier.fillMaxSize().padding(48.dp)) {
             Text(
-                "Open a workflow and press Run, or run one node from the editor.",
+                Strings.Runs.EMPTY,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -77,25 +78,25 @@ fun RunsScreen(
                             items = {
                                 val handover = run.nodes.firstOrNull { it.canTakeOver && it.status.isActive }
                                 buildList {
-                                    add(ContextMenuItem("Show") { registry.select(run) })
+                                    add(ContextMenuItem(Strings.Runs.SHOW) { registry.select(run) })
                                     if (run.isElsewhere) return@buildList
                                     if (run.isActive) {
-                                        add(ContextMenuItem("Stop") { registry.stop(run) })
+                                        add(ContextMenuItem(Strings.Runs.STOP) { registry.stop(run) })
                                         handover?.let { node ->
                                             add(
-                                                ContextMenuItem("Take over in ${registry.terminalApp}") {
+                                                ContextMenuItem(Strings.Runs.takeOverIn(registry.terminalApp)) {
                                                     registry.takeOver(node)
                                                 },
                                             )
                                         }
                                     } else {
-                                        add(ContextMenuItem("Clear") { registry.remove(run) })
+                                        add(ContextMenuItem(Strings.Runs.CLEAR) { registry.remove(run) })
                                         if (run.archiveDir != null) {
                                             add(
-                                                ContextMenuItem("Delete from disk") {
+                                                ContextMenuItem(Strings.Runs.DELETE_FROM_DISK) {
                                                     registry
                                                         .forget(run)
-                                                        .onFailure { onMessage(it.message ?: "Couldn't delete that run") }
+                                                        .onFailure { onMessage(it.message ?: Strings.Runs.COULDNT_DELETE) }
                                                 },
                                             )
                                         }
@@ -121,7 +122,7 @@ fun RunsScreen(
                                     registry
                                         .retry(run, node.nodeId)
                                         .onSuccess { retried -> registry.select(retried) }
-                                        .onFailure { onMessage(it.message ?: "Couldn't retry that run") }
+                                        .onFailure { onMessage(it.message ?: Strings.Runs.COULDNT_RETRY) }
                                     Unit
                                 }.takeIf {
                                     !selectedState.isActive && selectedState.of(node).status.isFinished && registry.canRetry(run)
@@ -129,13 +130,13 @@ fun RunsScreen(
                             ContextMenuArea(
                                 items = {
                                     buildList {
-                                        add(ContextMenuItem("Show") { registry.select(run, node) })
+                                        add(ContextMenuItem(Strings.Runs.SHOW) { registry.select(run, node) })
                                         retry?.let {
-                                            add(ContextMenuItem("Retry from this node", it))
+                                            add(ContextMenuItem(Strings.Runs.RETRY_FROM_NODE, it))
                                         }
                                         if (node.canTakeOver && node.status.isActive && !run.isElsewhere) {
                                             add(
-                                                ContextMenuItem("Take over in ${registry.terminalApp}") {
+                                                ContextMenuItem(Strings.Runs.takeOverIn(registry.terminalApp)) {
                                                     registry.takeOver(node)
                                                 },
                                             )
@@ -163,7 +164,7 @@ fun RunsScreen(
         if (run == null || node == null) {
             Box(Modifier.fillMaxSize().padding(32.dp)) {
                 Text(
-                    "Select a run.",
+                    Strings.Runs.SELECT_ONE,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -227,7 +228,7 @@ private fun RunRow(
                 )
             }
             Text(
-                "${state.summary()} · ${format(state.elapsed(run.startedAt, now))}",
+                Strings.Runs.rowSummary(state.summary(), format(state.elapsed(run.startedAt, now))),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -238,12 +239,12 @@ private fun RunRow(
             run.isElsewhere(state) -> Unit
             state.isActive ->
                 IconButton(onClick = onStop) {
-                    Icon(ZopfIcons.Stop, contentDescription = "Stop run", Modifier.size(12.dp))
+                    Icon(ZopfIcons.Stop, contentDescription = Strings.Runs.STOP_RUN, Modifier.size(12.dp))
                 }
 
             else ->
                 IconButton(onClick = onRemove) {
-                    Icon(ZopfIcons.Clear, contentDescription = "Clear run", Modifier.size(14.dp))
+                    Icon(ZopfIcons.Clear, contentDescription = Strings.Runs.CLEAR_RUN, Modifier.size(14.dp))
                 }
         }
     }
@@ -295,7 +296,7 @@ private fun NodeRow(
             IconButton(onClick = it, modifier = Modifier.size(24.dp)) {
                 Icon(
                     ZopfIcons.Refresh,
-                    contentDescription = "Retry from ${node.nodeTitle}",
+                    contentDescription = Strings.Runs.retryFrom(node.nodeTitle),
                     Modifier.size(12.dp),
                 )
             }

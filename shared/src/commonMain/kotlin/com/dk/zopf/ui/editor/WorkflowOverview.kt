@@ -36,6 +36,7 @@ import com.dk.zopf.model.validate
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
+import com.dk.zopf.util.Strings
 
 @Composable
 fun WorkflowOverview(
@@ -57,26 +58,26 @@ fun WorkflowOverview(
 
         if (errors.isNotEmpty()) {
             Gap()
-            SectionLabel("Stops the run")
+            SectionLabel(Strings.EditorOverview.STOPS_THE_RUN)
             Gap(6)
             IssueList(errors, workflow, onSelectNode)
         }
 
         if (warnings.isNotEmpty()) {
             Gap()
-            SectionLabel("Worth a look")
+            SectionLabel(Strings.EditorOverview.WORTH_A_LOOK)
             Gap(6)
             IssueList(warnings, workflow, onSelectNode)
         }
 
         Gap()
-        SectionLabel("At a glance")
+        SectionLabel(Strings.EditorOverview.AT_A_GLANCE)
         Gap(6)
         Tally(workflow)
 
         if (workflow.repos.isNotEmpty()) {
             Gap()
-            SectionLabel("Repos")
+            SectionLabel(Strings.EditorOverview.REPOS)
             Gap(6)
             workflow.repos.forEach { Repo(it) }
         }
@@ -85,7 +86,7 @@ fun WorkflowOverview(
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Gap(8)
         Text(
-            "Select a node to edit it.",
+            Strings.EditorOverview.SELECT_A_NODE,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -98,12 +99,12 @@ private fun Readiness(
     warnings: Int,
 ) {
     val ready = errors == 0
-    val headline = if (ready) "Ready to run" else "Not ready to run"
+    val headline = if (ready) Strings.EditorOverview.READY_TO_RUN else Strings.EditorOverview.NOT_READY_TO_RUN
     val detail =
         listOfNotNull(
-            errors.takeIf { it > 0 }?.let { count(it, "error") },
-            warnings.takeIf { it > 0 }?.let { count(it, "warning") },
-        ).joinToString(", ").ifEmpty { "Nothing to fix." }
+            errors.takeIf { it > 0 }?.let { Strings.Words.count(it, Strings.Words.ERROR) },
+            warnings.takeIf { it > 0 }?.let { Strings.Words.count(it, Strings.Words.WARNING) },
+        ).joinToString(", ").ifEmpty { Strings.EditorOverview.NOTHING_TO_FIX }
 
     Surface(
         Modifier.fillMaxWidth(),
@@ -202,7 +203,7 @@ private fun NodeChip(
         Icon(node.type.icon, contentDescription = null, Modifier.size(11.dp), tint = tint)
         Spacer(Modifier.width(4.dp))
         Text(
-            "Open",
+            Strings.EditorOverview.OPEN,
             style = MaterialTheme.typography.labelSmall,
             color = tint,
             maxLines = 1,
@@ -215,7 +216,7 @@ private fun NodeChip(
 private fun Tally(workflow: Workflow) {
     if (workflow.nodes.isEmpty()) {
         Text(
-            "No nodes yet. Add one from the toolbar and it will show up here.",
+            Strings.EditorOverview.NO_NODES_YET,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -236,7 +237,7 @@ private fun Tally(workflow: Workflow) {
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        count(tally, type.label.lowercase()),
+                        Strings.Words.count(tally, type.label.lowercase()),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -251,7 +252,7 @@ private fun Tally(workflow: Workflow) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                count(workflow.edges.size, "edge"),
+                Strings.Words.count(workflow.edges.size, Strings.Words.EDGE),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )

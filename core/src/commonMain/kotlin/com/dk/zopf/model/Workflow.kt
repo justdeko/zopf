@@ -1,6 +1,7 @@
 package com.dk.zopf.model
 
 import com.dk.zopf.store.BuildInfo
+import com.dk.zopf.util.Strings
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -126,7 +127,7 @@ internal object NodeTypeSerializer : KSerializer<NodeType> {
         if (raw == LEGACY_AGENT_TYPE) return NodeType.AGENT
         return NodeType.entries.firstOrNull { it.serialName == raw }
             ?: throw SerializationException(
-                "\"$raw\" isn't a kind of node. It can be ${NodeType.entries.joinToString { it.serialName }}",
+                Strings.NodeKinds.notANodeType(raw, NodeType.entries.joinToString { it.serialName }),
             )
     }
 }
@@ -155,9 +156,9 @@ enum class AgentProviderId {
     val label: String
         get() =
             when (this) {
-                CLAUDE -> "Claude Code"
-                CODEX -> "codex"
-                DSH -> "DeepSeek Harness"
+                CLAUDE -> Strings.Providers.CLAUDE_CODE
+                CODEX -> Strings.Providers.CODEX
+                DSH -> Strings.Providers.DEEP_SEEK_HARNESS
             }
 }
 

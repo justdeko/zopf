@@ -5,6 +5,7 @@ import com.dk.zopf.runtime.Release
 import com.dk.zopf.runtime.Version
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.Log
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,20 +63,20 @@ class AppUpdate(
 
     fun blocker(): String? =
         when {
-            bundle == null -> "zopf installs updates only when it runs as an app. The release page has the new one."
+            bundle == null -> Strings.Updates.NOT_AN_APP
             bundle.toString().contains(TRANSLOCATION) ->
-                "macOS is running zopf out of the disk image. Drag it to Applications and it can update itself."
-            bundle.parent?.isWritable() != true -> "zopf can't write to ${bundle.parent}, so it can't replace itself there."
-            '"' in bundle.toString() -> "zopf can't update itself from a path with a quote in it."
-            team == null -> "This build isn't signed, so zopf can't tell a real update from a forged one."
+                Strings.Updates.TRANSLOCATED
+            bundle.parent?.isWritable() != true -> Strings.Updates.cannotWriteTo(bundle.parent)
+            '"' in bundle.toString() -> Strings.Updates.QUOTED_PATH
+            team == null -> Strings.Updates.UNSIGNED
             else -> null
         }
 
     fun install(release: Release): Result<Unit> =
         runCatching {
             blocker()?.let { error(it) }
-            val signer = team ?: error("This build isn't signed, so zopf can't tell a real update from a forged one.")
-            val url = release.app.ifBlank { error("Release ${release.version} publishes no app to install. The release page has it.") }
+            val signer = team ?: error(Strings.Updates.UNSIGNED)
+            val url = release.app.ifBlank { error(Strings.Updates.noAppAsset("${release.version}")) }
 
             val waiting = stagedVersion()
             if (waiting != null && waiting >= release.version) {
@@ -92,7 +93,7 @@ class AppUpdate(
             try {
                 mounted(dmg) { volume ->
                     val app = volume.resolve(APP_BUNDLE_NAME)
-                    check(app.exists()) { "The disk image holds no $APP_BUNDLE_NAME." }
+                    check(app.exists()) { Strings.Updates.noBundleInImage(APP_BUNDLE_NAME) }
                     verify(app, signer, release.version)
                     stage(app)
                 }
@@ -102,16 +103,16 @@ class AppUpdate(
             _state.value = UpdateInstall.Ready(release.version)
             Log.info("zopf ${release.version} is staged at $staged")
         }.onFailure { failure ->
-            val reason = failure.message ?: "the update wouldn't install"
+            val reason = failure.message ?: Strings.Updates.INSTALL_FAILED
             _state.value = UpdateInstall.Failed(reason)
             Log.warn("update install failed: $reason")
         }
 
     fun swap(reopen: Boolean): Result<Unit> =
         runCatching {
-            val ready = _state.value as? UpdateInstall.Ready ?: error("There is no update waiting to be installed.")
-            val target = bundle ?: error("zopf isn't running from an app bundle.")
-            check(staged.exists()) { "The staged ${ready.version} has gone missing from $cache." }
+            val ready = _state.value as? UpdateInstall.Ready ?: error(Strings.RunErrors.NO_UPDATE_WAITING)
+            val target = bundle ?: error(Strings.Updates.NOT_RUNNING_FROM_BUNDLE)
+            check(staged.exists()) { Strings.Updates.stagedMissing("${ready.version}", cache) }
             val script = cache.resolve("swap.sh")
             script.writeText(swapScript(staged, target, reopen))
             Log.info("swapping in zopf ${ready.version} at $target")
@@ -145,19 +146,19 @@ class AppUpdate(
     ) {
         val requirement = "identifier \"$APP_BUNDLE_ID\" and anchor apple generic and certificate leaf[subject.OU] = \"$team\""
         tool(listOf("/usr/bin/codesign", "--verify", "--deep", "--strict", "-R=$requirement", app.toString()))
-            .getOrElse { error("The download isn't signed by the team that signed this copy of zopf. Nothing was installed.") }
+            .getOrElse { error(Strings.Updates.NOT_OUR_SIGNER) }
         tool(listOf("/usr/sbin/spctl", "--assess", "--type", "execute", app.toString()))
-            .getOrElse { error("macOS won't vouch for the download, so zopf left it alone.") }
+            .getOrElse { error(Strings.Updates.NOT_NOTARIZED) }
         val found = tool(listOf("/usr/bin/defaults", "read", app.resolve("Contents/Info.plist").toString(), VERSION_KEY))
         val inside = Version.parse(found.getOrNull()?.trim().orEmpty())
-        check(inside == version) { "The download says it is ${inside ?: "nothing in particular"}, not $version." }
+        check(inside == version) { Strings.Updates.wrongVersionInside(inside?.toString() ?: Strings.Updates.NOTHING_IN_PARTICULAR, "$version") }
     }
 
     private fun stage(app: Path) {
         staged.parent.toFile().deleteRecursively()
         staged.parent.createDirectories()
         tool(listOf("/usr/bin/ditto", app.toString(), staged.toString()))
-            .getOrElse { error("The new zopf wouldn't copy out of the disk image: ${it.message}") }
+            .getOrElse { error(Strings.Updates.wouldntCopy(it.message)) }
     }
 
     private fun <T> mounted(
@@ -168,7 +169,7 @@ class AppUpdate(
         tool(listOf("/usr/bin/hdiutil", "attach", dmg.toString(), "-nobrowse", "-readonly", "-mountpoint", volume.toString()))
             .getOrElse {
                 runCatching { volume.deleteIfExists() }
-                error("The disk image wouldn't mount: ${it.message}")
+                error(Strings.Updates.wouldntMount(it.message))
             }
         try {
             return block(volume)
@@ -215,9 +216,9 @@ private fun runTool(argv: List<String>): Result<String> =
         val output = process.inputStream.bufferedReader().readText()
         if (!process.waitFor(TOOL_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             process.destroyForcibly()
-            error("${argv.first()} took too long")
+            error(Strings.Updates.tookTooLong(argv.first()))
         }
-        check(process.exitValue() == 0) { output.trim().lines().lastOrNull() ?: "${argv.first()} failed" }
+        check(process.exitValue() == 0) { output.trim().lines().lastOrNull() ?: Strings.Updates.toolFailed(argv.first()) }
         output
     }
 

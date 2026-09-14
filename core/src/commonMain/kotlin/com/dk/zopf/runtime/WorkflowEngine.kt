@@ -18,6 +18,7 @@ import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.RunRecord
 import com.dk.zopf.store.workspace.ConnectorStore
 import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -73,21 +74,19 @@ class WorkflowEngine(
         if (workflow.isFromTheFuture) {
             return Result.failure(
                 IllegalArgumentException(
-                    "${workflow.name} needs workflow format v${workflow.version}. This zopf reads " +
-                        "v$WORKFLOW_VERSION, so update zopf to run it",
+                    Strings.RunErrors.formatTooNew(workflow.name, workflow.version, WORKFLOW_VERSION),
                 ),
             )
         }
 
         val plan = only?.let(::listOf) ?: workflow.nodes
         if (plan.isEmpty()) {
-            return Result.failure(IllegalArgumentException("${workflow.name} has no nodes yet"))
+            return Result.failure(IllegalArgumentException(Strings.RunErrors.noNodes(workflow.name)))
         }
         if (only != null && !only.type.needsProcess()) {
             return Result.failure(
                 IllegalArgumentException(
-                    "${only.type.label} nodes only mean something with the rest of the graph " +
-                        "around them, so run the workflow instead",
+                    Strings.RunErrors.singleNodeNeedsGraph(only.type.label),
                 ),
             )
         }
@@ -210,7 +209,7 @@ class WorkflowEngine(
         }
 
         run.nodes.filter { it.status == RunStatus.QUEUED }.forEach {
-            it.notice("Never became reachable. Its dependencies are in a loop.", isWarning = true)
+            it.notice(Strings.Transcript.UNREACHABLE, isWarning = true)
             it.finish(RunStatus.FAILED)
         }
     }
@@ -253,13 +252,13 @@ class WorkflowEngine(
                     incoming.any {
                         it.on == EdgeTrigger.SUCCESS && run.node(it.from)?.status == RunStatus.FAILED
                     } -> {
-                        nodeRun.notice("Skipped: something it depends on failed")
+                        nodeRun.notice(Strings.Transcript.SKIPPED_FAILED_DEPENDENCY)
                         nodeRun.finish(RunStatus.SKIPPED)
                         changed = true
                     }
 
                     else -> {
-                        nodeRun.notice("Skipped: the run took another path")
+                        nodeRun.notice(Strings.Transcript.SKIPPED_OTHER_PATH)
                         nodeRun.finish(RunStatus.SKIPPED)
                         changed = true
                     }
@@ -333,14 +332,14 @@ class WorkflowEngine(
         nodeRun.approval = approval
         nodeRun.update { copy(status = RunStatus.WAITING) }
         when (val asked = node.prompt.takeIf { it.isNotBlank() }) {
-            null -> nodeRun.notice(node.title.ifBlank { "Waiting for you" })
+            null -> nodeRun.notice(node.title.ifBlank { Strings.Transcript.WAITING_FOR_YOU })
             else -> nodeRun.prompt(outputs.interpolate(asked).also { warnUnresolved(nodeRun, it) }.text)
         }
         onWaiting(nodeRun)
 
         val approved = approval.await()
-        nodeRun.produce(if (approved) "approved" else "rejected")
-        nodeRun.notice(if (approved) "Approved" else "Rejected. The rest of the run is skipped.")
+        nodeRun.produce(if (approved) Strings.Transcript.APPROVED_OUTPUT else Strings.Transcript.REJECTED_OUTPUT)
+        nodeRun.notice(if (approved) Strings.Transcript.APPROVED else Strings.Transcript.REJECTED)
         nodeRun.finish(if (approved) RunStatus.SUCCEEDED else RunStatus.STOPPED)
     }
 
@@ -364,12 +363,12 @@ class WorkflowEngine(
 
         nodeRun.update { answered() }
         if (answer == null) {
-            nodeRun.notice("Cancelled. The rest of the run is skipped.")
+            nodeRun.notice(Strings.Transcript.CANCELLED)
             nodeRun.finish(RunStatus.STOPPED)
             return
         }
         nodeRun.produce(answer)
-        nodeRun.notice("You: $answer")
+        nodeRun.notice(Strings.Transcript.youSaid(answer))
         nodeRun.finish(RunStatus.SUCCEEDED)
     }
 
@@ -428,14 +427,13 @@ class WorkflowEngine(
 
         if (node.type == NodeType.CONNECTOR) {
             if (node.connector.isBlank()) {
-                return Result.failure(IllegalStateException("${node.displayTitle} doesn't name a connector"))
+                return Result.failure(IllegalStateException(Strings.RunErrors.nodeNamesNoConnector(node.displayTitle)))
             }
             val found =
                 ConnectorStore(workspace).find(node.connector)
                     ?: return Result.failure(
                         IllegalStateException(
-                            "No connector called \"${node.connector}\" in " +
-                                "${workspace?.name ?: "this workspace"} or ~/.zopf/connectors",
+                            Strings.RunErrors.connectorNotFound(node.connector, workspace?.name ?: Strings.RunErrors.THIS_WORKSPACE),
                         ),
                     )
             return Result.success(found.dir)
@@ -447,15 +445,15 @@ class WorkflowEngine(
                 requested != null ->
                     workspace?.resolveRepo(workflow, requested)
                         ?: return Result.failure(
-                            IllegalStateException("Repo \"$requested\" isn't declared in ${workflow.name}"),
+                            IllegalStateException(Strings.RunErrors.repoUndeclared(requested, workflow.name)),
                         )
 
                 else ->
                     workspace?.root
-                        ?: return Result.failure(IllegalStateException("Open a workspace before running a node"))
+                        ?: return Result.failure(IllegalStateException(Strings.Workspaces.OPEN_BEFORE_NODE_RUN))
             }
         if (!path.exists() || !path.isDirectory()) {
-            return Result.failure(IllegalStateException("$path isn't there any more"))
+            return Result.failure(IllegalStateException(Strings.RunErrors.pathGone(path)))
         }
         return Result.success(path)
     }

@@ -36,6 +36,7 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.ui.editor.toKuiver
 import com.dk.zopf.ui.theme.KuiverBridge
 import com.dk.zopf.ui.theme.ZopfTheme
+import com.dk.zopf.util.Strings
 
 private val MinimapWidth = 108.dp
 
@@ -90,7 +91,7 @@ fun WorkflowThumbnail(
             .clip(shape)
             .background(colors.graphSurface)
             .swallowingDrags()
-            .semantics { contentDescription = "${workflow.nodes.size} nodes" },
+            .semantics { contentDescription = Strings.Editor.nodeCountDescription(workflow.nodes.size) },
     ) {
         KuiverBridge {
             KuiverViewer(

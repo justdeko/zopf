@@ -42,6 +42,7 @@ import com.dk.zopf.model.blurb
 import com.dk.zopf.model.label
 import com.dk.zopf.ui.theme.PathIcon
 import com.dk.zopf.ui.theme.colors
+import com.dk.zopf.util.Strings
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -188,7 +189,7 @@ internal fun ConnectDropMenu(
         ) {
             Column(Modifier.padding(vertical = 6.dp)) {
                 Text(
-                    "New node after $fromTitle",
+                    Strings.Editor.newNodeAfter(fromTitle),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),

@@ -31,6 +31,7 @@ import com.dk.zopf.store.workspace.OpenWorkspace
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -56,13 +57,13 @@ fun WorkspaceSwitcher(
         OutlinedButton(onClick = { expanded = true }, contentPadding = ButtonPadding) {
             Icon(
                 if (offline) ZopfIcons.Warning else ZopfIcons.Folder,
-                contentDescription = if (offline) "Workspace unavailable" else null,
+                contentDescription = if (offline) Strings.Workspaces.UNAVAILABLE else null,
                 modifier = Modifier.size(16.dp),
                 tint = if (offline) MaterialTheme.colorScheme.error else LocalContentColor.current,
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = active?.displayName ?: "No workspace",
+                text = active?.displayName ?: Strings.Workspaces.NONE,
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -73,7 +74,7 @@ fun WorkspaceSwitcher(
         }
 
         IconButton(onClick = onRefresh) {
-            Icon(ZopfIcons.Refresh, contentDescription = "Refresh workspaces", modifier = Modifier.size(18.dp))
+            Icon(ZopfIcons.Refresh, contentDescription = Strings.Workspaces.REFRESH, modifier = Modifier.size(18.dp))
         }
 
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -98,7 +99,7 @@ fun WorkspaceSwitcher(
                             {
                                 Icon(
                                     ZopfIcons.Warning,
-                                    contentDescription = "Unavailable",
+                                    contentDescription = Strings.Workspaces.UNAVAILABLE_SHORT,
                                     tint = MaterialTheme.colorScheme.error,
                                 )
                             }
@@ -108,7 +109,7 @@ fun WorkspaceSwitcher(
                             expanded = false
                             onForget(workspace.path)
                         }) {
-                            Icon(ZopfIcons.Clear, contentDescription = "Forget workspace")
+                            Icon(ZopfIcons.Clear, contentDescription = Strings.Workspaces.FORGET)
                         }
                     },
                     onClick = {
@@ -121,12 +122,12 @@ fun WorkspaceSwitcher(
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
 
             DropdownMenuItem(
-                text = { Text("Open workspace…") },
+                text = { Text(Strings.Workspaces.OPEN) },
                 leadingIcon = { Icon(ZopfIcons.Add, contentDescription = null) },
                 onClick = {
                     expanded = false
 
-                    chooseDirectory("Open or create a zopf workspace")?.let(onAdd)
+                    chooseDirectory(Strings.Workspaces.CHOOSE_TITLE)?.let(onAdd)
                 },
             )
         }

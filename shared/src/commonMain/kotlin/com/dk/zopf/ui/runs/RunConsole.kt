@@ -65,6 +65,7 @@ import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
 import com.dk.zopf.ui.theme.colors
+import com.dk.zopf.util.Strings
 import com.dk.zopf.util.format
 import com.dk.zopf.util.spend
 import kotlinx.coroutines.delay
@@ -151,7 +152,7 @@ private fun RunHeader(
                         append(" · ")
                         append(format(state.elapsed(run.startedAt, now)))
                         spend(state.costUsd, state.tokens)?.let { append(" · $it") }
-                        state.exitCode?.takeIf { it != 0 }?.let { append(" · exit $it") }
+                        state.exitCode?.takeIf { it != 0 }?.let { append(" · " + Strings.Console.exitCode(it)) }
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -165,19 +166,19 @@ private fun RunHeader(
                     Icon(ZopfIcons.Terminal, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
 
-                    Text("Take over in $terminalApp")
+                    Text(Strings.Console.takeOverIn(terminalApp))
                 }
             }
             if (state.status.isActive && !isElsewhere) {
                 TextButton(onClick = onStop) {
                     Icon(ZopfIcons.Stop, contentDescription = null, Modifier.size(14.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Stop")
+                    Text(Strings.Console.STOP)
                 }
             }
             onClose?.let {
                 IconButton(onClick = it) {
-                    Icon(ZopfIcons.Clear, contentDescription = "Close console", Modifier.size(16.dp))
+                    Icon(ZopfIcons.Clear, contentDescription = Strings.Console.CLOSE_CONSOLE, Modifier.size(16.dp))
                 }
             }
         }
@@ -223,7 +224,7 @@ private fun Transcript(
                 LoadingIndicator()
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "Waiting for the first event…",
+                    Strings.Console.WAITING_FOR_FIRST_EVENT,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -280,12 +281,12 @@ private fun ScrollControls(
         Column {
             if (canScrollUp) {
                 IconButton(onClick = onTop, modifier = Modifier.size(30.dp)) {
-                    Icon(ZopfIcons.JumpToTop, contentDescription = "Jump to top", Modifier.size(16.dp))
+                    Icon(ZopfIcons.JumpToTop, contentDescription = Strings.Console.JUMP_TO_TOP, Modifier.size(16.dp))
                 }
             }
             if (canScrollDown) {
                 IconButton(onClick = onBottom, modifier = Modifier.size(30.dp)) {
-                    Icon(ZopfIcons.JumpToBottom, contentDescription = "Jump to bottom", Modifier.size(16.dp))
+                    Icon(ZopfIcons.JumpToBottom, contentDescription = Strings.Console.JUMP_TO_BOTTOM, Modifier.size(16.dp))
                 }
             }
         }
@@ -411,7 +412,7 @@ private fun PromptRow(entry: ConsoleEntry.Prompt) {
                     contentPadding = PaddingValues(vertical = 4.dp),
                 ) {
                     Text(
-                        if (expanded) "Show less" else "Show all",
+                        if (expanded) Strings.Console.SHOW_LESS else Strings.Console.SHOW_ALL,
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
@@ -439,8 +440,8 @@ private fun SummaryRow(entry: ConsoleEntry.Summary) {
             }
             Text(
                 buildString {
-                    append(if (entry.isError) "Turn failed" else "Turn finished")
-                    entry.durationMs?.let { append(" in ${format(Duration.ofMillis(it))}") }
+                    append(if (entry.isError) Strings.Console.TURN_FAILED else Strings.Console.TURN_FINISHED)
+                    entry.durationMs?.let { append(Strings.Console.inDuration(format(Duration.ofMillis(it)))) }
                     spend(entry.costUsd, entry.tokens)?.let { append(" · $it") }
                 },
                 style = MaterialTheme.typography.labelSmall,
@@ -482,15 +483,15 @@ private fun FollowUpBar(
                         false
                     }
                 },
-            placeholder = { Text("Follow up in this session…") },
+            placeholder = { Text(Strings.Console.FOLLOW_UP_PLACEHOLDER) },
             textStyle = MaterialTheme.typography.bodyMedium,
             maxLines = 4,
         )
         Spacer(Modifier.width(8.dp))
         IconButton(onClick = { send() }, enabled = text.isNotBlank()) {
-            Icon(ZopfIcons.Send, contentDescription = "Send", Modifier.size(18.dp))
+            Icon(ZopfIcons.Send, contentDescription = Strings.Console.SEND, Modifier.size(18.dp))
         }
-        TextButton(onClick = onFinish) { Text("Finish") }
+        TextButton(onClick = onFinish) { Text(Strings.Console.FINISH) }
     }
 }
 
@@ -516,7 +517,7 @@ private fun PermissionBar(
     AttentionBar(RunStatus.FAILED) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(
-                "${request.toolName} wants to run",
+                Strings.Console.wantsToRun(request.toolName),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -531,14 +532,14 @@ private fun PermissionBar(
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { onDecide(false, false) }) { Text("Deny") }
+                TextButton(onClick = { onDecide(false, false) }) { Text(Strings.Console.DENY) }
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = { onDecide(true, true) }) { Text("Allow for this run") }
+                TextButton(onClick = { onDecide(true, true) }) { Text(Strings.Console.ALLOW_FOR_THIS_RUN) }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = { onDecide(true, false) }) {
                     Icon(ZopfIcons.Check, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Allow")
+                    Text(Strings.Console.ALLOW)
                 }
             }
         }
@@ -561,12 +562,12 @@ private fun GateBar(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = { onApprove(false) }) { Text("Reject") }
+            TextButton(onClick = { onApprove(false) }) { Text(Strings.Console.REJECT) }
             Spacer(Modifier.width(8.dp))
             Button(onClick = { onApprove(true) }) {
                 Icon(ZopfIcons.Check, contentDescription = null, Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Approve")
+                Text(Strings.Console.APPROVE)
             }
         }
     }
@@ -611,7 +612,7 @@ private fun InputBar(
                                     false
                                 }
                             },
-                        placeholder = { Text("Your answer…") },
+                        placeholder = { Text(Strings.Console.ANSWER_PLACEHOLDER) },
                         textStyle = MaterialTheme.typography.bodyMedium,
                         maxLines = 4,
                     )
@@ -619,12 +620,12 @@ private fun InputBar(
                     Spacer(Modifier.weight(1f))
                 }
                 Spacer(Modifier.width(8.dp))
-                TextButton(onClick = { onAnswer(null) }) { Text("Cancel run") }
+                TextButton(onClick = { onAnswer(null) }) { Text(Strings.Console.CANCEL_RUN) }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = { onAnswer(text.trim()) }, enabled = text.isNotBlank()) {
                     Icon(ZopfIcons.Send, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Answer")
+                    Text(Strings.Console.ANSWER)
                 }
             }
         }

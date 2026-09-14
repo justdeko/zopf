@@ -1,6 +1,7 @@
 package com.dk.zopf.runtime
 
 import com.dk.zopf.store.BuildInfo
+import com.dk.zopf.util.Strings
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.file.Files
@@ -26,7 +27,7 @@ object Download {
         onProgress: (Double) -> Unit = {},
     ): Result<Path> =
         runCatching {
-            val parent = target.parent ?: error("$target has nowhere to land")
+            val parent = target.parent ?: error(Strings.Updates.nowhereToLand(target))
             parent.createDirectories()
             val partial = Files.createTempFile(parent, ".${target.name}-", ".part")
             try {
@@ -43,7 +44,7 @@ object Download {
                             if (total > 0) onProgress((read.toDouble() / total).coerceIn(0.0, 1.0))
                         }
                     }
-                    check(total <= 0 || read == total) { "the download stopped at $read of $total bytes" }
+                    check(total <= 0 || read == total) { Strings.Updates.downloadStopped(read, total) }
                 }
                 Files.move(partial, target, StandardCopyOption.REPLACE_EXISTING)
                 target
@@ -68,7 +69,7 @@ object Download {
     }
 
     private fun open(url: String): Body {
-        check(url.startsWith("https://")) { "$url isn't an https link" }
+        check(url.startsWith("https://")) { Strings.Updates.notHttps(url) }
         val connection =
             (URI(url).toURL().openConnection() as HttpURLConnection).apply {
                 setRequestProperty("User-Agent", "zopf/${BuildInfo.version}")
@@ -83,7 +84,7 @@ object Download {
             }
         if (code != HttpURLConnection.HTTP_OK) {
             connection.disconnect()
-            error("$url answered $code")
+            error(Strings.Updates.answeredWith(url, code))
         }
         return Body(connection)
     }

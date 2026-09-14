@@ -6,6 +6,7 @@ import com.dk.zopf.runtime.Release
 import com.dk.zopf.runtime.Version
 import com.dk.zopf.runtime.ZOPF_REPO
 import com.dk.zopf.store.BuildInfo
+import com.dk.zopf.util.Strings
 import java.io.File
 import java.io.PrintStream
 import java.nio.file.Files
@@ -49,61 +50,61 @@ fun upgradeCli(
     checksum: (String) -> Result<String> = Download::text,
 ): Int {
     if (install == null) {
-        err.println("zopf: this copy wasn't put there by the installer, so it can't replace itself. Reinstall with")
+        err.println(Strings.Cli.NOT_INSTALLED_BY_INSTALLER)
         err.println("  $INSTALLER")
         return EXIT_FAILED
     }
-    val pinned = options.one("version")?.let { Version.parse(it) ?: throw UsageError("--version takes x.y.z, not \"$it\"") }
+    val pinned = options.one("version")?.let { Version.parse(it) ?: throw UsageError(Strings.Cli.versionTakesSemver(it)) }
     val release =
         releases(pinned).getOrElse {
-            err.println("zopf: couldn't ask GitHub for ${pinned?.toString() ?: "the latest release"}: ${it.message}")
+            err.println(Strings.Cli.couldntAskGitHubFor(pinned?.toString() ?: Strings.Cli.THE_LATEST_RELEASE, it.message))
             return EXIT_FAILED
         }
     if (pinned == null && running != null && release.version <= running) {
-        out.println("zopf $running is the latest release")
+        out.println(Strings.Cli.latestAlready("$running"))
         return EXIT_OK
     }
     val target = install.versionDir(release.version)
     if (target == install.current) {
-        out.println("zopf ${release.version} is already what's installed")
+        out.println(Strings.Cli.alreadyInstalled("${release.version}"))
         return EXIT_OK
     }
     val url = release.cli
     if (url.isBlank()) {
-        err.println("zopf: release ${release.version} publishes no command line to install. ${release.url}")
+        err.println(Strings.Cli.noCliAsset("${release.version}", release.url))
         return EXIT_FAILED
     }
     if (options.has("dry-run")) {
-        out.println("would install ${release.version} to $target and point ${install.link} at it")
+        out.println(Strings.Cli.wouldInstall("${release.version}", target, install.link))
         return EXIT_OK
     }
 
     val staging = Files.createTempDirectory("zopf-upgrade")
     try {
         val archive = staging.resolve(url.substringAfterLast('/'))
-        out.println("Downloading zopf ${release.version}")
+        out.println(Strings.Cli.downloading("${release.version}"))
         download(url, archive).getOrElse {
-            err.println("zopf: couldn't download ${archive.name}: ${it.message}")
+            err.println(Strings.Cli.couldntDownload(archive.name, it.message))
             return EXIT_FAILED
         }
         when (val checked = verified(archive, checksum("$url.sha256").getOrNull())) {
-            null -> err.println("note: ${release.version} publishes no .sha256, so the download wasn't verified")
+            null -> err.println(Strings.Cli.noChecksum("${release.version}"))
             else ->
                 if (!checked) {
-                    err.println("zopf: ${archive.name} isn't the file GitHub says it is. Nothing was installed.")
+                    err.println(Strings.Cli.checksumMismatch(archive.name))
                     return EXIT_FAILED
                 }
         }
 
         target.toFile().deleteRecursively()
         untar(archive, install.opt).getOrElse {
-            err.println("zopf: couldn't unpack ${archive.name}: ${it.message}")
+            err.println(Strings.Cli.couldntUnpack(archive.name, it.message))
             return EXIT_FAILED
         }
         val binary = target.resolve("bin/zopf")
         if (!binary.isExecutable()) {
             target.toFile().deleteRecursively()
-            err.println("zopf: ${archive.name} holds no bin/zopf where one was expected. Nothing was installed.")
+            err.println(Strings.Cli.noBinaryInside(archive.name))
             return EXIT_FAILED
         }
         relink(install.link, binary)
@@ -111,7 +112,7 @@ fun upgradeCli(
         staging.toFile().deleteRecursively()
     }
 
-    out.println("Updated zopf ${running ?: "unknown"} → ${release.version} at ${install.link}")
+    out.println(Strings.Cli.updated(running?.toString() ?: Strings.Cli.UNKNOWN_VERSION, "${release.version}", install.link))
     return EXIT_OK
 }
 
@@ -158,9 +159,9 @@ private fun untar(
         val output = process.inputStream.bufferedReader().readText()
         if (!process.waitFor(UNTAR_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             process.destroyForcibly()
-            error("tar took too long")
+            error(Strings.Cli.TAR_TOOK_TOO_LONG)
         }
-        check(process.exitValue() == 0) { output.trim().lines().lastOrNull() ?: "tar failed" }
+        check(process.exitValue() == 0) { output.trim().lines().lastOrNull() ?: Strings.Cli.TAR_FAILED }
     }
 
 private fun relink(

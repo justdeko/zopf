@@ -8,6 +8,7 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.store.zopfYaml
+import com.dk.zopf.util.Strings
 import kotlinx.serialization.descriptors.SerialDescriptor
 
 data class UnknownKey(
@@ -19,14 +20,14 @@ fun unknownKeysIn(yaml: String): List<UnknownKey> {
     val root = runCatching { zopfYaml.parseToYamlNode(yaml) }.getOrNull() as? YamlMap ?: return emptyList()
     val found = mutableListOf<UnknownKey>()
 
-    found += root.strayKeys(Workflow.serializer().descriptor, "the workflow")
+    found += root.strayKeys(Workflow.serializer().descriptor, Strings.Validation.THE_WORKFLOW)
 
     root.list("nodes").forEachIndexed { index, node ->
-        val name = (node as? YamlMap)?.text("id") ?: "node ${index + 1}"
+        val name = (node as? YamlMap)?.text("id") ?: Strings.Validation.nodeAt(index)
         found += (node as? YamlMap)?.strayKeys(WorkflowNode.serializer().descriptor, name).orEmpty()
     }
     root.list("edges").forEachIndexed { index, edge ->
-        found += (edge as? YamlMap)?.strayKeys(WorkflowEdge.serializer().descriptor, "edge ${index + 1}").orEmpty()
+        found += (edge as? YamlMap)?.strayKeys(WorkflowEdge.serializer().descriptor, Strings.Validation.edgeAt(index)).orEmpty()
     }
     return found
 }

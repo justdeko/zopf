@@ -44,6 +44,7 @@ import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
 import com.dk.zopf.ui.theme.colors
+import com.dk.zopf.util.Strings
 
 @Composable
 fun SectionLabel(
@@ -132,7 +133,7 @@ fun SuggestingField(
             supportingText = { Text(if (text.isBlank()) noneLabel else supportingText.orEmpty()) },
             trailingIcon = {
                 IconButton(onClick = { typing = !typing }) {
-                    Icon(ZopfIcons.List, contentDescription = "Choose", Modifier.size(18.dp))
+                    Icon(ZopfIcons.List, contentDescription = Strings.Inspector.CHOOSE, Modifier.size(18.dp))
                 }
             },
         )
@@ -185,7 +186,7 @@ fun <T> InspectorDropdown(
             supportingText = supportingText?.let { { Text(it) } },
             trailingIcon = {
                 IconButton(onClick = { expanded = true }) {
-                    Icon(ZopfIcons.List, contentDescription = "Choose", Modifier.size(18.dp))
+                    Icon(ZopfIcons.List, contentDescription = Strings.Inspector.CHOOSE, Modifier.size(18.dp))
                 }
             },
         )
@@ -216,7 +217,7 @@ fun <T> InspectorDropdown(
                 )
             }
             if (options.isEmpty() && noneLabel == null) {
-                DropdownMenuItem(text = { Text("Nothing to choose from") }, onClick = {}, enabled = false)
+                DropdownMenuItem(text = { Text(Strings.Inspector.NOTHING_TO_CHOOSE_FROM) }, onClick = {}, enabled = false)
             }
         }
     }
@@ -254,7 +255,7 @@ fun ChipListField(
                         onClick = { onChange(values - value) },
                         label = { Text(value, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         trailingIcon = {
-                            Icon(ZopfIcons.Clear, contentDescription = "Remove", Modifier.size(16.dp))
+                            Icon(ZopfIcons.Clear, contentDescription = Strings.Inspector.REMOVE, Modifier.size(16.dp))
                         },
                     )
                 }
@@ -270,11 +271,11 @@ fun ChipListField(
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
             )
             IconButton(onClick = { add(draft) }, enabled = draft.isNotBlank()) {
-                Icon(ZopfIcons.Add, contentDescription = "Add", Modifier.size(18.dp))
+                Icon(ZopfIcons.Add, contentDescription = Strings.Inspector.ADD, Modifier.size(18.dp))
             }
             onBrowse?.let {
                 IconButton(onClick = it) {
-                    Icon(ZopfIcons.Folder, contentDescription = "Browse", Modifier.size(18.dp))
+                    Icon(ZopfIcons.Folder, contentDescription = Strings.Inspector.BROWSE, Modifier.size(18.dp))
                 }
             }
         }
@@ -362,7 +363,7 @@ fun KeyValueField(
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 )
                 IconButton(onClick = { onChange(values - key) }) {
-                    Icon(ZopfIcons.Delete, contentDescription = "Remove $key", Modifier.size(16.dp))
+                    Icon(ZopfIcons.Delete, contentDescription = Strings.Inspector.removeInput(key), Modifier.size(16.dp))
                 }
             }
         }
@@ -371,7 +372,7 @@ fun KeyValueField(
                 value = newKey,
                 onValueChange = { newKey = it },
                 modifier = Modifier.weight(1f),
-                label = { Text("New input name") },
+                label = { Text(Strings.Inspector.NEW_INPUT_NAME) },
                 singleLine = true,
             )
             IconButton(
@@ -381,7 +382,7 @@ fun KeyValueField(
                 },
                 enabled = newKey.isNotBlank() && newKey.trim() !in values,
             ) {
-                Icon(ZopfIcons.Add, contentDescription = "Add input", Modifier.size(18.dp))
+                Icon(ZopfIcons.Add, contentDescription = Strings.Inspector.ADD_INPUT, Modifier.size(18.dp))
             }
         }
     }
@@ -402,7 +403,7 @@ fun ReferenceChips(
 ) {
     if (groups.all { it.fields.isEmpty() }) return
     Column(modifier.fillMaxWidth()) {
-        SectionLabel("Insert from upstream")
+        SectionLabel(Strings.Inspector.INSERT_FROM_UPSTREAM)
         groups.forEach { group ->
             if (group.fields.isEmpty()) return@forEach
             Row(
@@ -467,7 +468,7 @@ fun EdgeRow(
         )
         trailing()
         IconButton(onClick = onRemove) {
-            Icon(ZopfIcons.Clear, contentDescription = "Disconnect", Modifier.size(16.dp))
+            Icon(ZopfIcons.Clear, contentDescription = Strings.Inspector.DISCONNECT, Modifier.size(16.dp))
         }
     }
 }

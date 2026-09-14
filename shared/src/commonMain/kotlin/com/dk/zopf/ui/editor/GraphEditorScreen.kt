@@ -110,6 +110,7 @@ import com.dk.zopf.ui.theme.KuiverBridge
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
 import com.dk.zopf.ui.theme.colors
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -431,23 +432,23 @@ fun GraphEditorScreen(
     if (confirmingClose) {
         AlertDialog(
             onDismissRequest = { confirmingClose = false },
-            title = { Text("Save ${workflow.name}?") },
-            text = { Text("Some changes haven't been written to the YAML file yet.") },
+            title = { Text(Strings.Editor.unsavedTitle(workflow.name)) },
+            text = { Text(Strings.Editor.UNSAVED_BODY) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmingClose = false
                     save()
                     onClose()
-                }) { Text("Save and close") }
+                }) { Text(Strings.Editor.SAVE_AND_CLOSE) }
             },
             dismissButton = {
                 Row {
-                    TextButton(onClick = { confirmingClose = false }) { Text("Keep editing") }
+                    TextButton(onClick = { confirmingClose = false }) { Text(Strings.Editor.KEEP_EDITING) }
                     TextButton(onClick = {
                         confirmingClose = false
                         state.revert()
                         onClose()
-                    }) { Text("Discard") }
+                    }) { Text(Strings.Editor.DISCARD) }
                 }
             },
         )
@@ -562,7 +563,7 @@ private fun Canvas(
 
                 val model = workflow.edges.firstOrNull { it.from == edge.fromId && it.to == edge.toId }
                 val failure = model?.on == EdgeTrigger.FAILURE
-                val label = model?.let { it.condition?.toString() ?: "failed".takeIf { _ -> failure } }
+                val label = model?.let { it.condition?.toString() ?: Strings.Editor.FAILED_EDGE_LABEL.takeIf { _ -> failure } }
 
                 val toStatus = runStatuses[edge.toId]
                 val flow = edgeFlow(runStatuses[edge.fromId], toStatus, failure)
@@ -618,14 +619,14 @@ private fun nodeMenu(
     onRunNode: (WorkflowNode) -> Unit,
 ): List<ContextMenuItem> =
     buildList {
-        add(ContextMenuItem("Edit ${node.displayTitle}") { state.select(node.id) })
+        add(ContextMenuItem(Strings.Editor.editNode(node.displayTitle)) { state.select(node.id) })
 
         if (node.type == NodeType.AGENT || node.type == NodeType.SHELL) {
-            add(ContextMenuItem("Run this node") { onRunNode(node) })
+            add(ContextMenuItem(Strings.Editor.RUN_THIS_NODE) { onRunNode(node) })
         }
-        add(ContextMenuItem("Connect from here") { state.startConnecting(node.id) })
-        add(ContextMenuItem("Duplicate") { state.duplicateNode(node.id) })
-        add(ContextMenuItem("Delete") { state.removeNode(node.id) })
+        add(ContextMenuItem(Strings.Editor.CONNECT_FROM_HERE) { state.startConnecting(node.id) })
+        add(ContextMenuItem(Strings.Editor.DUPLICATE) { state.duplicateNode(node.id) })
+        add(ContextMenuItem(Strings.Editor.DELETE) { state.removeNode(node.id) })
     }
 
 @Composable
@@ -695,22 +696,16 @@ private fun EditorTopBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(ZopfIcons.Back, contentDescription = "Back to workflows", Modifier.size(18.dp))
+                    Icon(ZopfIcons.Back, contentDescription = Strings.Editor.BACK, Modifier.size(18.dp))
                 }
                 Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                     Text(
-                        workflow.name + if (isDirty) " •" else "",
+                        workflow.name + if (isDirty) Strings.Editor.DIRTY_MARKER else "",
                         style = MaterialTheme.typography.titleMediumEmphasized,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    val summary =
-                        buildString {
-                            append(count(workflow.nodes.size, "node"))
-                            append(" · ")
-                            append(count(workflow.edges.size, "edge"))
-                            if (errors > 0) append(" · $errors to fix")
-                        }
+                    val summary = Strings.Editor.subtitle(workflow.nodes.size, workflow.edges.size, errors)
                     Text(
                         summary,
                         style = MaterialTheme.typography.labelSmall,
@@ -725,7 +720,7 @@ private fun EditorTopBar(
                 IconButton(onClick = onToggleSource) {
                     Icon(
                         ZopfIcons.Code,
-                        contentDescription = if (sourceVisible) "Back to the canvas" else "Edit the YAML",
+                        contentDescription = if (sourceVisible) Strings.Editor.BACK_TO_CANVAS else Strings.Editor.EDIT_YAML,
                         Modifier.size(18.dp),
                         tint =
                             if (sourceVisible) {
@@ -738,41 +733,36 @@ private fun EditorTopBar(
                 IconButton(onClick = onToggleInspector) {
                     Icon(
                         if (inspectorVisible) ZopfIcons.SidePanel else ZopfIcons.SidePanelHidden,
-                        contentDescription = if (inspectorVisible) "Hide inspector" else "Show inspector",
+                        contentDescription = if (inspectorVisible) Strings.Editor.HIDE_INSPECTOR else Strings.Editor.SHOW_INSPECTOR,
                         Modifier.size(18.dp),
                     )
                 }
                 IconButton(onClick = onSettings) {
-                    Icon(ZopfIcons.Tune, contentDescription = "Workflow settings", Modifier.size(18.dp))
+                    Icon(ZopfIcons.Tune, contentDescription = Strings.Editor.WORKFLOW_SETTINGS, Modifier.size(18.dp))
                 }
                 runnableNode?.let { node ->
                     TextButton(onClick = { onRun(node) }) {
                         Icon(ZopfIcons.Play, contentDescription = null, Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Run ${node.displayTitle}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(Strings.Editor.runNode(node.displayTitle), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
 
                 TextButton(onClick = onRunWorkflow, enabled = workflow.nodes.isNotEmpty()) {
                     Icon(ZopfIcons.Play, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Run workflow")
+                    Text(Strings.Editor.RUN_WORKFLOW)
                 }
                 Spacer(Modifier.width(4.dp))
                 Button(onClick = onSave, enabled = isDirty) {
                     Icon(ZopfIcons.Check, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Save")
+                    Text(Strings.Editor.SAVE)
                 }
             }
         }
     }
 }
-
-internal fun count(
-    n: Int,
-    noun: String,
-) = if (n == 1) "1 $noun" else "$n ${noun}s"
 
 @Composable
 private fun NodePalette(onAdd: (NodeType) -> Unit) {
@@ -785,7 +775,7 @@ private fun NodePalette(onAdd: (NodeType) -> Unit) {
             IconButton(onClick = { onAdd(type) }) {
                 Icon(
                     type.icon,
-                    contentDescription = "Add a ${type.label} node. ${type.blurb}",
+                    contentDescription = Strings.Editor.addNode(type.label, type.blurb),
                     Modifier.size(20.dp),
                     tint = type.colors().accent,
                 )
@@ -812,7 +802,7 @@ private fun InspectorSplitter(onDrag: (Dp) -> Unit) {
         Modifier
             .width(8.dp)
             .fillMaxHeight()
-            .semantics { contentDescription = "Resize inspector" }
+            .semantics { contentDescription = Strings.Editor.RESIZE_INSPECTOR }
             .pointerHoverIcon(ResizeCursor)
             .hoverable(interactions)
             .draggable(
@@ -850,12 +840,12 @@ private fun ConnectBanner(
             Icon(ZopfIcons.Link, contentDescription = null, Modifier.size(16.dp))
             Spacer(Modifier.width(10.dp))
             Text(
-                "Connecting from $fromTitle. Click the next node.",
+                Strings.Editor.connectingFrom(fromTitle),
                 style = MaterialTheme.typography.labelMedium,
             )
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = onCancel) {
-                Icon(ZopfIcons.Clear, contentDescription = "Cancel", Modifier.size(16.dp))
+                Icon(ZopfIcons.Clear, contentDescription = Strings.Editor.CANCEL, Modifier.size(16.dp))
             }
         }
     }
@@ -878,12 +868,12 @@ private fun ChangedOnDiskBanner(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "This file changed on disk.",
+                Strings.Editor.FILE_CHANGED_ON_DISK,
                 style = MaterialTheme.typography.labelMedium,
             )
             Spacer(Modifier.width(8.dp))
-            TextButton(onClick = onReload) { Text("Load theirs") }
-            TextButton(onClick = onKeepMine) { Text("Keep mine") }
+            TextButton(onClick = onReload) { Text(Strings.Editor.LOAD_THEIRS) }
+            TextButton(onClick = onKeepMine) { Text(Strings.Editor.KEEP_MINE) }
         }
     }
 }
@@ -900,22 +890,22 @@ private fun CanvasControls(
 ) {
     HorizontalFloatingToolbar(expanded = true, modifier = modifier) {
         IconButton(onClick = onZoomOut) {
-            Icon(ZopfIcons.ZoomOut, contentDescription = "Zoom out", Modifier.size(18.dp))
+            Icon(ZopfIcons.ZoomOut, contentDescription = Strings.Editor.ZOOM_OUT, Modifier.size(18.dp))
         }
         IconButton(onClick = onZoomIn) {
-            Icon(ZopfIcons.ZoomIn, contentDescription = "Zoom in", Modifier.size(18.dp))
+            Icon(ZopfIcons.ZoomIn, contentDescription = Strings.Editor.ZOOM_IN, Modifier.size(18.dp))
         }
         IconButton(onClick = onFit) {
-            Icon(ZopfIcons.FitToScreen, contentDescription = "Fit to window", Modifier.size(18.dp))
+            Icon(ZopfIcons.FitToScreen, contentDescription = Strings.Editor.FIT_TO_WINDOW, Modifier.size(18.dp))
         }
         IconButton(onClick = onRelayout) {
-            Icon(ZopfIcons.Refresh, contentDescription = "Lay out again", Modifier.size(18.dp))
+            Icon(ZopfIcons.Refresh, contentDescription = Strings.Editor.LAY_OUT_AGAIN, Modifier.size(18.dp))
         }
 
         FilledIconToggleButton(checked = nodeDragEnabled, onCheckedChange = { onToggleNodeDrag() }) {
             Icon(
                 ZopfIcons.OpenWith,
-                contentDescription = if (nodeDragEnabled) "Stop moving nodes" else "Move nodes",
+                contentDescription = if (nodeDragEnabled) Strings.Editor.STOP_MOVING_NODES else Strings.Editor.MOVE_NODES,
                 Modifier.size(18.dp),
             )
         }
@@ -926,7 +916,7 @@ private fun CanvasControls(
 private fun EmptyCanvasHint() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(
-            "Add a node from the palette on the left.",
+            Strings.Editor.EMPTY_CANVAS,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

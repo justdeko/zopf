@@ -1,5 +1,6 @@
 package com.dk.zopf.store
 
+import com.dk.zopf.util.Strings
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -11,7 +12,7 @@ import kotlin.io.path.name
 import kotlin.io.path.writeText
 
 internal fun Path.writeTextAtomically(text: String) {
-    if (isDirectory()) throw IOException("$this is a directory, not a file zopf can write")
+    if (isDirectory()) throw IOException(Strings.RunErrors.notAFile(this))
     val dir = parent ?: return writeText(text)
     dir.createDirectories()
     val temp = Files.createTempFile(dir, ".$name-", ".tmp")

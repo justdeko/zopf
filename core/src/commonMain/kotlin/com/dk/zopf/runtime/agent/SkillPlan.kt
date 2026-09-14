@@ -4,6 +4,7 @@ import com.dk.zopf.store.workflow.Prompts
 import com.dk.zopf.store.workspace.DiscoveredSkill
 import com.dk.zopf.store.workspace.homeDir
 import com.dk.zopf.store.workspace.skillMustBeNamed
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 
 data class SelectedSkill(
@@ -36,8 +37,7 @@ class SkillPlan(
                 selected.filterNot { it.ambient }.takeIf { it.isNotEmpty() }?.let { passed ->
                     add(
                         SkillNotice(
-                            "Skills: " + passed.joinToString { "${it.name} (${it.source})" } +
-                                ", one --plugin-dir each",
+                            Strings.Transcript.skillsPassed(passed.joinToString { "${it.name} (${it.source})" }),
                             isWarning = false,
                         ),
                     )
@@ -45,8 +45,7 @@ class SkillPlan(
                 selected.filter { it.ambient }.takeIf { it.isNotEmpty() }?.let { ambient ->
                     add(
                         SkillNotice(
-                            "Already loaded by this session, so passed no flag: " +
-                                ambient.joinToString { it.name },
+                            Strings.Transcript.skillsAmbient(ambient.joinToString { it.name }),
                             isWarning = false,
                         ),
                     )
@@ -54,8 +53,7 @@ class SkillPlan(
                 if (unresolved.isNotEmpty()) {
                     add(
                         SkillNotice(
-                            "No skill directory found for ${unresolved.joinToString()}. " +
-                                "Declare it in the workflow's settings, or the name goes nowhere.",
+                            Strings.Transcript.skillsUnresolved(unresolved.joinToString()),
                             isWarning = true,
                         ),
                     )
@@ -65,8 +63,7 @@ class SkillPlan(
                 forced.firstOrNull()?.let {
                     add(
                         SkillNotice(
-                            "${it.name} sets disable-model-invocation, so it is invoked as /${it.name} " +
-                                "and the prompt goes to it as arguments",
+                            Strings.Transcript.skillForcedCommand(it.name),
                             isWarning = false,
                         ),
                     )
@@ -74,9 +71,7 @@ class SkillPlan(
                 forced.drop(1).takeIf { it.isNotEmpty() }?.let { rest ->
                     add(
                         SkillNotice(
-                            "Only one command is expanded per message, so " +
-                                rest.joinToString { it.name } + " won't fire. " +
-                                "Give each one its own node.",
+                            Strings.Transcript.skillCommandsDropped(rest.joinToString { it.name }),
                             isWarning = true,
                         ),
                     )

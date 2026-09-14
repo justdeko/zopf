@@ -14,6 +14,7 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.outgoingEdges
 import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.util.Strings
 
 const val InAnchor = "left"
 const val OutAnchor = "right"
@@ -104,12 +105,12 @@ fun Workflow.connect(
     from: String,
     to: String,
 ): Result<Workflow> {
-    if (from == to) return Result.failure(IllegalArgumentException("A node can't feed itself"))
-    val fromNode = node(from) ?: return Result.failure(IllegalArgumentException("No node called \"$from\""))
-    if (node(to) == null) return Result.failure(IllegalArgumentException("No node called \"$to\""))
-    if (hasEdge(from, to)) return Result.failure(IllegalStateException("Those are already connected"))
+    if (from == to) return Result.failure(IllegalArgumentException(Strings.Editor.SELF_EDGE))
+    val fromNode = node(from) ?: return Result.failure(IllegalArgumentException(Strings.Editor.noSuchNode(from)))
+    if (node(to) == null) return Result.failure(IllegalArgumentException(Strings.Editor.noSuchNode(to)))
+    if (hasEdge(from, to)) return Result.failure(IllegalStateException(Strings.Editor.ALREADY_CONNECTED))
     if (toKuiver().wouldCreateCycle(from, to)) {
-        return Result.failure(IllegalStateException("That would make a loop, and a workflow has to finish"))
+        return Result.failure(IllegalStateException(Strings.Editor.WOULD_LOOP))
     }
 
     val condition =

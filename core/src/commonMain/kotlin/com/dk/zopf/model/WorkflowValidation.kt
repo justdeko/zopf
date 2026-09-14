@@ -1,5 +1,7 @@
 package com.dk.zopf.model
 
+import com.dk.zopf.util.Strings
+
 data class WorkflowIssue(
     val message: String,
     val nodeId: String? = null,
@@ -22,17 +24,17 @@ fun Workflow.validate(
     val declaredRepos = repos.mapTo(mutableSetOf()) { it.id }
 
     if (isFromTheFuture) {
-        issues += WorkflowIssue("This workflow needs workflow format v$version. This zopf reads v$WORKFLOW_VERSION, so update zopf")
+        issues += WorkflowIssue(Strings.Validation.fromTheFuture(version, WORKFLOW_VERSION))
     }
 
     issues += graphIssues()
 
     repos.filterNot(repoExists).forEach {
-        issues += WorkflowIssue("Repo \"${it.id}\" isn't at ${it.path} any more")
+        issues += WorkflowIssue(Strings.Validation.repoMoved(it.id, it.path))
     }
 
     defaults.repo?.let { repo ->
-        if (repo !in declaredRepos) issues += WorkflowIssue("Default repo \"$repo\" isn't declared")
+        if (repo !in declaredRepos) issues += WorkflowIssue(Strings.Validation.defaultRepoUndeclared(repo))
     }
 
     for (node in nodes) {
@@ -40,11 +42,11 @@ fun Workflow.validate(
 
         node.repo?.let { repo ->
             if (repo !in declaredRepos) {
-                issues += WorkflowIssue("$where runs in \"$repo\", which isn't declared", node.id)
+                issues += WorkflowIssue(Strings.Validation.repoUndeclared(where, repo), node.id)
             }
         }
         node.alsoRead.filterNot { it in declaredRepos }.forEach {
-            issues += WorkflowIssue("$where also reads \"$it\", which isn't declared", node.id)
+            issues += WorkflowIssue(Strings.Validation.alsoReadUndeclared(where, it), node.id)
         }
 
         val ancestors = ancestorsOf(node.id)
@@ -60,14 +62,14 @@ fun Workflow.validate(
             text: String,
             source: String? = null,
         ) {
-            val located = source?.let { " in $it" }.orEmpty()
+            val located = Strings.Validation.inFile(source)
             val resolvable = mutableSetOf<String>()
             for (referenced in NodeRefs.referencedNodeIds(text)) {
                 when (referenced) {
                     !in nodeIds -> {
                         issues +=
                             WorkflowIssue(
-                                "$where reads \${$referenced…}$located, which is no longer a node",
+                                Strings.Validation.referencesUnknownNode(where, referenced, located),
                                 node.id,
                             )
                     }
@@ -75,7 +77,7 @@ fun Workflow.validate(
                     !in ancestors -> {
                         issues +=
                             WorkflowIssue(
-                                "$where reads \${$referenced…}$located, but nothing connects $referenced to it",
+                                Strings.Validation.referencesUnconnectedNode(where, referenced, located),
                                 node.id,
                             )
                     }
@@ -92,8 +94,7 @@ fun Workflow.validate(
                 if (field !in produced) {
                     issues +=
                         WorkflowIssue(
-                            "$referenced produces ${produced.joinToString()}, so $where " +
-                                "can't read \${$referenced.$field}$located",
+                            Strings.Validation.referencesUnknownField(referenced, produced.joinToString(), where, field, located),
                             node.id,
                         )
                 }
@@ -121,7 +122,7 @@ fun Workflow.validate(
         nodes.filterNot { it.id in connected }.forEach {
             issues +=
                 WorkflowIssue(
-                    "${it.displayTitle} isn't connected to anything",
+                    Strings.Validation.orphanNode(it.displayTitle),
                     it.id,
                     WorkflowIssue.Severity.WARNING,
                 )
@@ -138,14 +139,13 @@ private fun Workflow.graphIssues(): List<WorkflowIssue> {
     duplicateNodeIds().forEach { id ->
         issues +=
             WorkflowIssue(
-                "There are ${nodes.count { it.id == id }} nodes called \"$id\". Ids have to be unique, " +
-                    "since \${$id.result} can only mean one of them",
+                Strings.Validation.duplicateId(nodes.count { it.id == id }, id),
                 id,
             )
     }
 
     edges.filter { it.from == it.to }.forEach { edge ->
-        issues += WorkflowIssue("The edge on \"${edge.from}\" feeds itself, so it could never run", edge.from)
+        issues += WorkflowIssue(Strings.Validation.selfEdge(edge.from), edge.from)
     }
 
     edges
@@ -158,15 +158,14 @@ private fun Workflow.graphIssues(): List<WorkflowIssue> {
         .forEach { (missing, other) ->
             issues +=
                 WorkflowIssue(
-                    "An edge connects \"$missing\", which isn't a node in $name. The edge to \"$other\" " +
-                        "is ignored, so the run takes a path nobody wrote",
+                    Strings.Validation.edgeToMissingNode(missing, name, other),
                 )
         }
 
     unreachableFromStart().takeIf { it.isNotEmpty() }?.let { stuck ->
         issues +=
             WorkflowIssue(
-                "${stuck.joinToString()} can never run: the edges into them make a loop",
+                Strings.Validation.cycle(stuck.joinToString()),
                 stuck.first(),
             )
     }
@@ -176,14 +175,14 @@ private fun Workflow.graphIssues(): List<WorkflowIssue> {
 private fun WorkflowNode.emptinessIssue(): List<WorkflowIssue> {
     val missing =
         when (type) {
-            NodeType.AGENT -> if (prompt.isBlank() && promptFile.isBlank()) "a prompt" else null
-            NodeType.SHELL -> if (command.isBlank()) "a command" else null
-            NodeType.CONNECTOR -> if (connector.isBlank()) "a connector" else null
-            NodeType.BRANCH -> if (expression.isBlank()) "an expression" else null
-            NodeType.INPUT -> if (prompt.isBlank()) "a question" else null
+            NodeType.AGENT -> if (prompt.isBlank() && promptFile.isBlank()) Strings.Validation.NEEDS_PROMPT else null
+            NodeType.SHELL -> if (command.isBlank()) Strings.Validation.NEEDS_COMMAND else null
+            NodeType.CONNECTOR -> if (connector.isBlank()) Strings.Validation.NEEDS_CONNECTOR else null
+            NodeType.BRANCH -> if (expression.isBlank()) Strings.Validation.NEEDS_EXPRESSION else null
+            NodeType.INPUT -> if (prompt.isBlank()) Strings.Validation.NEEDS_QUESTION else null
             NodeType.GATE -> null
         }
-    return missing?.let { listOf(WorkflowIssue("$displayTitle needs $it", id)) }.orEmpty()
+    return missing?.let { listOf(WorkflowIssue(Strings.Validation.needs(displayTitle, it), id)) }.orEmpty()
 }
 
 private fun WorkflowNode.choiceIssues(): List<WorkflowIssue> {
@@ -191,7 +190,7 @@ private fun WorkflowNode.choiceIssues(): List<WorkflowIssue> {
     if (default in choices) return emptyList()
     return listOf(
         WorkflowIssue(
-            "$displayTitle offers ${choices.joinToString()}, so its default \"$default\" can't be picked",
+            Strings.Validation.defaultNotAChoice(displayTitle, choices.joinToString(), default),
             id,
             WorkflowIssue.Severity.WARNING,
         ),
@@ -203,13 +202,13 @@ private fun WorkflowNode.promptFileIssues(fileExists: (String) -> Boolean): List
 
     val issues = mutableListOf<WorkflowIssue>()
     if (!fileExists(promptFile)) {
-        issues += WorkflowIssue("$displayTitle reads its prompt from $promptFile, which isn't there", id)
+        issues += WorkflowIssue(Strings.Validation.promptFileMissing(displayTitle, promptFile), id)
     }
 
     if (prompt.isNotBlank()) {
         issues +=
             WorkflowIssue(
-                "$displayTitle sends $promptFile, so its inline prompt is ignored",
+                Strings.Validation.inlinePromptIgnored(displayTitle, promptFile),
                 id,
                 WorkflowIssue.Severity.WARNING,
             )
@@ -222,12 +221,12 @@ private fun WorkflowNode.schemaIssues(): List<WorkflowIssue> {
 
     val issues = mutableListOf<WorkflowIssue>()
     if (type != NodeType.AGENT) {
-        issues += WorkflowIssue("$displayTitle declares an output schema, which only an agent node can use", id)
+        issues += WorkflowIssue(Strings.Validation.schemaOnNonAgent(displayTitle), id)
         return issues
     }
 
     schema.filter { it.name.isBlank() }.forEach {
-        issues += WorkflowIssue("$displayTitle declares an output field with no name", id)
+        issues += WorkflowIssue(Strings.Validation.unnamedOutputField(displayTitle), id)
     }
 
     schema
@@ -238,14 +237,14 @@ private fun WorkflowNode.schemaIssues(): List<WorkflowIssue> {
         .filterValues { it > 1 }
         .keys
         .forEach {
-            issues += WorkflowIssue("$displayTitle declares the output field \"$it\" more than once", id)
+            issues += WorkflowIssue(Strings.Validation.duplicateOutputField(displayTitle, it), id)
         }
 
     val builtIn = NodeType.AGENT.outputFields().toSet()
     schema.map { it.name }.filter { it in builtIn }.forEach {
         issues +=
             WorkflowIssue(
-                "$displayTitle declares an output field named \"$it\", which \${$id.$it} already means",
+                Strings.Validation.outputFieldShadowsBuiltIn(displayTitle, it, id),
                 id,
             )
     }
@@ -253,7 +252,7 @@ private fun WorkflowNode.schemaIssues(): List<WorkflowIssue> {
     schema.filter { it.name.isNotBlank() && !NodeRefs.isFieldName(it.name) }.forEach {
         issues +=
             WorkflowIssue(
-                "$displayTitle declares the output field \"${it.name}\", which \${$id.…} can't name",
+                Strings.Validation.outputFieldUnreferenceable(displayTitle, it.name, id),
                 id,
                 WorkflowIssue.Severity.WARNING,
             )
@@ -266,8 +265,7 @@ private fun WorkflowNode.skillIssues(knownSkills: Set<String>?): List<WorkflowIs
     if (knownSkills == null || type != NodeType.AGENT) return emptyList()
     return skills.filterNot { it in knownSkills }.map {
         WorkflowIssue(
-            "$displayTitle uses the \"$it\" skill, which isn't in this workflow's repos, the " +
-                "workspace or ~/.claude/skills",
+            Strings.Validation.unknownSkill(displayTitle, it),
             id,
             WorkflowIssue.Severity.WARNING,
         )
@@ -284,7 +282,7 @@ private fun WorkflowNode.providerIssues(
             "sandbox".takeIf { sandbox != null },
         ).map {
             WorkflowIssue(
-                "$displayTitle is a ${type.serialName} node, so its \"$it\" does nothing",
+                Strings.Validation.fieldDoesNothing(displayTitle, type.serialName, it),
                 id,
                 WorkflowIssue.Severity.WARNING,
             )
@@ -296,8 +294,7 @@ private fun WorkflowNode.providerIssues(
     if (!executableExists(provider)) {
         issues +=
             WorkflowIssue(
-                "$displayTitle runs ${provider.cliValue}, which isn't on your PATH. " +
-                    "The node will fail when it starts",
+                Strings.Validation.executableMissing(displayTitle, provider.cliValue),
                 id,
                 WorkflowIssue.Severity.WARNING,
             )
@@ -306,7 +303,7 @@ private fun WorkflowNode.providerIssues(
     provider.ignoredFields(this).takeIf { it.isNotEmpty() }?.let {
         issues +=
             WorkflowIssue(
-                "$displayTitle runs ${provider.label}, which ignores ${it.joinToString()}",
+                Strings.Validation.providerIgnoresFields(displayTitle, provider.label, it.joinToString()),
                 id,
                 WorkflowIssue.Severity.WARNING,
             )
@@ -324,8 +321,7 @@ private fun connectorIssues(
         lookup(node.connector)
             ?: return listOf(
                 WorkflowIssue(
-                    "${node.displayTitle} calls \"${node.connector}\", which isn't a connector in this " +
-                        "workspace or ~/.zopf/connectors",
+                    Strings.Validation.connectorMissing(node.displayTitle, node.connector),
                     node.id,
                 ),
             )
@@ -333,14 +329,14 @@ private fun connectorIssues(
     val issues = mutableListOf<WorkflowIssue>()
     manifest.inputs
         .filter { it.required && it.default.isBlank() && node.inputs[it.name].isNullOrBlank() }
-        .forEach { issues += WorkflowIssue("${node.displayTitle} needs an input for \"${it.name}\"", node.id) }
+        .forEach { issues += WorkflowIssue(Strings.Validation.connectorInputMissing(node.displayTitle, it.name), node.id) }
 
     node.inputs.keys
         .filter { key -> manifest.inputs.none { it.name == key } }
         .forEach {
             issues +=
                 WorkflowIssue(
-                    "${node.displayTitle} sets \"$it\", which ${manifest.name} doesn't declare",
+                    Strings.Validation.connectorInputUndeclared(node.displayTitle, it, manifest.name),
                     node.id,
                     WorkflowIssue.Severity.WARNING,
                 )
@@ -355,8 +351,7 @@ private fun Workflow.edgeTriggerIssues(node: WorkflowNode): List<WorkflowIssue> 
         outgoingEdges(node.id).filter { it.on == EdgeTrigger.FAILURE }.forEach { edge ->
             issues +=
                 WorkflowIssue(
-                    "${node.displayTitle} is a ${node.type.name.lowercase()}, which never fails, so the " +
-                        "edge to ${edge.to} can never be taken",
+                    Strings.Validation.failureEdgeOnInfallibleNode(node.displayTitle, node.type.name.lowercase(), edge.to),
                     node.id,
                     WorkflowIssue.Severity.WARNING,
                 )
@@ -367,8 +362,7 @@ private fun Workflow.edgeTriggerIssues(node: WorkflowNode): List<WorkflowIssue> 
         outgoingEdges(node.id).filter { it.condition != null }.forEach { edge ->
             issues +=
                 WorkflowIssue(
-                    "${node.displayTitle} isn't a branch, so the \"when\" on its edge to ${edge.to} " +
-                        "can never match and ${edge.to} never runs",
+                    Strings.Validation.conditionOnNonBranch(node.displayTitle, edge.to),
                     node.id,
                 )
         }
@@ -382,7 +376,7 @@ private fun Workflow.branchIssues(node: WorkflowNode): List<WorkflowIssue> {
     val issues = mutableListOf<WorkflowIssue>()
 
     if (outgoing.any { it.condition == null }) {
-        issues += WorkflowIssue("${node.displayTitle} has an edge that is neither true nor false", node.id)
+        issues += WorkflowIssue(Strings.Validation.branchEdgeWithoutCondition(node.displayTitle), node.id)
     }
     outgoing
         .groupBy { it.condition }
@@ -391,7 +385,7 @@ private fun Workflow.branchIssues(node: WorkflowNode): List<WorkflowIssue> {
         .forEach { (condition, edges) ->
             issues +=
                 WorkflowIssue(
-                    "${node.displayTitle} has ${edges.size} \"$condition\" edges; it can only take one",
+                    Strings.Validation.duplicateBranchEdges(node.displayTitle, edges.size, "$condition"),
                     node.id,
                 )
         }

@@ -42,6 +42,7 @@ import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
 import com.dk.zopf.ui.workspace.chooseDirectory
+import com.dk.zopf.util.Strings
 
 @Composable
 fun WorkflowSettingsDialog(
@@ -54,7 +55,7 @@ fun WorkflowSettingsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("${workflow.name} settings") },
+        title = { Text(Strings.WorkflowSettings.title(workflow.name)) },
         text = {
             Column(
                 Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
@@ -62,9 +63,9 @@ fun WorkflowSettingsDialog(
                 InspectorField(
                     value = workflow.description,
                     onValueChange = { state.edit { w -> w.copy(description = it) } },
-                    label = "Description",
+                    label = Strings.WorkflowSettings.DESCRIPTION_LABEL,
                     singleLine = false,
-                    supportingText = "Shown in the workflow list.",
+                    supportingText = Strings.WorkflowSettings.DESCRIPTION_HINT,
                 )
 
                 Gap()
@@ -76,18 +77,17 @@ fun WorkflowSettingsDialog(
                 HorizontalDivider()
                 Gap(8)
                 ChipListField(
-                    label = "Skill directories",
+                    label = Strings.WorkflowSettings.SKILL_DIRS_LABEL,
                     values = workflow.skills,
                     onChange = { skills ->
                         state.edit { it.copy(skills = skills) }
                         state.refreshLookups()
                     },
-                    addLabel = "Path to a skill",
+                    addLabel = Strings.WorkflowSettings.SKILL_DIR_ADD,
                     supportingText =
-                        "A directory with a SKILL.md in it. Absolute, ~-relative, or relative " +
-                            "to the workspace root. Nodes tick it by name.",
+                        Strings.WorkflowSettings.SKILL_DIRS_HINT,
                     onBrowse = {
-                        chooseDirectory("Choose a skill directory", state.startIn(null, workspace))?.let {
+                        chooseDirectory(Strings.WorkflowSettings.CHOOSE_SKILL_DIR, state.startIn(null, workspace))?.let {
                             state.addSkillDirectory(it, nodeId = null)
                         }
                     },
@@ -96,16 +96,16 @@ fun WorkflowSettingsDialog(
                 Gap()
                 HorizontalDivider()
                 Gap(8)
-                SectionLabel("Defaults")
+                SectionLabel(Strings.WorkflowSettings.DEFAULTS)
                 Gap(4)
                 InspectorDropdown(
-                    label = "Repo",
+                    label = Strings.WorkflowSettings.REPO_LABEL,
                     selected = workflow.defaults.repo,
                     options = state.repoIds,
                     optionLabel = { it },
                     onSelect = { repo -> state.edit { it.copy(defaults = it.defaults.copy(repo = repo)) } },
-                    noneLabel = "None",
-                    supportingText = "Used by nodes that don't name one.",
+                    noneLabel = Strings.WorkflowSettings.REPO_NONE,
+                    supportingText = Strings.WorkflowSettings.REPO_HINT,
                 )
                 Gap(8)
                 InspectorDropdown(
@@ -116,8 +116,8 @@ fun WorkflowSettingsDialog(
                     onSelect = { provider ->
                         state.edit { it.copy(defaults = it.defaults.copy(provider = provider)) }
                     },
-                    noneLabel = "Default (${state.defaultProvider.label})",
-                    supportingText = "Which agent CLI this workflow's agent nodes run, unless they name their own.",
+                    noneLabel = Strings.WorkflowSettings.providerNone(state.defaultProvider.label),
+                    supportingText = Strings.WorkflowSettings.PROVIDER_HINT,
                 )
                 if (defaultProvider.capabilities.modelSelection) {
                     Gap(8)
@@ -125,37 +125,37 @@ fun WorkflowSettingsDialog(
                         provider = defaultProvider,
                         selected = workflow.defaults.model,
                         onSelect = { model -> state.edit { it.copy(defaults = it.defaults.copy(model = model)) } },
-                        noneLabel = "Whatever ${defaultProvider.cliValue} is set to",
-                        supportingText = "Read by nodes running ${defaultProvider.label}. A node on another CLI names its own.",
+                        noneLabel = Strings.WorkflowSettings.modelNone(defaultProvider.cliValue),
+                        supportingText = Strings.WorkflowSettings.modelHint(defaultProvider.label),
                     )
                 }
                 Gap(8)
                 InspectorDropdown(
-                    label = "Permission mode",
+                    label = Strings.WorkflowSettings.PERMISSION_MODE_LABEL,
                     selected = workflow.defaults.permissionMode,
                     options = PermissionMode.entries,
                     optionLabel = { it.cliValue },
                     onSelect = { mode ->
                         state.edit { it.copy(defaults = it.defaults.copy(permissionMode = mode)) }
                     },
-                    noneLabel = "Whatever the CLI is set to",
-                    supportingText = "Claude Code only.",
+                    noneLabel = Strings.WorkflowSettings.PERMISSION_MODE_NONE,
+                    supportingText = Strings.WorkflowSettings.PERMISSION_MODE_HINT,
                 )
                 Gap(8)
                 InspectorDropdown(
-                    label = "Sandbox",
+                    label = Strings.WorkflowSettings.SANDBOX_LABEL,
                     selected = workflow.defaults.sandbox,
                     options = Sandbox.entries,
                     optionLabel = { it.cliValue },
                     onSelect = { sandbox ->
                         state.edit { it.copy(defaults = it.defaults.copy(sandbox = sandbox)) }
                     },
-                    noneLabel = "Whatever the CLI is set to",
-                    supportingText = "codex only.",
+                    noneLabel = Strings.WorkflowSettings.SANDBOX_NONE,
+                    supportingText = Strings.WorkflowSettings.SANDBOX_HINT,
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(Strings.WorkflowSettings.DONE) } },
     )
 }
 
@@ -167,10 +167,10 @@ private fun ReposSection(
     val workflow = state.workflow
     var adding by remember { mutableStateOf(false) }
 
-    SectionLabel("Repos")
+    SectionLabel(Strings.WorkflowSettings.REPOS)
     if (workflow.repos.isEmpty()) {
         Text(
-            "None declared. Nodes fall back to the workspace directory.",
+            Strings.WorkflowSettings.NO_REPOS_DECLARED,
             Modifier.padding(top = 4.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -189,7 +189,7 @@ private fun ReposSection(
 
     if (workspace?.selfRepo != null && workflow.repos.none { it.id == "self" }) {
         Text(
-            "\"self\" is available without declaring it: ${workspace.selfRepo}",
+            Strings.WorkflowSettings.selfRepoAvailable(workspace.selfRepo),
             Modifier.padding(top = 6.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -199,7 +199,7 @@ private fun ReposSection(
     TextButton(onClick = { adding = true }) {
         Icon(ZopfIcons.Add, contentDescription = null, Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
-        Text("Add repo")
+        Text(Strings.WorkflowSettings.ADD_REPO)
     }
 
     if (adding) {
@@ -231,7 +231,7 @@ private fun RepoRow(
             supportingText = resolved?.takeIf { it != repo.path },
         )
         IconButton(onClick = onRemove) {
-            Icon(ZopfIcons.Delete, contentDescription = "Remove ${repo.id}", Modifier.size(16.dp))
+            Icon(ZopfIcons.Delete, contentDescription = Strings.WorkflowSettings.removeRepo(repo.id), Modifier.size(16.dp))
         }
     }
 }
@@ -247,34 +247,34 @@ private fun AddRepoDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add repo") },
+        title = { Text(Strings.WorkflowSettings.ADD_REPO) },
         text = {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 InspectorField(
                     value = id,
                     onValueChange = { id = it },
-                    label = "Id",
+                    label = Strings.WorkflowSettings.REPO_ID_LABEL,
                     monospace = true,
-                    supportingText = "How nodes refer to it, e.g. app.",
+                    supportingText = Strings.WorkflowSettings.REPO_ID_HINT,
                 )
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     InspectorField(
                         value = path,
                         onValueChange = { path = it },
-                        label = "Path",
+                        label = Strings.WorkflowSettings.REPO_PATH_LABEL,
                         monospace = true,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = {
-                        chooseDirectory("Choose a repo")?.let {
+                        chooseDirectory(Strings.WorkflowSettings.CHOOSE_REPO)?.let {
                             path = it.toString()
 
                             if (id.isBlank()) id = it.fileName?.toString().orEmpty()
                         }
-                    }) { Text("Browse…") }
+                    }) { Text(Strings.WorkflowSettings.BROWSE) }
                 }
                 if (suggestions.isNotEmpty()) {
-                    SectionLabel("Used by other workflows")
+                    SectionLabel(Strings.WorkflowSettings.USED_BY_OTHER_WORKFLOWS)
                     suggestions.take(6).forEach { suggestion ->
                         TextButton(onClick = { path = suggestion }) {
                             Text(
@@ -292,9 +292,9 @@ private fun AddRepoDialog(
             TextButton(
                 onClick = { onAdd(id, path) },
                 enabled = id.isNotBlank() && path.isNotBlank(),
-            ) { Text("Add") }
+            ) { Text(Strings.WorkflowSettings.ADD) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.WorkflowSettings.CANCEL) } },
     )
 }
 

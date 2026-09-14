@@ -13,6 +13,7 @@ import com.dk.zopf.store.SettingsStore
 import com.dk.zopf.store.workflow.BrokenWorkflow
 import com.dk.zopf.store.workflow.WorkflowStore
 import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.util.Strings
 import com.dk.zopf.util.money
 import com.dk.zopf.util.stamp
 import java.io.PrintStream
@@ -37,15 +38,15 @@ fun listWorkflows(
     val workspace = locateWorkspace(options.one("workspace"))
     val listing = WorkflowStore(workspace).list()
 
-    out.println("${workspace.name} · ${workspace.root}")
+    out.println(Strings.Cli.header(workspace.name, workspace.root))
     if (listing.workflows.isEmpty() && listing.broken.isEmpty()) {
-        out.println("  no workflows yet")
+        out.println(Strings.Cli.NO_WORKFLOWS_YET)
     }
     val width = listing.workflows.maxOfOrNull { it.name.length } ?: 0
     listing.workflows.forEach { workflow ->
         val detail =
             listOfNotNull(
-                "${workflow.nodes.size} ${if (workflow.nodes.size == 1) "node" else "nodes"}",
+                Strings.Words.count(workflow.nodes.size, Strings.Words.NODE),
                 workflow.description
                     .lineSequence()
                     .firstOrNull()
@@ -53,7 +54,7 @@ fun listWorkflows(
             )
         out.println("  ${workflow.name.padEnd(width)}  ${detail.joinToString(" · ")}")
     }
-    listing.broken.forEach { out.println("  ${it.file.fileName}: doesn't parse. ${it.message}") }
+    listing.broken.forEach { out.println("  " + Strings.Cli.brokenFile(it.file.fileName, it.message)) }
     return EXIT_OK
 }
 
@@ -75,7 +76,7 @@ fun validateWorkflows(
             requested.mapNotNull { name ->
                 runCatching { store.load(name) }.fold(
                     onSuccess = {
-                        it ?: throw UsageError("No workflow called \"$name\" in ${workspace.name} (${workspace.root})")
+                        it ?: throw UsageError(Strings.Cli.noSuchWorkflow(name, workspace.name, workspace.root))
                     },
                     onFailure = {
                         broken += BrokenWorkflow(store.fileFor(name), it.message ?: it::class.simpleName.orEmpty())
@@ -86,17 +87,17 @@ fun validateWorkflows(
         }
 
     var refused = broken.isNotEmpty()
-    broken.forEach { out.println("${it.file.fileName}: doesn't parse. ${it.message}") }
+    broken.forEach { out.println(Strings.Cli.brokenFile(it.file.fileName, it.message)) }
 
     workflows.forEach { workflow ->
         val issues = workflow.issues(workspace)
         val stray = store.unknownKeys(workflow.name)
-        issues.forEach { out.println("${workflow.name}: ${it.render()}") }
+        issues.forEach { out.println(Strings.Cli.issueLine(workflow.name, it.render())) }
         stray.forEach {
-            out.println("${workflow.name}: warning: ${it.where} sets \"${it.key}\", which zopf doesn't know, so it is ignored")
+            out.println(Strings.Cli.warningLine(workflow.name, Strings.Validation.unknownKey(it.where, it.key)))
         }
         if (issues.any { it.severity == WorkflowIssue.Severity.ERROR }) refused = true
-        if (issues.isEmpty() && stray.isEmpty()) out.println("${workflow.name}: ok")
+        if (issues.isEmpty() && stray.isEmpty()) out.println(Strings.Cli.okLine(workflow.name))
     }
     return if (refused) EXIT_USAGE else EXIT_OK
 }
@@ -109,7 +110,7 @@ fun listRuns(
     val last = options.int("last", 1..1000) ?: DEFAULT_RUNS
     val records = RunArchive.all(archiveRoot).take(last).mapNotNull { archive -> archive.read()?.let { it to archive } }
     if (records.isEmpty()) {
-        out.println("no runs archived yet")
+        out.println(Strings.Cli.NO_RUNS_YET)
         return
     }
     records.forEach { (record, archive) ->
@@ -119,7 +120,7 @@ fun listRuns(
                 "${record.nodes.count { it.status == "SUCCEEDED" }}/${record.nodes.size}",
                 record.cost()?.let { money(it) },
             )
-        out.println("${record.startedAt.readable()}  ${record.workflow} · ${detail.joinToString(" · ")}")
+        out.println("${record.startedAt.readable()}  " + Strings.Cli.header(record.workflow, detail.joinToString(" · ")))
         out.println("  ${record.id.take(SHORT_ID)}  ${archive.dir}")
     }
 }
@@ -135,14 +136,14 @@ fun pruneRuns(
 
     val doomed = RunArchive.prune(archiveRoot, keep, olderThan)
     if (doomed.isEmpty()) {
-        out.println("nothing to prune, keeping $keep")
+        out.println(Strings.Cli.nothingToPrune(keep))
         return
     }
     doomed.forEach { dir ->
-        out.println("${if (dryRun) "would delete" else "deleted"} $dir")
+        out.println("${if (dryRun) Strings.Cli.WOULD_DELETE else Strings.Cli.DELETED} $dir")
         if (!dryRun) RunArchive.delete(dir)
     }
-    out.println("${doomed.size} run(s)${if (dryRun) " would go" else " gone"}, $keep kept")
+    out.println(Strings.Cli.pruned(doomed.size, if (dryRun) Strings.Cli.WOULD_GO else Strings.Cli.GONE, keep))
 }
 
 fun printVersion(
@@ -151,10 +152,10 @@ fun printVersion(
     check: UpdateCheck = UpdateCheck(),
     notify: Boolean = notifiable(),
 ) {
-    out.println("zopf ${BuildInfo.version}")
+    out.println(Strings.Cli.version(BuildInfo.version))
     if (!notify) return
     val release = check.cached() ?: return
-    err.println("zopf ${release.version} is out. Run zopf upgrade to install it.")
+    err.println(Strings.Cli.newerRelease("${release.version}"))
 }
 
 fun checkForUpdate(
@@ -166,15 +167,15 @@ fun checkForUpdate(
         onSuccess = { release ->
             val running = check.running
             if (running != null && release.version > running) {
-                out.println("zopf ${release.version} is out. You have $running.")
-                out.println("Run zopf upgrade to install it, or read ${release.url}")
+                out.println(Strings.Cli.newerThanRunning("${release.version}", "$running"))
+                out.println(Strings.Cli.readRelease(release.url))
             } else {
-                out.println("zopf ${BuildInfo.version} is the latest release")
+                out.println(Strings.Cli.latestAlready(BuildInfo.version))
             }
             EXIT_OK
         },
         onFailure = {
-            err.println("zopf: couldn't ask GitHub for the latest release: ${it.message}")
+            err.println(Strings.Cli.couldntAskGitHub(it.message))
             EXIT_FAILED
         },
     )
@@ -188,7 +189,7 @@ private fun notifiable(): Boolean =
 fun Workflow.issues(workspace: Workspace): List<WorkflowIssue> = issues(workspace, SettingsStore().load().defaultProvider)
 
 internal fun WorkflowIssue.render(): String {
-    val level = if (severity == WorkflowIssue.Severity.ERROR) "error" else "warning"
+    val level = if (severity == WorkflowIssue.Severity.ERROR) Strings.Validation.ERROR else Strings.Validation.WARNING
     return "$level: $message"
 }
 

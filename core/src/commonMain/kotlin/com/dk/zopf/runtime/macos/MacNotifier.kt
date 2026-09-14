@@ -4,6 +4,7 @@ import com.dk.zopf.runtime.exec.CommandLookup
 import com.dk.zopf.runtime.run.RunNotification
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.Log
+import com.dk.zopf.util.Strings
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -101,8 +102,8 @@ class MacNotifier(
 
     private fun positional(notification: RunNotification): List<String> =
         listOf(
-            collapse(notification.body).ifBlank { "(no output)" }.trimTo(MAX_BODY),
-            collapse(notification.title).ifBlank { "zopf" },
+            collapse(notification.body).ifBlank { Strings.Notifications.FALLBACK_BODY }.trimTo(MAX_BODY),
+            collapse(notification.title).ifBlank { Strings.Notifications.FALLBACK_TITLE },
             collapse(notification.subtitle),
             notification.sound,
         )
@@ -114,8 +115,8 @@ class MacNotifier(
             .start()
 
     private fun osascript(notification: RunNotification) {
-        val body = collapse(notification.body).ifBlank { "(no output)" }.trimTo(MAX_BODY)
-        val title = collapse(notification.title).ifBlank { "zopf" }
+        val body = collapse(notification.body).ifBlank { Strings.Notifications.FALLBACK_BODY }.trimTo(MAX_BODY)
+        val title = collapse(notification.title).ifBlank { Strings.Notifications.FALLBACK_TITLE }
         val subtitle = collapse(notification.subtitle)
         val clauses =
             buildList {

@@ -21,6 +21,7 @@ import com.dk.zopf.store.MAX_CONCURRENCY
 import com.dk.zopf.store.SettingsStore
 import com.dk.zopf.store.workflow.WorkflowStore
 import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -56,19 +57,19 @@ fun runWorkflow(
     val name =
         options.positionals.firstOrNull()
             ?: resumed?.workflowName
-            ?: throw UsageError("Which workflow? Run \"zopf list\" to see what this workspace has")
+            ?: throw UsageError(Strings.Cli.WHICH_WORKFLOW)
     if (options.positionals.size > 1) {
-        throw UsageError("One workflow at a time. \"${options.positionals.drop(1).joinToString(" ")}\" is extra")
+        throw UsageError(Strings.Cli.oneAtATime(options.positionals.drop(1).joinToString(" ")))
     }
     if (resumed != null && name != resumed.workflowName) {
-        throw UsageError("That run is of ${resumed.workflowName}, not \"$name\". Resume it without naming a workflow")
+        throw UsageError(Strings.Cli.resumeMismatch(resumed.workflowName, name))
     }
 
     val workspace = locateWorkspace(options.one("workspace"))
     val store = WorkflowStore(workspace)
     val loaded =
         store.load(name)
-            ?: throw UsageError("No workflow called \"$name\" in ${workspace.name} (${workspace.root})")
+            ?: throw UsageError(Strings.Cli.noSuchWorkflow(name, workspace.name, workspace.root))
 
     val gatePolicy = options.choice("on-gate", GatePolicy.entries.toTypedArray()) ?: GatePolicy.FAIL
     val answers = options.pairs("answer")
@@ -86,7 +87,7 @@ fun runWorkflow(
 
     val errors = workflow.issues(workspace).errors()
     if (errors.isNotEmpty()) {
-        err.println("zopf: ${workflow.name} didn't start, because it wouldn't get through the run. Fix these and try again:")
+        err.println(Strings.Cli.wontGetThrough(workflow.name))
         errors.forEach { err.println("  ${it.render()}") }
         return EXIT_USAGE
     }
@@ -116,7 +117,7 @@ fun runWorkflow(
         }
     val run =
         started.getOrElse {
-            err.println("zopf: ${it.message}")
+            err.println(Strings.Cli.failed("${it.message}"))
             return EXIT_USAGE
         }
     screen.starting(run)
@@ -142,9 +143,9 @@ private fun describeRun(
     if (issues.errors().isNotEmpty()) return EXIT_USAGE
 
     point?.let { out.println(it.plan()) }
-    out.println("${workflow.name} · ${workflow.nodes.size} nodes · nothing started")
+    out.println(Strings.Cli.dryRunHeader(workflow.name, workflow.nodes.size))
     workflow.runOrder().forEachIndexed { wave, ids ->
-        out.println("  ${wave + 1}. ${ids.joinToString()}")
+        out.println(Strings.Cli.wave(wave, ids.joinToString()))
     }
     return EXIT_OK
 }
@@ -163,7 +164,7 @@ private suspend fun awaitRun(
 
     run.nodes
         .filter { it.status.isActive }
-        .forEach { it.notice("Out of time. The run was given ${deadlineSeconds}s.", isWarning = true) }
+        .forEach { it.notice(Strings.Cli.outOfTime(deadlineSeconds), isWarning = true) }
     engine.stop(run)
     withTimeoutOrNull(STOP_GRACE_MILLIS.milliseconds) { job.join() }
 }
@@ -195,19 +196,18 @@ private class Decisions(
     private fun decideGate(node: NodeRun) {
         when (policy) {
             GatePolicy.APPROVE -> {
-                node.notice("Approved by --on-gate approve")
+                node.notice(Strings.Cli.approvedByPolicy())
                 engine.resolveGate(node, approved = true)
             }
 
             GatePolicy.REJECT -> {
-                node.notice("Rejected by --on-gate reject")
+                node.notice(Strings.Cli.rejectedByPolicy())
                 engine.resolveGate(node, approved = false)
             }
 
             GatePolicy.FAIL -> {
                 node.notice(
-                    "${node.nodeTitle} is a gate and nobody is here to answer it. " +
-                        "Pass --on-gate approve or --on-gate reject to decide up front.",
+                    Strings.Cli.gateNeedsPolicy(node.nodeTitle),
                     isWarning = true,
                 )
                 engine.resolveGate(node, approved = false)
@@ -220,8 +220,7 @@ private class Decisions(
         val answer = answers[node.nodeId] ?: question.default.takeIf { it.isNotBlank() }
         if (answer == null) {
             node.notice(
-                "Nothing answers ${node.nodeId} and it declares no default. " +
-                    "Pass --answer ${node.nodeId}=<value>.",
+                Strings.Cli.inputNeedsAnswer(node.nodeId),
                 isWarning = true,
             )
         }
@@ -236,12 +235,12 @@ fun checkAnswers(
     answers.forEach { (nodeId, value) ->
         val node =
             workflow.node(nodeId)
-                ?: throw UsageError("--answer $nodeId=…: ${workflow.name} has no node called \"$nodeId\"")
+                ?: throw UsageError(Strings.Cli.answerUnknownNode(nodeId, workflow.name))
         if (node.type != NodeType.INPUT) {
-            throw UsageError("--answer $nodeId=…: \"$nodeId\" is a ${node.type.name.lowercase()} node, not an input")
+            throw UsageError(Strings.Cli.answerWrongNodeType(nodeId, node.type.name.lowercase()))
         }
         if (node.choices.isNotEmpty() && value !in node.choices) {
-            throw UsageError("--answer $nodeId=$value: \"$nodeId\" offers ${node.choices.joinToString()}")
+            throw UsageError(Strings.Cli.answerNotAChoice(nodeId, value, node.choices.joinToString()))
         }
     }
 }

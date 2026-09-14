@@ -3,6 +3,7 @@ package com.dk.zopf.cli
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.store.workspace.resolvePathAgainst
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -13,15 +14,14 @@ fun locateWorkspace(
     if (requested != null) {
         val dir = resolvePathAgainst(requested, from)
         return Workspace.open(dir)
-            ?: throw UsageError("$dir isn't a workspace, and has no .zopf directory in it")
+            ?: throw UsageError(Strings.RunErrors.notAWorkspace(dir))
     }
 
     enclosingWorkspace(from)?.let { return it }
 
     return Workspace.open(AppPaths.defaultWorkspace)
         ?: throw UsageError(
-            "No workspace here. zopf looks for a .zopf directory from $from upwards, then in " +
-                "${AppPaths.defaultWorkspace}. Pass --workspace <dir> to name one.",
+            Strings.RunErrors.noWorkspaceHere(from, AppPaths.defaultWorkspace),
         )
 }
 

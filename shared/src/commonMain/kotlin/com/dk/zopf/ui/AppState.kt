@@ -49,6 +49,7 @@ import com.dk.zopf.store.workspace.WorkspaceRegistry
 import com.dk.zopf.ui.editor.EditorCommands
 import com.dk.zopf.ui.editor.EditorState
 import com.dk.zopf.ui.workspace.chooseDirectory
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -61,10 +62,10 @@ import kotlin.io.path.name
 enum class Screen(
     val label: String,
 ) {
-    WORKFLOWS("Workflows"),
-    RUNS("Runs"),
-    CONNECTORS("Connectors"),
-    SETTINGS("Settings"),
+    WORKFLOWS(Strings.Nav.WORKFLOWS),
+    RUNS(Strings.Nav.RUNS),
+    CONNECTORS(Strings.Nav.CONNECTORS),
+    SETTINGS(Strings.Nav.SETTINGS),
 }
 
 enum class DialogRequest { NEW_WORKFLOW, NEW_CONNECTOR }
@@ -165,7 +166,7 @@ class AppState(
 
     fun start() {
         Log.info("starting · ${settings.current.concurrency} at once · ${settings.current.theme.label}")
-        settingsRead.exceptionOrNull()?.let { message = "${it.message}. Using the defaults." }
+        settingsRead.exceptionOrNull()?.let { message = Strings.Workspaces.settingsFellBack(it.message) }
         registry.load()
         syncFromRegistry()
 
@@ -177,7 +178,7 @@ class AppState(
         housekeep()
 
         activeWorkspace?.workspace?.takeIf { it.config.isFromTheFuture }?.let {
-            message = "${it.name} was written by a newer zopf. Some of it may not mean what it says here."
+            message = Strings.Workspaces.fromTheFuture(it.name)
         }
     }
 
@@ -197,9 +198,11 @@ class AppState(
             if (missing.isEmpty()) return@launch
             Log.warn("${missing.joinToString { it.executable }} isn't on the login shell's PATH")
             message =
-                "Can't find ${missing.joinToString(" or ") { it.executable }}. Install " +
-                missing.joinToString(" or ") { it.id.label } +
-                " and sign in, or the nodes that use ${if (missing.size == 1) "it" else "them"} will fail."
+                Strings.RunErrors.missingExecutables(
+                    missing.joinToString(" or ") { it.executable },
+                    missing.joinToString(" or ") { it.id.label },
+                    missing.size,
+                )
         }
     }
 
@@ -214,7 +217,7 @@ class AppState(
                 install(release)
                 return@launch
             }
-            if (check.announceOnce(release)) message = "zopf ${release.version} is out. Settings has it."
+            if (check.announceOnce(release)) message = Strings.Updates.isOut("${release.version}")
         }
     }
 
@@ -229,7 +232,7 @@ class AppState(
     private fun install(release: Release) {
         appUpdate
             .install(release)
-            .onSuccess { message = "zopf ${release.version} is ready. Restart zopf to use it." }
+            .onSuccess { message = Strings.Updates.readyToRestart("${release.version}") }
             .onFailure { message = it.message }
     }
 
@@ -269,11 +272,11 @@ class AppState(
     fun addWorkspace(dir: Path) {
         val added = registry.add(dir)
         if (added == null) {
-            message = "Couldn't open ${dir.fileName} as a workspace"
+            message = Strings.Workspaces.couldntOpen("${dir.fileName}")
             return
         }
         syncFromRegistry()
-        message = "Opened ${added.displayName}"
+        message = Strings.Workspaces.opened(added.displayName)
     }
 
     fun forgetWorkspace(path: Path) {
@@ -282,7 +285,7 @@ class AppState(
     }
 
     fun openWorkspace() {
-        chooseDirectory("Open or create a zopf workspace")?.let(::addWorkspace)
+        chooseDirectory(Strings.Workspaces.CHOOSE_TITLE)?.let(::addWorkspace)
     }
 
     fun refreshWorkspaces() {
@@ -344,15 +347,15 @@ class AppState(
     ) {
         val workspace = activeWorkspace?.workspace
         if (workspace == null) {
-            message = "Open a workspace first, then describe the workflow"
+            message = Strings.Workspaces.OPEN_BEFORE_DRAFTING
             return
         }
         val slug = slugify(name)
         when {
-            slug.isBlank() -> message = "Give it a name first"
-            description.isBlank() -> message = "Say what it should do first"
-            WorkflowStore(workspace).fileFor(slug).exists() -> message = "A workflow named \"$slug\" already exists"
-            drafting != null -> message = "zopf is already drafting $drafting"
+            slug.isBlank() -> message = Strings.Workflows.NAME_FIRST
+            description.isBlank() -> message = Strings.Workflows.DESCRIPTION_FIRST
+            WorkflowStore(workspace).fileFor(slug).exists() -> message = Strings.Workflows.nameTaken(slug)
+            drafting != null -> message = Strings.Workflows.alreadyDrafting("$drafting")
             else -> {
                 drafting = slug
                 scope.launch {
@@ -383,7 +386,7 @@ class AppState(
             screen = Screen.RUNS
             run.job?.join()
             if (run.status != RunStatus.SUCCEEDED) {
-                message = "The draft of $slug stopped before it finished"
+                message = Strings.Workflows.draftStopped(slug)
                 return
             }
 
@@ -414,7 +417,7 @@ class AppState(
         problems: List<String>,
     ) {
         if (drafted == null) {
-            message = "The draft of $slug didn't come back as a workflow"
+            message = Strings.Workflows.draftNotAWorkflow(slug)
             return
         }
         WorkflowStore(workspace).save(drafted)
@@ -422,8 +425,8 @@ class AppState(
         openEditor(drafted)
         message =
             when (val first = problems.firstOrNull()) {
-                null -> "Wrote $slug, look it over before you run it"
-                else -> "Wrote $slug, but it won't run yet: $first"
+                null -> Strings.Workflows.drafted(slug)
+                else -> Strings.Workflows.draftedWithIssue(slug, first)
             }
     }
 
@@ -474,15 +477,15 @@ class AppState(
         if (blocking.isNotEmpty()) {
             val rest = blocking.size - 1
             message =
-                "${target.name} can't run yet. ${blocking.first().message}" +
-                if (rest > 0) " (and ${if (rest == 1) "1 more thing" else "$rest more things"} to fix)" else ""
+                Strings.Workflows.notRunnable(target.name, blocking.first().message) +
+                if (rest > 0) Strings.Workflows.andMoreToFix(rest) else ""
             return
         }
         runs
             .startWorkflow(activeWorkspace?.workspace, target)
             .onSuccess {
                 showRunPanel = true
-                if (editing?.workflow?.name != target.name) message = "Running ${target.name}"
+                if (editing?.workflow?.name != target.name) message = Strings.Workflows.running(target.name)
             }.onFailure { message = it.message }
     }
 
@@ -497,7 +500,7 @@ class AppState(
     ) {
         val workspace = activeWorkspace?.workspace
         if (workspace == null) {
-            message = "Open a workspace first, then add a connector"
+            message = Strings.Workspaces.OPEN_BEFORE_CONNECTOR
             return
         }
         ConnectorStore(workspace)
@@ -529,15 +532,14 @@ class AppState(
             val agent = authoringAgent(default) { it in installedAgents }
             if (agent.id !in installedAgents) {
                 message =
-                    "Can't find ${agent.executable}. Install ${agent.id.label} to write \"$name\" with it, " +
-                    "or write connector.json and the script yourself."
+                    Strings.Connectors.missingAgent(agent.executable, agent.id.label, name)
                 return@launch
             }
             TerminalLauncher
                 .openIn(agent, dir, terminal, prompt)
                 .onSuccess {
-                    message = "Opened $name in $terminal. Refresh when you're done."
-                }.onFailure { message = "Couldn't open $terminal: ${it.message}" }
+                    message = Strings.Connectors.openedIn(name, terminal)
+                }.onFailure { message = Strings.Connectors.couldntOpen(terminal, it.message) }
         }
     }
 
@@ -557,14 +559,14 @@ class AppState(
 
     fun updateSettings(change: (AppSettings) -> AppSettings) {
         settings.update(change).onFailure {
-            message = "Couldn't save settings: ${it.message}"
+            message = Strings.Workspaces.couldntSaveSettings(it.message)
         }
     }
 
     fun runWorkflowNamed(name: String) {
         val workflow = listing.workflows.firstOrNull { it.name == name }
         if (workflow == null) {
-            message = "No workflow called $name in this workspace"
+            message = Strings.Workflows.notFound(name)
             return
         }
         runWorkflow(workflow)
@@ -597,7 +599,7 @@ internal fun prunedRunsMessage(
     if (gone <= keep) {
         null
     } else {
-        "Deleted $gone archived runs, keeping the last $keep. See Settings › History."
+        Strings.Cli.prunedRuns(gone, keep)
     }
 
 internal fun RunRegistry.runForEditor(workflowName: String): WorkflowRun? = selectedRun?.takeIf { it.workflowName == workflowName }

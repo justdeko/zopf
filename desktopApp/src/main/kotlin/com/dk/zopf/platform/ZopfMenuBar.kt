@@ -14,6 +14,7 @@ import com.dk.zopf.model.label
 import com.dk.zopf.ui.AppState
 import com.dk.zopf.ui.DialogRequest
 import com.dk.zopf.ui.Screen
+import com.dk.zopf.util.Strings
 
 @Composable
 fun FrameWindowScope.ZopfMenuBar(
@@ -24,19 +25,19 @@ fun FrameWindowScope.ZopfMenuBar(
     onZoom: () -> Unit,
 ) {
     MenuBar {
-        Menu("File") {
+        Menu(Strings.MenuBar.FILE) {
             FileMenu(app, onHideWindow)
         }
-        Menu("Workflow") {
+        Menu(Strings.MenuBar.WORKFLOW) {
             WorkflowMenu(app)
         }
-        Menu("View") {
+        Menu(Strings.MenuBar.VIEW) {
             ViewMenu(app)
         }
-        Menu("Workspace") {
+        Menu(Strings.MenuBar.WORKSPACE) {
             WorkspaceMenu(app)
         }
-        Menu("Window") {
+        Menu(Strings.MenuBar.WINDOW) {
             WindowMenu(placement, onMinimize, onZoom)
         }
     }
@@ -49,13 +50,13 @@ private fun MenuScope.WindowMenu(
     onZoom: () -> Unit,
 ) {
     Item(
-        "Minimize",
+        Strings.MenuBar.MINIMIZE,
         shortcut = KeyShortcut(Key.M, meta = true),
         enabled = placement != WindowPlacement.Fullscreen,
         onClick = onMinimize,
     )
     Item(
-        "Zoom",
+        Strings.MenuBar.ZOOM,
         enabled = placement != WindowPlacement.Fullscreen,
         onClick = onZoom,
     )
@@ -70,7 +71,7 @@ private fun MenuScope.FileMenu(
     val workspace = app.activeWorkspace
 
     Item(
-        "New Workflow…",
+        Strings.MenuBar.NEW_WORKFLOW,
         shortcut = KeyShortcut(Key.N, meta = true),
         enabled = editor == null && workspace?.isOnline == true,
     ) {
@@ -78,7 +79,7 @@ private fun MenuScope.FileMenu(
         app.dialogRequest = DialogRequest.NEW_WORKFLOW
     }
     Item(
-        "New Connector…",
+        Strings.MenuBar.NEW_CONNECTOR,
         shortcut = KeyShortcut(Key.N, meta = true, shift = true),
         enabled = editor == null && workspace != null,
     ) {
@@ -88,18 +89,18 @@ private fun MenuScope.FileMenu(
     Separator()
 
     Item(
-        "Save",
+        Strings.MenuBar.SAVE,
         shortcut = KeyShortcut(Key.S, meta = true),
         enabled = editor?.isDirty() == true,
     ) { editor?.save?.invoke() }
     Item(
-        "Show in Finder",
+        Strings.MenuBar.SHOW_IN_FINDER,
         shortcut = KeyShortcut(Key.R, meta = true, alt = true),
         enabled = app.editing != null || app.selectedWorkflow != null,
     ) { app.revealCurrentWorkflow() }
     Separator()
 
-    Item("Close Window", shortcut = KeyShortcut(Key.W, meta = true)) { onHideWindow() }
+    Item(Strings.MenuBar.CLOSE_WINDOW, shortcut = KeyShortcut(Key.W, meta = true)) { onHideWindow() }
 }
 
 @Composable
@@ -113,7 +114,7 @@ private fun MenuScope.WorkflowMenu(app: AppState) {
     val selectedState = selectedRun?.state?.collectAsState()?.value
 
     Item(
-        "Run Workflow",
+        Strings.MenuBar.RUN_WORKFLOW,
         shortcut = KeyShortcut(Key.R, meta = true),
         enabled = app.runnableWorkflow != null,
     ) { app.runWorkflow() }
@@ -123,48 +124,48 @@ private fun MenuScope.WorkflowMenu(app: AppState) {
             it.type == NodeType.AGENT || it.type == NodeType.SHELL
         }
     Item(
-        "Run Selected Node",
+        Strings.MenuBar.RUN_SELECTED_NODE,
         shortcut = KeyShortcut(Key.R, meta = true, shift = true),
         enabled = runnableNode != null,
     ) { runnableNode?.let(app::runNode) }
     Separator()
     Item(
-        "Stop Run",
+        Strings.MenuBar.STOP_RUN,
         shortcut = KeyShortcut(Key.Period, meta = true),
         enabled = selectedState?.isActive == true,
     ) { selectedRun?.let(app.runs::stop) }
     Item(
-        "Stop Everything",
+        Strings.MenuBar.STOP_EVERYTHING,
         shortcut = KeyShortcut(Key.Period, meta = true, alt = true),
         enabled = activity.active > 0,
     ) { app.runs.stopAll() }
     Separator()
 
-    Menu("Add Node", enabled = editing != null) {
+    Menu(Strings.MenuBar.ADD_NODE, enabled = editing != null) {
         NodeType.entries.forEach { type ->
             Item(type.label) { editing?.addNode(type) }
         }
     }
     val node = editing?.selectedNodeId
     Item(
-        "Duplicate Node",
+        Strings.MenuBar.DUPLICATE_NODE,
         shortcut = KeyShortcut(Key.D, meta = true),
         enabled = node != null,
     ) { node?.let { editing.duplicateNode(it) } }
     Item(
-        "Connect From Node",
+        Strings.MenuBar.CONNECT_FROM_NODE,
         shortcut = KeyShortcut(Key.L, meta = true),
         enabled = node != null,
     ) { node?.let { editing.startConnecting(it) } }
 
     Item(
-        "Delete Node",
+        Strings.MenuBar.DELETE_NODE,
         shortcut = KeyShortcut(Key.Backspace, meta = true),
         enabled = node != null,
     ) { node?.let { editing.removeNode(it) } }
     Separator()
     Item(
-        "Workflow Settings…",
+        Strings.MenuBar.WORKFLOW_SETTINGS,
         shortcut = KeyShortcut(Key.Comma, meta = true, alt = true),
         enabled = app.editorCommands != null,
     ) { app.editorCommands?.openSettings?.invoke() }
@@ -184,31 +185,31 @@ private fun MenuScope.ViewMenu(app: AppState) {
     }
     Separator()
     CheckboxItem(
-        "Inspector",
+        Strings.MenuBar.INSPECTOR,
         checked = editor?.isInspectorVisible() == true,
         shortcut = KeyShortcut(Key.I, meta = true),
         enabled = editor != null,
     ) { editor?.toggleInspector?.invoke() }
 
     CheckboxItem(
-        "Move Nodes",
+        Strings.MenuBar.MOVE_NODES,
         checked = editor?.isNodeDragEnabled() == true,
         shortcut = KeyShortcut(Key.M, meta = true, shift = true),
         enabled = editor != null,
     ) { editor?.toggleNodeDrag?.invoke() }
     Separator()
-    Item("Zoom In", shortcut = KeyShortcut(Key.Equals, meta = true), enabled = editor != null) {
+    Item(Strings.MenuBar.ZOOM_IN, shortcut = KeyShortcut(Key.Equals, meta = true), enabled = editor != null) {
         editor?.zoomIn?.invoke()
     }
-    Item("Zoom Out", shortcut = KeyShortcut(Key.Minus, meta = true), enabled = editor != null) {
+    Item(Strings.MenuBar.ZOOM_OUT, shortcut = KeyShortcut(Key.Minus, meta = true), enabled = editor != null) {
         editor?.zoomOut?.invoke()
     }
-    Item("Fit to Window", shortcut = KeyShortcut(Key.Zero, meta = true), enabled = editor != null) {
+    Item(Strings.MenuBar.FIT_TO_WINDOW, shortcut = KeyShortcut(Key.Zero, meta = true), enabled = editor != null) {
         editor?.fit?.invoke()
     }
 
     Item(
-        "Lay Out Again",
+        Strings.MenuBar.LAY_OUT_AGAIN,
         shortcut = KeyShortcut(Key.Zero, meta = true, alt = true),
         enabled = editor != null,
     ) { editor?.relayout?.invoke() }
@@ -229,18 +230,18 @@ private fun MenuScope.WorkspaceMenu(app: AppState) {
 
     app.workspaces.forEach { workspace ->
         RadioButtonItem(
-            if (workspace.isOnline) workspace.displayName else "${workspace.displayName} (unavailable)",
+            if (workspace.isOnline) workspace.displayName else Strings.MenuBar.workspaceUnavailable(workspace.displayName),
             selected = workspace.path == app.activeWorkspace?.path,
             enabled = editor == null,
         ) { app.selectWorkspace(workspace.path) }
     }
     if (app.workspaces.isNotEmpty()) Separator()
     Item(
-        "Open Workspace…",
+        Strings.MenuBar.OPEN_WORKSPACE,
         shortcut = KeyShortcut(Key.O, meta = true, shift = true),
         enabled = editor == null,
     ) { app.openWorkspace() }
 
-    Item("Refresh Workspaces") { app.refreshWorkspaces() }
-    Item("Refresh Connectors", enabled = app.activeWorkspace != null) { app.refreshConnectors() }
+    Item(Strings.MenuBar.REFRESH_WORKSPACES) { app.refreshWorkspaces() }
+    Item(Strings.MenuBar.REFRESH_CONNECTORS, enabled = app.activeWorkspace != null) { app.refreshConnectors() }
 }

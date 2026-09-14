@@ -56,6 +56,7 @@ import com.dk.zopf.ui.editor.ModelField
 import com.dk.zopf.ui.editor.SectionLabel
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 
 private val TerminalSuggestions = listOf(DEFAULT_TERMINAL_APP, "iTerm", "Ghostty", "Warp", "kitty", "Alacritty")
@@ -89,13 +90,13 @@ fun SettingsScreen(
             .padding(horizontal = 24.dp, vertical = 20.dp),
     ) {
         Column(Modifier.widthIn(max = FormWidth)) {
-            SectionLabel("Running")
+            SectionLabel(Strings.Settings.RUNNING)
             ConcurrencyField(settings.concurrency) { chosen -> onChange { it.copy(concurrency = chosen) } }
 
             Gap()
             HorizontalDivider()
             Gap(8)
-            SectionLabel("Agents")
+            SectionLabel(Strings.Settings.AGENTS)
             AgentField(settings.defaultProvider) { chosen -> onChange { it.copy(defaultProvider = chosen) } }
             if (settings.defaultProvider.capabilities.modelSelection) {
                 Gap(4)
@@ -103,54 +104,48 @@ fun SettingsScreen(
                     provider = settings.defaultProvider,
                     selected = settings.defaultModel,
                     onSelect = { model -> onChange { it.copy(defaultModel = model) } },
-                    noneLabel = "Whatever ${settings.defaultProvider.cliValue} is set to",
-                    supportingText =
-                        "Used only when neither the node nor its workflow names one, and only for nodes " +
-                            "running ${settings.defaultProvider.label} — a model name belongs to the CLI it was written for.",
+                    noneLabel = Strings.Settings.defaultModelNone(settings.defaultProvider.cliValue),
+                    supportingText = Strings.Settings.defaultModelHint(settings.defaultProvider.label),
                 )
             }
-            Hint(
-                "These are only this machine's fallback. A workspace that names a provider or " +
-                    "model under defaults: in its zopf.yaml wins over them, so a repo can pin what its " +
-                    "own workflows run on.",
-            )
+            Hint(Strings.Settings.DEFAULTS_SCOPE)
 
             Gap()
             HorizontalDivider()
             Gap(8)
-            SectionLabel("Permissions")
+            SectionLabel(Strings.Settings.PERMISSIONS)
             Gap(4)
             ApprovalField(settings.inlineApproval) { on -> onChange { it.copy(inlineApproval = on) } }
 
             Gap()
             HorizontalDivider()
             Gap(8)
-            SectionLabel("Notifications")
+            SectionLabel(Strings.Settings.NOTIFICATIONS)
             NotifyField(settings.notify) { chosen -> onChange { it.copy(notify = chosen) } }
 
             Gap()
             HorizontalDivider()
             Gap(8)
-            SectionLabel("Appearance")
+            SectionLabel(Strings.Settings.APPEARANCE)
             ThemeField(settings.theme) { chosen -> onChange { it.copy(theme = chosen) } }
 
             Gap()
             HorizontalDivider()
             Gap(8)
-            SectionLabel("Take-over")
+            SectionLabel(Strings.Settings.TAKE_OVER)
             Gap(4)
             TerminalField(settings.terminalApp) { app -> onChange { it.copy(terminalApp = app) } }
 
             Gap()
             HorizontalDivider()
             Gap(8)
-            SectionLabel("History")
+            SectionLabel(Strings.Settings.HISTORY)
             KeepRunsField(settings.keepRuns) { chosen -> onChange { it.copy(keepRuns = chosen) } }
 
             Gap()
             HorizontalDivider()
             Gap(8)
-            SectionLabel("Updates")
+            SectionLabel(Strings.Settings.UPDATES)
             Gap(4)
             UpdateField(
                 settings = settings,
@@ -166,25 +161,25 @@ fun SettingsScreen(
             Gap()
             HorizontalDivider()
             Gap(8)
-            SectionLabel("Open source")
+            SectionLabel(Strings.Settings.OPEN_SOURCE)
             Gap(4)
             TextButton({ showLicenses = true }, Modifier.padding(start = 0.dp)) {
-                Text("Open source licenses")
+                Text(Strings.Settings.OPEN_SOURCE_LICENSES)
             }
 
             Gap(20)
             Text(
-                "zopf ${BuildInfo.version}",
+                Strings.Settings.version(BuildInfo.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "Written to $settingsFile",
+                Strings.Settings.writtenTo(settingsFile),
                 style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "Logging to ${Log.file}",
+                Strings.Settings.loggingTo(Log.file),
                 style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -198,7 +193,7 @@ private fun AgentField(
     onSelect: (AgentProviderId) -> Unit,
 ) {
     Text(
-        "Default CLI",
+        Strings.Settings.DEFAULT_CLI_LABEL,
         Modifier.padding(top = 8.dp),
         style = MaterialTheme.typography.bodyMedium,
     )
@@ -208,10 +203,7 @@ private fun AgentField(
         label = { it.label },
         onSelect = onSelect,
     )
-    Hint(
-        "Used only by an agent node that names no CLI, in a workflow whose defaults name none either. " +
-            "zopf drives whichever you pick with the login you already have.",
-    )
+    Hint(Strings.Settings.DEFAULT_CLI_HINT)
     caveats(value)?.let { Hint(it) }
 }
 
@@ -219,24 +211,16 @@ private fun caveats(provider: AgentProviderId): String? {
     val can = provider.capabilities
     val missing =
         buildList {
-            if (!can.followUps) add("follow-ups")
-            if (!can.resumeInTerminal) add("take-over")
-            if (!can.inlineApproval) add("inline approval")
-            if (!can.toolPermissions) add("a permission mode")
-            if (!can.skills) add("skills")
-            if (!can.modelSelection) add("a model you pick")
-            if (!can.reportsCostUsd) add("a dollar cost")
+            if (!can.followUps) add(Strings.Settings.NO_FOLLOW_UPS)
+            if (!can.resumeInTerminal) add(Strings.Settings.NO_TAKE_OVER)
+            if (!can.inlineApproval) add(Strings.Settings.NO_INLINE_APPROVAL)
+            if (!can.toolPermissions) add(Strings.Settings.NO_PERMISSION_MODE)
+            if (!can.skills) add(Strings.Settings.NO_SKILLS)
+            if (!can.modelSelection) add(Strings.Settings.NO_MODEL_CHOICE)
+            if (!can.reportsCostUsd) add(Strings.Settings.NO_COST_REPORT)
         }
     if (missing.isEmpty()) return null
-    val head = missing.dropLast(1)
-    return buildString {
-        append(provider.label)
-        append(if (can.followUps) " has no " else " takes one turn per node, with no ")
-        if (head.isNotEmpty()) append("${head.joinToString()} or ")
-        append(missing.last())
-        append(".")
-        if (can.sandbox) append(" It takes a sandbox instead.")
-    }
+    return Strings.Settings.capabilityNote(provider.label, missing, can.followUps, can.sandbox)
 }
 
 @Composable
@@ -246,10 +230,9 @@ private fun ApprovalField(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("Ask before ${ASKABLE_TOOLS.joinToString()}", style = MaterialTheme.typography.bodyMedium)
+            Text(Strings.Settings.askBefore(ASKABLE_TOOLS.joinToString()), style = MaterialTheme.typography.bodyMedium)
             Text(
-                "The node pauses and the run console offers Allow or Deny. When off, each node's " +
-                    "own permission mode decides.",
+                Strings.Settings.ASK_BEFORE_HINT,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -272,10 +255,9 @@ private fun UpdateField(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("Check for new releases", style = MaterialTheme.typography.bodyMedium)
+            Text(Strings.Settings.CHECK_FOR_RELEASES, style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Once a week, zopf asks GitHub for the latest release and says so here. It sends its " +
-                    "own version and nothing else.",
+                Strings.Settings.CHECK_FOR_RELEASES_HINT,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -287,10 +269,9 @@ private fun UpdateField(
         Gap(4)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Install them on its own", style = MaterialTheme.typography.bodyMedium)
+                Text(Strings.Settings.INSTALL_ON_ITS_OWN, style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    "zopf downloads the release, refuses anything not signed by the developer who signed this " +
-                        "copy, and swaps it in the next time you quit.",
+                    Strings.Settings.INSTALL_ON_ITS_OWN_HINT,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -306,41 +287,44 @@ private fun UpdateField(
     blocker?.let { Hint(it) }
     if (update != null) {
         Gap(8)
-        Text("zopf ${update.version} is out. You have ${BuildInfo.version}.", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            Strings.Settings.updateAvailable("${update.version}", BuildInfo.version),
+            style = MaterialTheme.typography.bodyMedium,
+        )
         when (install) {
             is UpdateInstall.Downloading -> {
                 Gap(8)
                 LinearProgressIndicator({ install.fraction.toFloat() }, Modifier.fillMaxWidth())
-                Hint("Downloading ${(install.fraction * 100).toInt()}%")
+                Hint(Strings.Settings.downloading((install.fraction * 100).toInt()))
             }
 
-            UpdateInstall.Verifying -> Hint("Checking who signed it")
+            UpdateInstall.Verifying -> Hint(Strings.Settings.CHECKING_SIGNATURE)
 
             is UpdateInstall.Ready ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("${install.version} is ready.", style = MaterialTheme.typography.bodyMedium)
+                    Text(Strings.Settings.readyToInstall("${install.version}"), style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = onRestart) { Text("Restart now") }
+                    TextButton(onClick = onRestart) { Text(Strings.Settings.RESTART_NOW) }
                 }
 
             is UpdateInstall.Failed ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(install.reason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.width(8.dp))
-                    TextButton(onClick = onOpenRelease) { Text("Open the release") }
+                    TextButton(onClick = onOpenRelease) { Text(Strings.Settings.OPEN_THE_RELEASE) }
                 }
 
             UpdateInstall.Idle ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (blocker == null) {
-                        TextButton(onClick = onInstall) { Text("Install it") }
+                        TextButton(onClick = onInstall) { Text(Strings.Settings.INSTALL_IT) }
                         Spacer(Modifier.width(8.dp))
                     }
-                    TextButton(onClick = onOpenRelease) { Text("Open the release") }
+                    TextButton(onClick = onOpenRelease) { Text(Strings.Settings.OPEN_THE_RELEASE) }
                 }
         }
     }
-    Hint("ZOPF_NO_UPDATE_CHECK=1 turns it off for `zopf` in a terminal too. `zopf upgrade` installs the new one there.")
+    Hint(Strings.Settings.UPDATE_ENV_HINT)
 }
 
 @Composable
@@ -349,23 +333,21 @@ private fun KeepRunsField(
     onSelect: (Int) -> Unit,
 ) {
     Text(
-        "Runs to keep",
+        Strings.Settings.RUNS_TO_KEEP,
         Modifier.padding(top = 8.dp),
         style = MaterialTheme.typography.bodyMedium,
     )
     ConnectedChoices(
         options = KeepRunsOptions,
         selected = KeepRunsOptions.minByOrNull { kotlin.math.abs(it - value) } ?: DEFAULT_KEEP_RUNS,
-        label = { if (it == KEEP_EVERY_RUN) "All" else "$it" },
+        label = { if (it == KEEP_EVERY_RUN) Strings.Settings.KEEP_ALL else "$it" },
         onSelect = onSelect,
     )
     Hint(
-        "A run archives every message, tool call and line of output, so a chatty build step can be " +
-            "megabytes. zopf keeps all of it by default.",
+        Strings.Settings.RUNS_TO_KEEP_HINT,
     )
     Hint(
-        "Pick a number and older runs are deleted the next time zopf starts. The Runs screen and " +
-            "`zopf runs` read the same archive, so both lose them.",
+        Strings.Settings.PRUNE_HINT,
     )
 }
 
@@ -375,7 +357,7 @@ private fun ConcurrencyField(
     onSelect: (Int) -> Unit,
 ) {
     Text(
-        "Nodes at once",
+        Strings.Settings.CONCURRENCY,
         Modifier.padding(top = 8.dp),
         style = MaterialTheme.typography.bodyMedium,
     )
@@ -386,10 +368,9 @@ private fun ConcurrencyField(
         onSelect = onSelect,
     )
     Hint(
-        "Counted per run. Two workflows going at once can each have this many processes in flight. " +
-            "Gates and branches never take a slot, since they run nothing.",
+        Strings.Settings.CONCURRENCY_HINT,
     )
-    Hint("Applies to the next run you start. Anything already going keeps the limit it began with.")
+    Hint(Strings.Settings.CONCURRENCY_APPLIES_NEXT)
 }
 
 @Composable
@@ -398,7 +379,7 @@ private fun NotifyField(
     onSelect: (NotifyLevel) -> Unit,
 ) {
     Text(
-        "Notify me about",
+        Strings.Settings.NOTIFY_ABOUT,
         Modifier.padding(top = 8.dp),
         style = MaterialTheme.typography.bodyMedium,
     )
@@ -408,7 +389,7 @@ private fun NotifyField(
         label = { it.label },
         onSelect = onSelect,
     )
-    Hint("${value.hint} Nothing is posted while zopf is the app you're looking at.")
+    Hint(Strings.Settings.notifyHint(value.hint))
 }
 
 @Composable
@@ -417,7 +398,7 @@ private fun ThemeField(
     onSelect: (ThemePreference) -> Unit,
 ) {
     Text(
-        "Colour scheme",
+        Strings.Settings.COLOUR_SCHEME,
         Modifier.padding(top = 8.dp),
         style = MaterialTheme.typography.bodyMedium,
     )
@@ -429,9 +410,9 @@ private fun ThemeField(
     )
     Hint(
         if (value == ThemePreference.SYSTEM) {
-            "Follows macOS, and changes with it while the app is open."
+            Strings.Settings.THEME_SYSTEM_HINT
         } else {
-            "Fixed, whichever theme macOS uses. File pickers and the menu bar icon still follow the system."
+            Strings.Settings.THEME_FIXED_HINT
         },
     )
 }
@@ -451,12 +432,12 @@ private fun TerminalField(
     InspectorField(
         value = draft,
         onValueChange = ::set,
-        label = "Terminal app",
+        label = Strings.Settings.TERMINAL_APP_LABEL,
         supportingText =
             if (draft.isBlank()) {
-                "Blank falls back to $DEFAULT_TERMINAL_APP."
+                Strings.Settings.terminalFallback(DEFAULT_TERMINAL_APP)
             } else {
-                "Opened with: open -a $draft"
+                Strings.Settings.openedWith(draft)
             },
         isError = draft.isBlank(),
     )
@@ -513,7 +494,7 @@ private fun <T> ConnectedChoices(
                             if (!checked) {
                                 null
                             } else {
-                                { Icon(ZopfIcons.Check, contentDescription = "Current") }
+                                { Icon(ZopfIcons.Check, contentDescription = Strings.Settings.CURRENT) }
                             },
                         onClick = {
                             onSelect(option)

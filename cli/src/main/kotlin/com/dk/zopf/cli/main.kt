@@ -1,6 +1,7 @@
 package com.dk.zopf.cli
 
 import com.dk.zopf.store.Log
+import com.dk.zopf.util.Strings
 import java.io.PrintStream
 import kotlin.system.exitProcess
 
@@ -21,12 +22,12 @@ fun zopf(
     try {
         dispatch(args, out, err)
     } catch (usage: UsageError) {
-        err.println("zopf: ${usage.message}")
+        err.println(Strings.Cli.failed("${usage.message}"))
         EXIT_USAGE
     } catch (failure: Throwable) {
         Log.error("zopf ${args.joinToString(" ")}", failure)
-        err.println("zopf: ${failure.message ?: failure}")
-        err.println("More in ${Log.file}")
+        err.println(Strings.Cli.failed("${failure.message ?: failure}"))
+        err.println(Strings.Cli.moreIn(Log.file))
         EXIT_FAILED
     }
 
@@ -79,7 +80,7 @@ private fun dispatch(
         }
 
         else -> {
-            throw UsageError("No \"$command\" command. Try run, list, validate, runs, prune, check-update or upgrade")
+            throw UsageError(Strings.Cli.noSuchCommand(command))
         }
     }
 }
@@ -87,50 +88,5 @@ private fun dispatch(
 fun usage(out: PrintStream) {
     out.println(braid(colour = System.console() != null))
     out.println()
-    out.println(
-        """
-        zopf runs agent workflows from a terminal, driving the claude, codex or dsh CLI you already have.
-
-        zopf run <workflow>       run a workflow to the end, then exit with its verdict
-          --workspace <dir>       workspace to read from (default: the one around you)
-          --repo <id>=<path>      point a repo the workflow declares at another path
-          --on-gate <policy>      what to do at a gate: approve, reject or fail (default)
-          --answer <node>=<value> answer an input node up front
-          --concurrency <n>       how many nodes may run at once (overrides settings.json)
-          --model <name>          model for nodes that don't name one
-          --provider <name>       claude, codex or dsh, for agent nodes that don't name one
-          --timeout <seconds>     stop the run if it hasn't finished by then
-          --format <format>       text (default), json (the archive's NDJSON) or quiet
-          --resume <run-id>       redo the run from where it stopped ("last" is the newest)
-          --dry-run               print the order nodes would run in, start nothing
-
-        zopf list                 list the workflows here, including the ones that don't parse
-          --workspace <dir>
-
-        zopf validate [workflow]  run the editor's checks as an exit code, every workflow by default
-          --workspace <dir>
-
-        zopf runs                 list the run archive, newest first
-          --last <n>              how many to show (default 10)
-
-        zopf prune                delete archived runs, oldest first
-          --keep <n>              how many to keep (default 200)
-          --older-than <days>     only delete runs finished more than this many days ago
-          --dry-run               list what would go, delete nothing
-
-        zopf version              print the version of this build, and any newer one already known
-
-        zopf check-update         ask GitHub whether a newer zopf has been released
-
-        zopf upgrade              install the newest release over this one and relink zopf
-          --version <x.y.z>       a specific release, rather than the newest published one
-          --dry-run               say what it would install, download nothing
-
-        The workspace is either the .zopf dir, the nearest parent that has one, or
-        ~/.zopf. Use zopf.yaml for workspace-wide defaults.
-
-        Exit codes: 0 run successful, 1 a node failed with nothing to catch it, 2 the run was
-        stopped, 3 bad usage.
-        """.trimIndent(),
-    )
+    out.println(Strings.Help.USAGE)
 }

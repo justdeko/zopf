@@ -1,5 +1,7 @@
 package com.dk.zopf.model
 
+import com.dk.zopf.util.Strings
+
 private val NODE_ID = Regex("[A-Za-z0-9_-]+")
 
 fun isValidNodeId(id: String): Boolean = NODE_ID.matches(id)
@@ -9,12 +11,12 @@ val NodeType.idStem: String get() = serialName
 val NodeType.label: String
     get() =
         when (this) {
-            NodeType.AGENT -> "Agent"
-            NodeType.SHELL -> "Shell"
-            NodeType.CONNECTOR -> "Connector"
-            NodeType.GATE -> "Gate"
-            NodeType.BRANCH -> "Branch"
-            NodeType.INPUT -> "Input"
+            NodeType.AGENT -> Strings.NodeKinds.AGENT
+            NodeType.SHELL -> Strings.NodeKinds.SHELL
+            NodeType.CONNECTOR -> Strings.NodeKinds.CONNECTOR
+            NodeType.GATE -> Strings.NodeKinds.GATE
+            NodeType.BRANCH -> Strings.NodeKinds.BRANCH
+            NodeType.INPUT -> Strings.NodeKinds.INPUT
         }
 
 fun NodeType.canFail(): Boolean = this !in setOf(NodeType.GATE, NodeType.BRANCH, NodeType.INPUT)
@@ -22,12 +24,12 @@ fun NodeType.canFail(): Boolean = this !in setOf(NodeType.GATE, NodeType.BRANCH,
 val NodeType.blurb: String
     get() =
         when (this) {
-            NodeType.AGENT -> "Run a headless agent session"
-            NodeType.SHELL -> "Run a command in your login shell"
-            NodeType.CONNECTOR -> "Call a connector script"
-            NodeType.GATE -> "Wait for you to approve"
-            NodeType.BRANCH -> "Take one path or the other"
-            NodeType.INPUT -> "Ask you for a value"
+            NodeType.AGENT -> Strings.NodeKinds.AGENT_BLURB
+            NodeType.SHELL -> Strings.NodeKinds.SHELL_BLURB
+            NodeType.CONNECTOR -> Strings.NodeKinds.CONNECTOR_BLURB
+            NodeType.GATE -> Strings.NodeKinds.GATE_BLURB
+            NodeType.BRANCH -> Strings.NodeKinds.BRANCH_BLURB
+            NodeType.INPUT -> Strings.NodeKinds.INPUT_BLURB
         }
 
 fun uniqueNodeId(
@@ -60,7 +62,7 @@ fun Workflow.duplicateNode(id: String): Pair<Workflow, WorkflowNode>? {
     val clone =
         original.copy(
             id = uniqueNodeId(original.id, nodes.mapTo(mutableSetOf()) { it.id }),
-            title = if (original.title.isBlank()) "" else "${original.title} copy",
+            title = if (original.title.isBlank()) "" else original.title + Strings.NodeKinds.COPY_SUFFIX,
             position = original.position?.let { Position(it.x + DUPLICATE_OFFSET, it.y + DUPLICATE_OFFSET) },
         )
     return copy(nodes = nodes + clone) to clone
@@ -80,10 +82,10 @@ fun Workflow.renameNode(
 ): Result<Workflow> {
     if (from == to) return Result.success(this)
     if (!isValidNodeId(to)) {
-        return Result.failure(IllegalArgumentException("Ids can use letters, digits, - and _ only"))
+        return Result.failure(IllegalArgumentException(Strings.Validation.ID_CHARACTERS))
     }
-    if (node(from) == null) return Result.failure(IllegalArgumentException("No node called \"$from\""))
-    if (node(to) != null) return Result.failure(IllegalStateException("\"$to\" is already taken"))
+    if (node(from) == null) return Result.failure(IllegalArgumentException(Strings.Validation.noSuchNode(from)))
+    if (node(to) != null) return Result.failure(IllegalStateException(Strings.Validation.idTaken(to)))
 
     return Result.success(
         copy(
@@ -118,10 +120,10 @@ fun Workflow.addRepo(
 ): Result<Workflow> {
     val trimmed = id.trim()
     if (!isValidNodeId(trimmed)) {
-        return Result.failure(IllegalArgumentException("Repo ids can use letters, digits, - and _ only"))
+        return Result.failure(IllegalArgumentException(Strings.Validation.REPO_ID_CHARACTERS))
     }
     if (repos.any { it.id == trimmed }) {
-        return Result.failure(IllegalStateException("\"$trimmed\" is already declared"))
+        return Result.failure(IllegalStateException(Strings.Validation.repoTaken(trimmed)))
     }
     return Result.success(copy(repos = repos + RepoRef(trimmed, path.trim())))
 }

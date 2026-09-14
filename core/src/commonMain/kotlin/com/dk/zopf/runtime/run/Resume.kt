@@ -5,6 +5,7 @@ import com.dk.zopf.model.descendantsOf
 import com.dk.zopf.runtime.NodeOutput
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.RunArchive
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 import kotlin.io.path.name
 
@@ -25,21 +26,24 @@ object Resume {
     ): Result<WorkflowRun> {
         val archives = RunArchive.all(root)
         if (archives.isEmpty()) {
-            return Result.failure(IllegalStateException("No runs are archived yet, so there is nothing to resume"))
+            return Result.failure(IllegalStateException(Strings.RunErrors.NOTHING_ARCHIVED))
         }
         val matches = if (id == LATEST) archives.take(1) else archives.filter { it.dir.name.startsWith(id) }
         val archive =
             when {
                 matches.isEmpty() ->
                     return Result.failure(
-                        IllegalArgumentException("No archived run has an id starting with \"$id\". Run \"zopf runs\" to see them"),
+                        IllegalArgumentException(Strings.RunErrors.noArchivedRun(id)),
                     )
 
                 matches.size > 1 ->
                     return Result.failure(
                         IllegalArgumentException(
-                            "\"$id\" matches ${matches.size} runs. Use more of the id: " +
+                            Strings.RunErrors.ambiguousRunId(
+                                id,
+                                matches.size,
                                 matches.take(SHOWN_MATCHES).joinToString { it.dir.name },
+                            ),
                         ),
                     )
 
@@ -48,11 +52,11 @@ object Resume {
 
         val record =
             archive.read()
-                ?: return Result.failure(IllegalStateException("${archive.dir} has no run.json in it any more"))
+                ?: return Result.failure(IllegalStateException(Strings.RunErrors.archiveEmpty(archive.dir)))
         val run = WorkflowRun.restored(record, record.restoreAs()).also { it.archiveDir = archive.dir }
         if (run.isElsewhere) {
             return Result.failure(
-                IllegalStateException("${run.workflowName} is still running somewhere else, so stop it before resuming"),
+                IllegalStateException(Strings.RunErrors.stillRunningSomewhereElse(run.workflowName)),
             )
         }
         return Result.success(run)

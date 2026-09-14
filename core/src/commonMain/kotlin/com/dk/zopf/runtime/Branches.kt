@@ -1,5 +1,7 @@
 package com.dk.zopf.runtime
 
+import com.dk.zopf.util.Strings
+
 data class BranchVerdict(
     val taken: Boolean,
     val explanation: String,
@@ -21,12 +23,12 @@ object Branches {
             val left = interpolate(unquote(text.substring(0, at)))
             val right = interpolate(unquote(text.substring(at + operator.length)))
             val taken = if (operator == "!=") left != right else left == right
-            return BranchVerdict(taken, "\"$left\" $operator \"$right\" → $taken")
+            return BranchVerdict(taken, Strings.Transcript.branchCompared(left, operator, right, taken))
         }
 
         val resolved = interpolate(text)
         val taken = resolved.lowercase() !in FALSEY
-        return BranchVerdict(taken, "\"$resolved\" is ${if (taken) "set" else "empty or false"} → $taken")
+        return BranchVerdict(taken, Strings.Transcript.branchTruthy(resolved, taken))
     }
 
     private fun unquote(value: String): String {

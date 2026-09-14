@@ -1,5 +1,6 @@
 package com.dk.zopf.model
 
+import com.dk.zopf.util.Strings
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -28,7 +29,7 @@ data class ConnectorManifest(
     val summary: String
         get() =
             description.ifBlank {
-                if (inputs.isEmpty()) "No declared inputs" else inputs.joinToString { it.name }
+                if (inputs.isEmpty()) Strings.Connectors.NO_DECLARED_INPUTS else inputs.joinToString { it.name }
             }
 }
 
@@ -53,7 +54,7 @@ data class ConnectorSecret(
     val keychain: String? = null,
     val required: Boolean = true,
 ) {
-    val sourceLabel: String get() = keychain?.let { "environment, or keychain \"$it\"" } ?: "environment"
+    val sourceLabel: String get() = Strings.Prefs.secretSource(keychain)
 }
 
 @Serializable

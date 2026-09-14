@@ -5,6 +5,7 @@ import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.runtime.run.ResumePoint
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
+import com.dk.zopf.util.Strings
 import com.dk.zopf.util.format
 import com.dk.zopf.util.spend
 import java.io.PrintStream
@@ -56,8 +57,10 @@ class TextRenderer(
         width = run.nodes.maxOfOrNull { it.nodeId.length } ?: 0
         say(
             null,
-            "${run.workflowName} · ${run.nodes.size} ${if (run.nodes.size == 1) "node" else "nodes"}" +
-                (run.workspaceRoot?.let { " · $it" } ?: ""),
+            Strings.Cli.header(
+                run.workflowName,
+                Strings.Words.count(run.nodes.size, Strings.Words.NODE) + (run.workspaceRoot?.let { " · $it" } ?: ""),
+            ),
         )
     }
 
@@ -103,7 +106,7 @@ class TextRenderer(
             listOfNotNull(
                 node.status.label.lowercase(),
                 format(node.elapsed()),
-                node.exitCode?.takeIf { it != 0 }?.let { "exit $it" },
+                node.exitCode?.takeIf { it != 0 }?.let { Strings.Console.exitCode(it) },
                 spend(node.costUsd, node.tokens),
             )
         say(node, tint(node.status, detail.joinToString(" · ")))
@@ -117,7 +120,7 @@ class TextRenderer(
                 format(run.elapsed()),
                 spend(run.costUsd, run.tokens),
             )
-        say(null, tint(run.status, "${run.workflowName} · ${detail.joinToString(" · ")}"))
+        say(null, tint(run.status, Strings.Cli.header(run.workflowName, detail.joinToString(" · "))))
         run.nodes
             .filter { it.status != RunStatus.SUCCEEDED }
             .forEach { say(null, dim("  ${it.nodeId}: ${it.status.label.lowercase()}")) }
@@ -183,7 +186,8 @@ fun summaryOf(entry: ConsoleEntry.Summary): String =
     ).joinToString(" · ")
 
 fun ResumePoint.plan(): String =
-    "Resuming ${run.id.take(SHORT_ID)} · " +
-        (if (carried.isEmpty()) "nothing to carry over" else "carrying over ${carried.keys.joinToString()}") +
-        " · " +
-        (if (redo.isEmpty()) "nothing left to run" else "running ${redo.joinToString()}")
+    Strings.Cli.resuming(
+        run.id.take(SHORT_ID),
+        if (carried.isEmpty()) Strings.Cli.NOTHING_TO_CARRY_OVER else Strings.Cli.carryingOver(carried.keys.joinToString()),
+        if (redo.isEmpty()) Strings.Cli.NOTHING_LEFT_TO_RUN else Strings.Cli.runningNodes(redo.joinToString()),
+    )

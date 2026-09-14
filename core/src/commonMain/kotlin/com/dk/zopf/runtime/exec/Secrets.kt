@@ -1,6 +1,7 @@
 package com.dk.zopf.runtime.exec
 
 import com.dk.zopf.model.ConnectorSecret
+import com.dk.zopf.util.Strings
 import java.util.concurrent.TimeUnit
 
 enum class SecretSource {
@@ -12,9 +13,9 @@ enum class SecretSource {
     val label: String
         get() =
             when (this) {
-                ENVIRONMENT -> "environment"
-                KEYCHAIN -> "keychain"
-                MISSING -> "not set"
+                ENVIRONMENT -> Strings.Prefs.SECRET_FROM_ENVIRONMENT
+                KEYCHAIN -> Strings.Prefs.SECRET_FROM_KEYCHAIN
+                MISSING -> Strings.Prefs.SECRET_MISSING
             }
 }
 

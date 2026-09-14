@@ -11,6 +11,7 @@ import com.dk.zopf.runtime.agent.ContentBlock
 import com.dk.zopf.runtime.agent.PendingPermission
 import com.dk.zopf.runtime.agent.PermissionRequest
 import com.dk.zopf.runtime.exec.ShellLine
+import com.dk.zopf.util.Strings
 import com.dk.zopf.util.toFields
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,15 +55,15 @@ enum class RunStatus {
     val label: String
         get() =
             when (this) {
-                QUEUED -> "Queued"
-                STARTING -> "Starting"
-                RUNNING -> "Running"
-                WAITING -> "Waiting for you"
-                SUCCEEDED -> "Done"
-                FAILED -> "Failed"
-                STOPPED -> "Stopped"
-                SKIPPED -> "Skipped"
-                DETACHED -> "In Terminal"
+                QUEUED -> Strings.RunStates.QUEUED
+                STARTING -> Strings.RunStates.STARTING
+                RUNNING -> Strings.RunStates.RUNNING
+                WAITING -> Strings.RunStates.WAITING
+                SUCCEEDED -> Strings.RunStates.SUCCEEDED
+                FAILED -> Strings.RunStates.FAILED
+                STOPPED -> Strings.RunStates.STOPPED
+                SKIPPED -> Strings.RunStates.SKIPPED
+                DETACHED -> Strings.RunStates.DETACHED
             }
 }
 
@@ -276,7 +277,7 @@ class NodeRun(
         when (event) {
             is AgentEvent.SystemInit -> {
                 update { observed(model = event.model ?: model) }
-                notice("Session started · ${model ?: "default model"} · ${event.cwd ?: cwd}")
+                notice(Strings.Transcript.sessionStarted(model ?: Strings.Transcript.DEFAULT_MODEL, event.cwd ?: cwd))
             }
 
             is AgentEvent.TextDelta -> appendDelta(event.text, event.isThinking)
@@ -305,7 +306,7 @@ class NodeRun(
                 closeStreaming(null, isThinking = false)
 
                 event.permissionDenials.forEach {
-                    notice("Denied: ${it.toolName} ${it.summary}".trimEnd(), isWarning = true)
+                    notice(Strings.Transcript.denied(it.toolName, it.summary), isWarning = true)
                 }
 
                 event.text?.takeIf { it.isNotBlank() }?.let {
@@ -341,7 +342,7 @@ class NodeRun(
             is AgentEvent.Notice ->
                 when {
                     event.kind == "rate_limit" && event.detail != "allowed" ->
-                        notice("Rate limit: ${event.detail}", isWarning = true)
+                        notice(Strings.Transcript.rateLimit(event.detail), isWarning = true)
 
                     event.kind == "error" ->
                         event.detail?.takeIf { it.isNotBlank() }?.let { notice(it, isWarning = true) }
@@ -391,14 +392,14 @@ class NodeRun(
     internal fun carryOver(output: NodeOutput) {
         produce(output.result, output.extras)
         update { observed(sessionId = output.sessionId) }
-        notice("Carried over from the previous attempt")
+        notice(Strings.Transcript.CARRIED_OVER)
         finish(RunStatus.SUCCEEDED, output.exitCode)
     }
 
     @Synchronized
     internal fun beginPermission(pending: PendingPermission) {
         update { permissionAsked(pending) }
-        notice("${pending.request.toolName} wants to run: ${pending.request.summary}".trimEnd(':', ' '))
+        notice(Strings.Transcript.wantsToRun(pending.request.toolName, pending.request.summary))
     }
 
     @Synchronized
@@ -408,7 +409,7 @@ class NodeRun(
     ) {
         update { permissionAnswered() }
         notice(
-            if (allowed) "Allowed ${request.toolName}" else "Denied ${request.toolName}",
+            if (allowed) Strings.Transcript.allowed(request.toolName) else Strings.Transcript.deniedTool(request.toolName),
             isWarning = !allowed,
         )
     }
@@ -442,7 +443,7 @@ class NodeRun(
 
     @Synchronized
     fun echoFollowUp(text: String) {
-        add(ConsoleEntry.Notice(nextKey, "You: $text"))
+        add(ConsoleEntry.Notice(nextKey, Strings.Transcript.youSaid(text)))
     }
 
     @Synchronized

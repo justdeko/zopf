@@ -3,6 +3,7 @@ package com.dk.zopf.runtime.macos
 import com.dk.zopf.runtime.agent.AgentProvider
 import com.dk.zopf.runtime.exec.CommandLookup
 import com.dk.zopf.store.DEFAULT_TERMINAL_APP
+import com.dk.zopf.util.Strings
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
@@ -37,11 +38,13 @@ object TerminalLauncher {
                     .start()
             val exit = open.waitFor()
             check(exit == 0) {
-                "Couldn't open $terminalApp: " +
+                Strings.RunErrors.couldntOpenTerminal(
+                    terminalApp,
                     open.errorStream
                         .bufferedReader()
                         .readText()
-                        .trim()
+                        .trim(),
+                )
             }
         }
 

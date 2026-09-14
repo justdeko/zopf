@@ -43,6 +43,7 @@ import com.dk.zopf.ui.theme.ZopfTheme
 import com.dk.zopf.ui.theme.isDark
 import com.dk.zopf.ui.workflows.WorkflowListScreen
 import com.dk.zopf.ui.workspace.WorkspaceSwitcher
+import com.dk.zopf.util.Strings
 
 private val RunPanelHeight = 300.dp
 
@@ -51,55 +52,23 @@ private fun subtitleFor(
     activity: RunActivity,
 ): String =
     when (state.screen) {
-        Screen.WORKFLOWS -> {
-            val listing = state.listing
-            when {
-                state.activeWorkspace == null -> {
-                    "No workspace open"
-                }
-
-                listing.broken.isEmpty() -> {
-                    count(listing.workflows.size, "workflow")
-                }
-
-                else -> {
-                    count(listing.workflows.size, "workflow") +
-                        " · ${count(listing.broken.size, "file")} that can't be read"
-                }
+        Screen.WORKFLOWS ->
+            if (state.activeWorkspace == null) {
+                Strings.Nav.NO_WORKSPACE
+            } else {
+                Strings.Nav.workflowsSubtitle(state.listing.workflows.size, state.listing.broken.size)
             }
-        }
 
-        Screen.RUNS -> {
-            val active = activity.active
-            val total = activity.total
-            when {
-                total == 0 -> "Nothing has run yet"
-                active == 0 -> "${count(total, "run")}, none active"
-                else -> "$active of ${count(total, "run")} active"
+        Screen.RUNS -> Strings.Nav.runsSubtitle(activity.total, activity.active)
+
+        Screen.CONNECTORS ->
+            if (state.activeWorkspace == null) {
+                Strings.Nav.NO_WORKSPACE
+            } else {
+                Strings.Nav.connectorsSubtitle(state.connectors.connectors.size, state.connectors.broken.size)
             }
-        }
 
-        Screen.CONNECTORS -> {
-            val listing = state.connectors
-            when {
-                state.activeWorkspace == null -> {
-                    "No workspace open"
-                }
-
-                listing.broken.isEmpty() -> {
-                    count(listing.connectors.size, "connector")
-                }
-
-                else -> {
-                    count(listing.connectors.size, "connector") +
-                        " · ${count(listing.broken.size, "broken")}"
-                }
-            }
-        }
-
-        Screen.SETTINGS -> {
-            "Applies to every run on this machine, in any workspace"
-        }
+        Screen.SETTINGS -> Strings.Nav.SETTINGS_SCOPE
     }
 
 @Composable
@@ -142,11 +111,6 @@ private fun TopBar(state: AppState) {
         }
     }
 }
-
-private fun count(
-    n: Int,
-    noun: String,
-) = if (n == 1) "1 $noun" else "$n ${noun}s"
 
 @Composable
 fun ZopfApp(state: AppState = remember { AppState() }) {

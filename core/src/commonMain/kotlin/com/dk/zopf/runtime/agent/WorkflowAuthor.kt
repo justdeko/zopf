@@ -13,6 +13,7 @@ import com.dk.zopf.store.workflow.slugify
 import com.dk.zopf.store.workspace.ConnectorStore
 import com.dk.zopf.store.workspace.SELF_REPO_ID
 import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
@@ -52,7 +53,7 @@ object WorkflowAuthor {
                     WorkflowNode(
                         id = NODE_ID,
                         type = NodeType.AGENT,
-                        title = "Drafting ${slugify(name)}",
+                        title = Strings.Workflows.drafting(slugify(name)),
                         repo = WORKSPACE_REPO,
                         alsoRead = listOf(GUIDE_REPO, SELF_REPO_ID),
                         sandbox = Sandbox.READ_ONLY,
@@ -97,7 +98,7 @@ object WorkflowAuthor {
         val yaml =
             yamlIn(answer)
                 ?: return Result.failure(
-                    IllegalStateException("Nothing in that answer was a workflow"),
+                    IllegalStateException(Strings.RunErrors.NOTHING_WAS_A_WORKFLOW),
                 )
         return runCatching { decodeWorkflow(yaml).copy(name = slugify(name)) }
     }

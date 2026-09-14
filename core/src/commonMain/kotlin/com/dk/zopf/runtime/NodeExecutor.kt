@@ -36,6 +36,7 @@ import com.dk.zopf.store.workspace.DiscoveredSkill
 import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.store.workspace.availableSkills
 import com.dk.zopf.store.workspace.resolvePathAgainst
+import com.dk.zopf.util.Strings
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -90,7 +91,7 @@ class ProcessNodeExecutor(
                 run.finish(RunStatus.FAILED)
                 return
             }
-        if (node.promptFile.isNotBlank()) run.notice("Prompt from ${node.promptFile}")
+        if (node.promptFile.isNotBlank()) run.notice(Strings.Transcript.promptFrom(node.promptFile))
 
         val skills =
             if (can.skills) planSkills(node.skills, execution.skillsInScope(), cwd) else SkillPlan(emptyList(), emptyList())
@@ -111,7 +112,7 @@ class ProcessNodeExecutor(
             if (can.inlineApproval && settings.current.inlineApproval) askableTools(mode) else emptyList()
         val settingsFile = permissions?.settingsFile(askAbout)
         if (settingsFile != null) {
-            run.notice("Will ask before ${askAbout.joinToString()}")
+            run.notice(Strings.Transcript.willAskBefore(askAbout.joinToString()))
         }
 
         execution.warnIgnored(provider.id)
@@ -147,7 +148,7 @@ class ProcessNodeExecutor(
                 model = invocation.model,
             )
         }
-        if (sandbox != null) run.notice("Sandbox: ${sandbox.cliValue}")
+        if (sandbox != null) run.notice(Strings.Transcript.sandbox(sandbox.cliValue))
 
         if (provider.promptChannel == PromptChannel.STDIN) {
             session.send(prompt).getOrThrow()
@@ -165,7 +166,7 @@ class ProcessNodeExecutor(
                         session
                             .events { line -> execution.archive.appendRaw(node.id, line) }
                             .collect { event -> run.consume(event) }
-                    }.onFailure { run.notice("Stream ended: ${it.message}", isWarning = true) }
+                    }.onFailure { run.notice(Strings.Transcript.streamEnded(it.message), isWarning = true) }
                 },
                 awaitExit = session::awaitExit,
             )
@@ -189,7 +190,7 @@ class ProcessNodeExecutor(
         val session = shell.start(ShellInvocation(command, cwd))
         run.live = ShellLive(session)
         run.update { launched(sessionId = null, command = listOf(command)) }
-        run.notice("$ $command")
+        run.notice(Strings.Transcript.shellCommand(command))
 
         val exit =
             within(
@@ -203,7 +204,7 @@ class ProcessNodeExecutor(
                             execution.archive.appendRaw(node.id, line.text)
                             run.consume(line)
                         }
-                    }.onFailure { run.notice("Output ended: ${it.message}", isWarning = true) }
+                    }.onFailure { run.notice(Strings.Transcript.outputEnded(it.message), isWarning = true) }
                 },
                 awaitExit = session::awaitExit,
             )
@@ -223,7 +224,7 @@ class ProcessNodeExecutor(
                 .filter { it.required && inputs[it.name].isNullOrBlank() }
                 .map { it.name }
         if (missing.isNotEmpty()) {
-            run.notice("${manifest.name} needs ${missing.joinToString()}. Set them on this node.", isWarning = true)
+            run.notice(Strings.Transcript.secretsMissing(manifest.name, missing.joinToString()), isWarning = true)
             run.finish(RunStatus.FAILED)
             return
         }
@@ -231,8 +232,11 @@ class ProcessNodeExecutor(
         val unresolved = secrets.filter { it.isMissing && it.declared.required }
         if (unresolved.isNotEmpty()) {
             run.notice(
-                "Couldn't find ${unresolved.joinToString { it.name }}. ${manifest.name} reads " +
+                Strings.Transcript.secretsUnresolved(
+                    unresolved.joinToString { it.name },
+                    manifest.name,
                     unresolved.joinToString { "${it.name} (${it.declared.sourceLabel})" },
+                ),
                 isWarning = true,
             )
             run.finish(RunStatus.FAILED)
@@ -242,11 +246,11 @@ class ProcessNodeExecutor(
         secrets
             .filterNot { it.isMissing }
             .takeIf { it.isNotEmpty() }
-            ?.let { run.notice("Secrets: ${it.joinToString()}") }
+            ?.let { run.notice(Strings.Transcript.secretsFound(it.joinToString())) }
         secrets
             .filter { it.isMissing }
             .takeIf { it.isNotEmpty() }
-            ?.let { run.notice("Optional and not set: ${it.joinToString { s -> s.name }}") }
+            ?.let { run.notice(Strings.Transcript.secretsOptionalMissing(it.joinToString { s -> s.name })) }
 
         val timeoutSeconds = execution.deadline() ?: manifest.timeoutSeconds
         val invocation =
@@ -260,7 +264,7 @@ class ProcessNodeExecutor(
         val session = connector.start(invocation)
         run.live = ConnectorLive(session)
         run.update { launched(sessionId = null, command = session.command) }
-        run.notice("${manifest.name} ← ${invocation.stdinJson()}")
+        run.notice(Strings.Transcript.connectorSent(manifest.name, invocation.stdinJson()))
 
         val exit =
             within(
@@ -274,7 +278,7 @@ class ProcessNodeExecutor(
                             execution.archive.appendRaw(node.id, line.text)
                             run.consume(line)
                         }
-                    }.onFailure { run.notice("Output ended: ${it.message}", isWarning = true) }
+                    }.onFailure { run.notice(Strings.Transcript.outputEnded(it.message), isWarning = true) }
                 },
                 awaitExit = session::awaitExit,
             )
@@ -282,7 +286,7 @@ class ProcessNodeExecutor(
 
         if (!output.sawJson) {
             run.notice(
-                "${manifest.name} printed no JSON object, so its plain output is the result",
+                Strings.Transcript.connectorPlainOutput(manifest.name),
                 isWarning = true,
             )
         }
@@ -297,8 +301,7 @@ class ProcessNodeExecutor(
             .takeIf { it.isNotEmpty() }
             ?.let {
                 run.notice(
-                    "${manifest.name} declares ${it.joinToString()} but didn't return " +
-                        if (it.size == 1) "it" else "them",
+                    Strings.Transcript.connectorMissingOutputs(manifest.name, it.joinToString(), it.size),
                     isWarning = true,
                 )
             }
@@ -350,7 +353,7 @@ private suspend fun within(
             launch {
                 delay(seconds.seconds)
                 expired.set(true)
-                run.notice("Gave up after ${seconds}s. Nothing finished it.", isWarning = true)
+                run.notice(Strings.Transcript.gaveUp(seconds), isWarning = true)
                 stop()
                 delay(TERM_GRACE_MILLIS.milliseconds)
                 kill()
@@ -381,7 +384,7 @@ private fun NodeExecution.skillsInScope(): List<DiscoveredSkill> = workspace?.le
 private fun NodeExecution.warnIgnored(provider: AgentProviderId) {
     val ignored = provider.ignoredFields(node)
     if (ignored.isEmpty()) return
-    run.notice("${provider.label} has no ${ignored.joinToString()}, so it is left out", isWarning = true)
+    run.notice(Strings.Transcript.ignoredFields(provider.label, ignored.joinToString()), isWarning = true)
 }
 
 internal fun resolveModel(
@@ -415,8 +418,7 @@ internal fun warnUnresolved(
 ) {
     if (interpolated.isComplete) return
     run.notice(
-        "Nothing has produced ${interpolated.unresolved.joinToString { "\${$it}" }} yet, " +
-            "so the reference is left as written",
+        Strings.Transcript.unresolvedReferences(interpolated.unresolved.joinToString { "\${$it}" }),
         isWarning = true,
     )
 }
@@ -436,7 +438,7 @@ private class ShellLive(
 ) : LiveProcess {
     override fun stop() = session.stop()
 
-    override fun send(text: String): Result<Unit> = Result.failure(UnsupportedOperationException("A shell node doesn't take follow-ups"))
+    override fun send(text: String): Result<Unit> = Result.failure(UnsupportedOperationException(Strings.RunErrors.SHELL_TAKES_NO_FOLLOW_UPS))
 
     override fun endInput() = Unit
 }
@@ -446,7 +448,7 @@ private class ConnectorLive(
 ) : LiveProcess {
     override fun stop() = session.stop()
 
-    override fun send(text: String): Result<Unit> = Result.failure(UnsupportedOperationException("A connector takes its inputs up front"))
+    override fun send(text: String): Result<Unit> = Result.failure(UnsupportedOperationException(Strings.RunErrors.CONNECTOR_TAKES_INPUTS_UP_FRONT))
 
     override fun endInput() = Unit
 }

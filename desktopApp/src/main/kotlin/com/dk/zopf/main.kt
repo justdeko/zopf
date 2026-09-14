@@ -21,6 +21,7 @@ import com.dk.zopf.store.Log
 import com.dk.zopf.ui.AppState
 import com.dk.zopf.ui.Screen
 import com.dk.zopf.ui.ZopfApp
+import com.dk.zopf.util.Strings
 import java.awt.Desktop
 import java.awt.Dimension
 
@@ -87,7 +88,7 @@ fun main() {
             onCloseRequest = { windowVisible = false },
             state = windowState,
             visible = windowVisible,
-            title = "zopf",
+            title = Strings.APP_NAME,
             icon = windowIcon,
         ) {
             LaunchedEffect(window) { window.minimumSize = Dimension(800, 600) }

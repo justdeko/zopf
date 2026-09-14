@@ -3,6 +3,7 @@ package com.dk.zopf.store.workflow
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.store.writeTextAtomically
+import com.dk.zopf.util.Strings
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
@@ -61,9 +62,9 @@ class WorkflowStore(
         template: String? = null,
     ): Result<Workflow> {
         val slug = slugify(name)
-        if (slug.isBlank()) return Result.failure(IllegalArgumentException("Name cannot be empty"))
+        if (slug.isBlank()) return Result.failure(IllegalArgumentException(Strings.RunErrors.NAME_CANNOT_BE_EMPTY))
         if (fileFor(slug).exists()) {
-            return Result.failure(IllegalStateException("A workflow named \"$slug\" already exists"))
+            return Result.failure(IllegalStateException(Strings.RunErrors.workflowExists(slug)))
         }
         val workflow =
             runCatching { template?.let { Templates.workflow(it, slug) } ?: Workflow(name = slug) }
@@ -77,10 +78,10 @@ class WorkflowStore(
         newName: String,
     ): Result<Workflow> {
         val slug = slugify(newName)
-        if (slug.isBlank()) return Result.failure(IllegalArgumentException("Name cannot be empty"))
+        if (slug.isBlank()) return Result.failure(IllegalArgumentException(Strings.RunErrors.NAME_CANNOT_BE_EMPTY))
         if (slug == workflow.name) return Result.success(workflow)
         if (fileFor(slug).exists()) {
-            return Result.failure(IllegalStateException("A workflow named \"$slug\" already exists"))
+            return Result.failure(IllegalStateException(Strings.RunErrors.workflowExists(slug)))
         }
         val renamed = workflow.copy(name = slug)
         save(renamed)
@@ -98,7 +99,7 @@ class WorkflowStore(
     ): Result<Workflow> {
         val targetStore = WorkflowStore(target)
         if (targetStore.fileFor(workflow.name).exists()) {
-            return Result.failure(IllegalStateException("\"${workflow.name}\" already exists in ${target.name}"))
+            return Result.failure(IllegalStateException(Strings.RunErrors.workflowExistsIn(workflow.name, target.name)))
         }
         val rebased =
             workflow.copy(
