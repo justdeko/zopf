@@ -43,6 +43,7 @@ data class NodeRunRecord(
     val command: List<String> = emptyList(),
     val exitCode: Int? = null,
     val costUsd: Double? = null,
+    val answer: String? = null,
 )
 
 class RunArchive(

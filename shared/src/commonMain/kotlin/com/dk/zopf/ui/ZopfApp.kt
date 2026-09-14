@@ -273,6 +273,7 @@ fun ZopfApp(state: AppState = remember { AppState() }) {
                                 onOpen = state::openEditor,
                                 onRun = { state.runWorkflow(it) },
                                 onCreate = state::createWorkflow,
+                                onDescribe = state::describeWorkflow,
                                 onRename = state::renameWorkflow,
                                 onDelete = state::deleteWorkflow,
                                 onReveal = state::reveal,

@@ -124,7 +124,7 @@ fun RunsScreen(
                                         .onFailure { onMessage(it.message ?: "Couldn't retry that run") }
                                     Unit
                                 }.takeIf {
-                                    !selectedState.isActive && selectedState.of(node).status.isFinished && run.workflow != null
+                                    !selectedState.isActive && selectedState.of(node).status.isFinished && registry.canRetry(run)
                                 }
                             ContextMenuArea(
                                 items = {

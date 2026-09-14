@@ -2,6 +2,7 @@ package com.dk.zopf.cli
 
 import com.dk.zopf.runtime.run.ConsoleEntry
 import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.ResumePoint
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.util.format
@@ -11,8 +12,12 @@ import java.time.Duration
 
 enum class Format { TEXT, JSON, QUIET }
 
+const val SHORT_ID = 8
+
 interface RunRenderer {
     fun starting(run: WorkflowRun) = Unit
+
+    fun resuming(point: ResumePoint) = Unit
 
     fun entry(
         node: NodeRun,
@@ -54,6 +59,10 @@ class TextRenderer(
             "${run.workflowName} · ${run.nodes.size} ${if (run.nodes.size == 1) "node" else "nodes"}" +
                 (run.workspaceRoot?.let { " · $it" } ?: ""),
         )
+    }
+
+    override fun resuming(point: ResumePoint) {
+        say(null, dim(point.plan()))
     }
 
     override fun entry(
@@ -172,3 +181,9 @@ fun summaryOf(entry: ConsoleEntry.Summary): String =
         entry.durationMs?.let { format(Duration.ofMillis(it)) },
         spend(entry.costUsd, entry.tokens),
     ).joinToString(" · ")
+
+fun ResumePoint.plan(): String =
+    "Resuming ${run.id.take(SHORT_ID)} · " +
+        (if (carried.isEmpty()) "nothing to carry over" else "carrying over ${carried.keys.joinToString()}") +
+        " · " +
+        (if (redo.isEmpty()) "nothing left to run" else "running ${redo.joinToString()}")

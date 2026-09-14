@@ -10,6 +10,8 @@ import com.dk.zopf.runtime.ProcessNodeExecutor
 import com.dk.zopf.runtime.WorkflowEngine
 import com.dk.zopf.runtime.errors
 import com.dk.zopf.runtime.run.NodeRun
+import com.dk.zopf.runtime.run.Resume
+import com.dk.zopf.runtime.run.ResumePoint
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.store.AppPaths
@@ -32,7 +34,7 @@ import kotlin.time.Duration.Companion.seconds
 enum class GatePolicy { APPROVE, REJECT, FAIL }
 
 val RUN_OPTIONS =
-    setOf("workspace", "repo", "on-gate", "answer", "concurrency", "model", "provider", "format", "timeout")
+    setOf("workspace", "repo", "on-gate", "answer", "concurrency", "model", "provider", "format", "timeout", "resume")
 
 val RUN_SWITCHES = setOf("dry-run")
 
@@ -47,11 +49,19 @@ fun runWorkflow(
     executor: NodeExecutor? = null,
     archiveRoot: Path = AppPaths.runsDir,
 ): Int {
+    val resumed =
+        options.one("resume")?.let { id ->
+            Resume.find(id, archiveRoot).getOrElse { throw UsageError(it.message.orEmpty()) }
+        }
     val name =
         options.positionals.firstOrNull()
+            ?: resumed?.workflowName
             ?: throw UsageError("Which workflow? Run \"zopf list\" to see what this workspace has")
     if (options.positionals.size > 1) {
         throw UsageError("One workflow at a time. \"${options.positionals.drop(1).joinToString(" ")}\" is extra")
+    }
+    if (resumed != null && name != resumed.workflowName) {
+        throw UsageError("That run is of ${resumed.workflowName}, not \"$name\". Resume it without naming a workflow")
     }
 
     val workspace = locateWorkspace(options.one("workspace"))
@@ -70,8 +80,9 @@ fun runWorkflow(
     val format = options.choice("format", Format.entries.toTypedArray()) ?: Format.TEXT
 
     checkAnswers(workflow, answers)
+    val point = resumed?.let { Resume.pointFor(it, workflow) }
 
-    if (options.has("dry-run")) return describeRun(workflow, workspace, out)
+    if (options.has("dry-run")) return describeRun(workflow, workspace, point, out)
 
     val errors = workflow.issues(workspace).errors()
     if (errors.isNotEmpty()) {
@@ -100,7 +111,7 @@ fun runWorkflow(
 
     val deadline = options.int("timeout", 1..MAX_TIMEOUT_SECONDS)
     val started =
-        engine.start(workspace, workflow) { node ->
+        engine.start(workspace, workflow, inherited = point?.carried.orEmpty()) { node ->
             node.onEntrySettled = { entry -> screen.entry(node, entry) }
         }
     val run =
@@ -109,6 +120,7 @@ fun runWorkflow(
             return EXIT_USAGE
         }
     screen.starting(run)
+    point?.let { screen.resuming(it) }
 
     val stopper = stopOnSignal(engine, run)
     runBlocking { awaitRun(engine, run, deadline) }
@@ -122,12 +134,14 @@ fun runWorkflow(
 private fun describeRun(
     workflow: Workflow,
     workspace: Workspace,
+    point: ResumePoint?,
     out: PrintStream,
 ): Int {
     val issues = workflow.issues(workspace)
     issues.forEach { out.println(it.render()) }
     if (issues.errors().isNotEmpty()) return EXIT_USAGE
 
+    point?.let { out.println(it.plan()) }
     out.println("${workflow.name} · ${workflow.nodes.size} nodes · nothing started")
     workflow.runOrder().forEachIndexed { wave, ids ->
         out.println("  ${wave + 1}. ${ids.joinToString()}")

@@ -2,18 +2,35 @@ package com.dk.zopf.store.workflow
 
 import com.dk.zopf.runtime.agent.SelectedSkill
 import com.dk.zopf.runtime.agent.SkillPlan
+import com.dk.zopf.runtime.agent.WorkflowAuthor
 import com.dk.zopf.runtime.exec.ConnectorScaffold
+import com.dk.zopf.store.workspace.Workspace
+import java.nio.file.Files
 import java.nio.file.Paths
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PromptsTest {
+    private val dir = Files.createTempDirectory("zopf-prompts")
+
+    private val workspace = Workspace.create(dir.resolve("ws"))
+
+    private val guide = WorkflowAuthor.unpackGuide(dir)
+
+    @AfterTest
+    fun cleanup() {
+        dir.toFile().deleteRecursively()
+    }
+
     private fun everyPrompt() =
         listOf(
             "connector-create" to ConnectorScaffold.createPrompt("slack-post"),
             "connector-fix" to ConnectorScaffold.fixPrompt("slack-post", "not JSON at offset 4"),
+            "workflow-author" to WorkflowAuthor.createPrompt("lint-fix", "run the linter", workspace, guide),
+            "workflow-repair" to WorkflowAuthor.repairPrompt(listOf("tests: no command"), "name: demo", guide),
             "skill-use-one" to useSentenceVia(listOf("code-review")),
             "skill-use-many" to useSentenceVia(listOf("a", "b", "c")),
         )

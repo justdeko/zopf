@@ -120,7 +120,7 @@ fun listRuns(
                 record.cost()?.let { money(it) },
             )
         out.println("${record.startedAt.readable()}  ${record.workflow} · ${detail.joinToString(" · ")}")
-        out.println("  ${archive.dir}")
+        out.println("  ${record.id.take(SHORT_ID)}  ${archive.dir}")
     }
 }
 

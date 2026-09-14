@@ -131,7 +131,8 @@ Some things that are crucial to understanding workflow nodes:
 - an `on: failure` edge does not fail the run (node still shows as failed)
 - generally, follow the [schema reference](plugins/zopf/skills/zopf-workflows/references/schema.md)
 
-The editor reads and writes to workflow files, so you can hand-edit it or draw it on the canvas. Or you can invoke the
+The editor reads and writes to workflow files, so you can hand-edit it or draw it on the canvas. You can also describe
+what it should do and let an agent draft the graph for you. Or you can invoke the
 [claude skills](plugins/zopf/skills) to construct one. To add them:
 
 ```
@@ -195,6 +196,8 @@ zopf list
 zopf validate
 # show past runs
 zopf runs --last 5
+# resume the last run from where it stopped
+zopf run --resume last
 ```
 
 Exit codes:

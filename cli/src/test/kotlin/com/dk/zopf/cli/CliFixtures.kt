@@ -46,7 +46,7 @@ class Sandbox {
         streams: Streams = Streams(),
     ): Pair<Int, Streams> {
         val full = args + listOf("--workspace", workspace.root.toString())
-        val code = runWorkflow(Options.parse(full, RUN_OPTIONS), streams.out, streams.err, executor, archiveRoot)
+        val code = runWorkflow(Options.parse(full, RUN_OPTIONS, RUN_SWITCHES), streams.out, streams.err, executor, archiveRoot)
         return code to streams
     }
 }
@@ -59,10 +59,15 @@ class FakeExecutor(
     val models: MutableList<String?> = Collections.synchronizedList(mutableListOf())
     val providers: MutableList<AgentProviderId?> = Collections.synchronizedList(mutableListOf())
     val directories: MutableList<Path?> = Collections.synchronizedList(mutableListOf())
+    val upstream: MutableMap<String, Map<String, String>> = Collections.synchronizedMap(mutableMapOf())
 
     override suspend fun execute(execution: NodeExecution) {
         val id = execution.node.id
         started.add(id)
+        upstream[id] =
+            execution.workflow.nodes
+                .mapNotNull { node -> execution.outputs[node.id]?.let { node.id to it.result } }
+                .toMap()
         models.add(execution.node.model ?: execution.workflow.defaults.model)
         providers.add(execution.run.provider)
         directories.add(execution.run.cwd)

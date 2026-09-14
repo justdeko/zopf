@@ -136,6 +136,7 @@ class WorkflowRun(
                         command = node.command,
                         exitCode = node.exitCode,
                         costUsd = node.costUsd,
+                        answer = node.decision(),
                     )
                 },
         )
@@ -146,6 +147,7 @@ class WorkflowRun(
     ) {
         record.nodes.forEach { archived ->
             val node = node(archived.nodeId) ?: return@forEach
+            archived.answer?.let(node::produce)
             node.update {
                 archived(
                     status = statusOf(archived.status, restore),
@@ -230,5 +232,7 @@ data class RunNotification(
     val thread: String = "",
     val actions: List<NotificationAction> = emptyList(),
 )
+
+private fun NodeRun.decision(): String? = if (nodeType.needsProcess()) null else output().result.takeIf { it.isNotBlank() }
 
 internal fun NodeType.needsProcess(): Boolean = this == NodeType.AGENT || this == NodeType.SHELL || this == NodeType.CONNECTOR

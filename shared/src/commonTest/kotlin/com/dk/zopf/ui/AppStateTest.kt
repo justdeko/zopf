@@ -7,6 +7,7 @@ import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.runtime.NodeExecution
 import com.dk.zopf.runtime.NodeExecutor
+import com.dk.zopf.runtime.exec.ShellLine
 import com.dk.zopf.runtime.run.RunRegistry
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.store.AppSettings
@@ -17,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.nio.file.Files
@@ -359,5 +361,128 @@ class ConnectorAgentTest {
         ).forEach { (default, isInstalled, expected) ->
             assertEquals(expected, authoringAgent(default, isInstalled).executable, "default ${default.cliValue}")
         }
+    }
+}
+
+class WorkflowDraftTest {
+    private val dirs = mutableListOf<Path>()
+    private val apps = mutableListOf<AppState>()
+
+    @AfterTest
+    fun cleanup() {
+        apps.forEach { it.shutdown() }
+        dirs.forEach { it.toFile().deleteRecursively() }
+    }
+
+    private fun tempDir(): Path = Files.createTempDirectory("zopf-draft").also { dirs.add(it) }
+
+    private class Answering(
+        private val answers: List<String>,
+    ) : NodeExecutor {
+        val prompts: MutableList<String> = mutableListOf()
+
+        override suspend fun execute(execution: NodeExecution) {
+            execution.run.consume(ShellLine(answers[minOf(prompts.size, answers.lastIndex)], isError = false))
+            prompts += execution.node.prompt
+        }
+    }
+
+    private fun app(executor: NodeExecutor): AppState =
+        AppState(WorkspaceRegistry(tempDir().resolve("workspaces.json")), archiveRoot = tempDir(), executor = executor)
+            .also { apps.add(it) }
+            .also { it.addWorkspace(tempDir().resolve("ws")) }
+
+    private fun draft(
+        vararg repo: String,
+        id: String = "build",
+    ) = """
+        ```yaml
+        name: whatever
+        nodes:
+          - id: $id
+            type: shell
+            command: make
+        ${repo.joinToString("") { "    repo: $it\n" }}```
+        """.trimIndent()
+
+    private fun AppState.awaitDraft() =
+        runBlocking {
+            withTimeout(20.seconds) {
+                while (drafting != null) delay(20)
+            }
+        }
+
+    @Test
+    fun `a described workflow is written and opened for review`() {
+        val app = app(Answering(listOf(draft())))
+
+        app.describeWorkflow("Lint Fix", "lint it and fix what it says")
+        app.awaitDraft()
+
+        assertEquals(listOf("lint-fix"), app.listing.workflows.map { it.name })
+        assertEquals("lint-fix", app.editing?.workflow?.name)
+        assertEquals("Wrote lint-fix, look it over before you run it", app.message)
+        assertEquals(Screen.RUNS, app.screen, "the draft is a run, and you watch it happen")
+    }
+
+    @Test
+    fun `the draft prompt carries what was asked for`() {
+        val executor = Answering(listOf(draft()))
+        val app = app(executor)
+
+        app.describeWorkflow("lint-fix", "lint it and fix what it says")
+        app.awaitDraft()
+
+        assertEquals(1, executor.prompts.size)
+        assertTrue("lint it and fix what it says" in executor.prompts.single(), executor.prompts.single())
+    }
+
+    @Test
+    fun `a draft that wouldn't run is handed back its errors once`() {
+        val executor = Answering(listOf(draft("app"), draft()))
+        val app = app(executor)
+
+        app.describeWorkflow("lint-fix", "lint it")
+        app.awaitDraft()
+
+        assertEquals(2, executor.prompts.size)
+        assertTrue("isn't declared" in executor.prompts.last(), executor.prompts.last())
+        assertEquals(listOf("lint-fix"), app.listing.workflows.map { it.name })
+    }
+
+    @Test
+    fun `a draft that stays broken is still written, with what to fix`() {
+        val app = app(Answering(listOf(draft("app"))))
+
+        app.describeWorkflow("lint-fix", "lint it")
+        app.awaitDraft()
+
+        assertEquals(listOf("lint-fix"), app.listing.workflows.map { it.name })
+        assertTrue(app.message.orEmpty().startsWith("Wrote lint-fix, but it won't run yet:"), app.message.orEmpty())
+    }
+
+    @Test
+    fun `an answer with no workflow in it writes nothing`() {
+        val app = app(Answering(listOf("I'd rather not.")))
+
+        app.describeWorkflow("lint-fix", "lint it")
+        app.awaitDraft()
+
+        assertEquals(emptyList(), app.listing.workflows)
+        assertNull(app.editing)
+        assertTrue("didn't come back as a workflow" in app.message.orEmpty(), app.message.orEmpty())
+    }
+
+    @Test
+    fun `a name already taken is refused before anything starts`() {
+        val executor = Answering(listOf(draft()))
+        val app = app(executor)
+        app.describeWorkflow("lint-fix", "lint it")
+        app.awaitDraft()
+
+        app.describeWorkflow("lint-fix", "lint it again")
+
+        assertEquals("A workflow named \"lint-fix\" already exists", app.message)
+        assertEquals(1, executor.prompts.size)
     }
 }

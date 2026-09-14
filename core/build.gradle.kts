@@ -41,7 +41,11 @@ kotlin {
         }
         commonTest { kotlin.srcDir("src/testFixtures/kotlin") }
 
-        commonMain { resources.srcDir(writeVersion) }
+        commonMain {
+            resources.srcDir(writeVersion)
+            // skills dir relevant for workflow generation
+            resources.srcDir(rootProject.layout.projectDirectory.dir("plugins/zopf/skills"))
+        }
     }
 }
 

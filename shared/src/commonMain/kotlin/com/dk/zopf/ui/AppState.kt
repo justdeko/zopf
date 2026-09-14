@@ -10,10 +10,12 @@ import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.capabilities
 import com.dk.zopf.model.providerFor
+import com.dk.zopf.runtime.NodeExecutor
 import com.dk.zopf.runtime.Release
 import com.dk.zopf.runtime.UpdateCheck
 import com.dk.zopf.runtime.agent.AgentProvider
 import com.dk.zopf.runtime.agent.AgentProviders
+import com.dk.zopf.runtime.agent.WorkflowAuthor
 import com.dk.zopf.runtime.errors
 import com.dk.zopf.runtime.exec.ConnectorScaffold
 import com.dk.zopf.runtime.issues
@@ -22,6 +24,7 @@ import com.dk.zopf.runtime.macos.Finder
 import com.dk.zopf.runtime.macos.MacNotifier
 import com.dk.zopf.runtime.macos.TerminalLauncher
 import com.dk.zopf.runtime.run.RunRegistry
+import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.runtime.run.WorkflowRunState
 import com.dk.zopf.store.AppPaths
@@ -33,11 +36,13 @@ import com.dk.zopf.store.SettingsStore
 import com.dk.zopf.store.WindowFrame
 import com.dk.zopf.store.workflow.WorkflowListing
 import com.dk.zopf.store.workflow.WorkflowStore
+import com.dk.zopf.store.workflow.slugify
 import com.dk.zopf.store.workspace.BrokenConnector
 import com.dk.zopf.store.workspace.Connector
 import com.dk.zopf.store.workspace.ConnectorListing
 import com.dk.zopf.store.workspace.ConnectorStore
 import com.dk.zopf.store.workspace.OpenWorkspace
+import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.store.workspace.WorkspaceRegistry
 import com.dk.zopf.ui.editor.EditorCommands
 import com.dk.zopf.ui.editor.EditorState
@@ -48,6 +53,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.nio.file.Path
+import kotlin.io.path.exists
 import kotlin.io.path.name
 
 enum class Screen(
@@ -61,9 +67,12 @@ enum class Screen(
 
 enum class DialogRequest { NEW_WORKFLOW, NEW_CONNECTOR }
 
+private const val DRAFT_ATTEMPTS = 2
+
 class AppState(
     val registry: WorkspaceRegistry = WorkspaceRegistry(),
     private val archiveRoot: Path = AppPaths.runsDir,
+    executor: NodeExecutor? = null,
 ) {
     var workspaces by mutableStateOf<List<OpenWorkspace>>(emptyList())
         private set
@@ -86,6 +95,9 @@ class AppState(
         private set
 
     var editorCommands by mutableStateOf<EditorCommands?>(null)
+
+    var drafting by mutableStateOf<String?>(null)
+        private set
 
     var dialogRequest by mutableStateOf<DialogRequest?>(null)
 
@@ -110,6 +122,7 @@ class AppState(
         RunRegistry(
             scope,
             settings,
+            executor = executor,
             archiveRoot = archiveRoot,
             notifier = MacNotifier(),
             isForeground = { windowFocused },
@@ -282,6 +295,95 @@ class AppState(
                 refreshWorkflows()
                 selectedWorkflow = it
             }.onFailure { message = it.message }
+    }
+
+    fun describeWorkflow(
+        name: String,
+        description: String,
+    ) {
+        val workspace = activeWorkspace?.workspace
+        if (workspace == null) {
+            message = "Open a workspace first, then describe the workflow"
+            return
+        }
+        val slug = slugify(name)
+        when {
+            slug.isBlank() -> message = "Give it a name first"
+            description.isBlank() -> message = "Say what it should do first"
+            WorkflowStore(workspace).fileFor(slug).exists() -> message = "A workflow named \"$slug\" already exists"
+            drafting != null -> message = "zopf is already drafting $drafting"
+            else -> {
+                drafting = slug
+                scope.launch {
+                    try {
+                        draft(workspace, slug, description)
+                    } finally {
+                        drafting = null
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun draft(
+        workspace: Workspace,
+        slug: String,
+        description: String,
+    ) {
+        var prompt = WorkflowAuthor.createPrompt(slug, description, workspace)
+        repeat(DRAFT_ATTEMPTS) { attempt ->
+            val run =
+                runs
+                    .startWorkflow(workspace, WorkflowAuthor.workflowFor(slug, prompt, workspace))
+                    .getOrElse {
+                        message = it.message
+                        return
+                    }
+            screen = Screen.RUNS
+            run.job?.join()
+            if (run.status != RunStatus.SUCCEEDED) {
+                message = "The draft of $slug stopped before it finished"
+                return
+            }
+
+            val answer =
+                run.nodes
+                    .firstOrNull()
+                    ?.output()
+                    ?.result
+                    .orEmpty()
+            val drafted = WorkflowAuthor.draftFrom(answer, slug)
+            val problems =
+                drafted.fold(
+                    onSuccess = { it.issues(workspace, defaultProvider()).errors().map { issue -> issue.message } },
+                    onFailure = { listOf(it.message.orEmpty()) },
+                )
+            if (problems.isEmpty() || attempt == DRAFT_ATTEMPTS - 1) {
+                settle(workspace, slug, drafted.getOrNull(), problems)
+                return
+            }
+            prompt = WorkflowAuthor.repairPrompt(problems, WorkflowAuthor.yamlIn(answer).orEmpty())
+        }
+    }
+
+    private fun settle(
+        workspace: Workspace,
+        slug: String,
+        drafted: Workflow?,
+        problems: List<String>,
+    ) {
+        if (drafted == null) {
+            message = "The draft of $slug didn't come back as a workflow"
+            return
+        }
+        WorkflowStore(workspace).save(drafted)
+        refreshWorkflows()
+        openEditor(drafted)
+        message =
+            when (val first = problems.firstOrNull()) {
+                null -> "Wrote $slug, look it over before you run it"
+                else -> "Wrote $slug, but it won't run yet: $first"
+            }
     }
 
     fun renameWorkflow(

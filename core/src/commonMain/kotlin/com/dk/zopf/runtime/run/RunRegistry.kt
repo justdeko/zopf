@@ -2,7 +2,6 @@ package com.dk.zopf.runtime.run
 
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowNode
-import com.dk.zopf.model.descendantsOf
 import com.dk.zopf.runtime.NodeExecutor
 import com.dk.zopf.runtime.ProcessNodeExecutor
 import com.dk.zopf.runtime.SessionReconciler
@@ -16,6 +15,7 @@ import com.dk.zopf.runtime.macos.SilentNotifier
 import com.dk.zopf.runtime.macos.TerminalLauncher
 import com.dk.zopf.store.LiveSettings
 import com.dk.zopf.store.RunArchive
+import com.dk.zopf.store.workflow.WorkflowStore
 import com.dk.zopf.store.workspace.Workspace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -134,6 +134,8 @@ class RunRegistry(
         node: WorkflowNode,
     ): Result<WorkflowRun> = engine.start(workspace, workflow, only = node).onSuccess(::adopt)
 
+    fun canRetry(run: WorkflowRun): Boolean = !run.isInteractive && (run.workflow != null || run.workspaceRoot != null)
+
     fun retry(
         run: WorkflowRun,
         nodeId: String,
@@ -141,27 +143,27 @@ class RunRegistry(
         if (run.isActive) {
             return Result.failure(IllegalStateException("${run.workflowName} is still running"))
         }
-        val workflow =
-            run.workflow
-                ?: return Result.failure(
-                    IllegalStateException("This run started before zopf last quit, so there is nothing to retry from"),
-                )
         if (run.isInteractive) {
             return Result.failure(
                 IllegalStateException("A single node run isn't a graph. Run it again from the editor."),
             )
         }
+        val workspace = run.workspace ?: run.workspaceRoot?.let(Workspace::open)
+        val workflow =
+            run.workflow
+                ?: workspace?.let { WorkflowStore(it).load(run.workflowName) }
+                ?: return Result.failure(
+                    IllegalStateException(
+                        "${run.workflowName} isn't in ${run.workspaceRoot ?: "the workspace it ran in"} any more, " +
+                            "so there is nothing to retry from",
+                    ),
+                )
         if (workflow.node(nodeId) == null) {
             return Result.failure(IllegalStateException("\"$nodeId\" isn't in ${workflow.name} any more"))
         }
 
-        val redo = workflow.descendantsOf(nodeId) + nodeId
-        val inherited =
-            run.nodes
-                .filter { it.status == RunStatus.SUCCEEDED && it.nodeId !in redo }
-                .associate { it.nodeId to it.output() }
-
-        return engine.start(run.workspace, workflow, inherited = inherited).onSuccess(::adopt)
+        val point = Resume.pointFor(run, workflow, alsoRedo = setOf(nodeId))
+        return engine.start(workspace, workflow, inherited = point.carried).onSuccess(::adopt)
     }
 
     fun stop(run: WorkflowRun) {

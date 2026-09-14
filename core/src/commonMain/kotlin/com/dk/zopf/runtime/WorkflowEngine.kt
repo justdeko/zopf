@@ -13,7 +13,9 @@ import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.runtime.run.needsProcess
 import com.dk.zopf.store.LiveSettings
+import com.dk.zopf.store.Log
 import com.dk.zopf.store.RunArchive
+import com.dk.zopf.store.RunRecord
 import com.dk.zopf.store.workspace.ConnectorStore
 import com.dk.zopf.store.workspace.Workspace
 import kotlinx.coroutines.CancellationException
@@ -128,7 +130,7 @@ class WorkflowEngine(
         val archive = RunArchive.create(run.id, RunArchive.workspaceId(workspace?.root), archiveRoot, onRaw)
         archive.write(run.record())
 
-        val recorder = scope.launch(Dispatchers.IO) { run.records().conflate().collect(archive::write) }
+        val recorder = scope.launch(Dispatchers.IO) { run.records().conflate().collect { archive.keep(it) } }
 
         run.job =
             scope.launch {
@@ -400,9 +402,14 @@ class WorkflowEngine(
                 else -> RunStatus.SUCCEEDED
             }
         run.settle(outcome = outcome, finishedAt = Instant.now())
-        archive.write(run.record())
+        archive.keep(run.record())
         archive.close()
         onFinished(run)
+    }
+
+    private fun RunArchive.keep(record: RunRecord) {
+        runCatching { write(record) }
+            .onFailure { Log.warn("Couldn't archive ${record.workflow}: ${it.message}") }
     }
 
     private fun WorkflowRun.isHandled(failed: NodeRun): Boolean =

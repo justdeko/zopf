@@ -15,8 +15,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -68,6 +72,8 @@ private val MinimapConfig =
         contentPadding = 0.92f,
         maxScale = 0.3f,
         minScale = 0.03f,
+        panVelocity = 0f,
+        zoomConditionDesktop = { false },
     )
 
 @Composable
@@ -83,6 +89,7 @@ fun WorkflowThumbnail(
         modifier
             .clip(shape)
             .background(colors.graphSurface)
+            .swallowingDrags()
             .semantics { contentDescription = "${workflow.nodes.size} nodes" },
     ) {
         KuiverBridge {
@@ -125,6 +132,17 @@ fun WorkflowMinimap(
         )
     }
 }
+
+private fun Modifier.swallowingDrags(): Modifier =
+    pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                awaitPointerEvent(PointerEventPass.Initial)
+                    .changes
+                    .forEach { if (it.positionChange() != Offset.Zero) it.consume() }
+            }
+        }
+    }
 
 @Composable
 private fun Dot(color: Color) {

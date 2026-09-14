@@ -7,13 +7,15 @@ reason they're files is so they can be edited without reading Kotlin.
 This README is the only file in here that is never sent to a model. Everything else is verbatim: no
 comments, no front matter, nothing but the text.
 
-| File | Sent when | Filled in by |
-| --- | --- | --- |
-| `connector-create.md` | New connector, once the folder exists | `ConnectorScaffold.createPrompt` |
-| `connector-fix.md` | Fix in Claude, on a connector zopf can't read | `ConnectorScaffold.fixPrompt` |
-| `connector-contract.md` | Pasted into both of the above as `{{contract}}` | `ConnectorScaffold` |
-| `skill-use-one.md` | A node with one skill zopf had to name | `SkillPlan.withInvocation` |
-| `skill-use-many.md` | Same, with more than one | `SkillPlan.withInvocation` |
+| File                    | Sent when                                                    | Filled in by                     |
+|-------------------------|--------------------------------------------------------------|----------------------------------|
+| `connector-create.md`   | New connector, once the folder exists                        | `ConnectorScaffold.createPrompt` |
+| `connector-fix.md`      | Fix in Claude, on a connector zopf can't read                | `ConnectorScaffold.fixPrompt`    |
+| `connector-contract.md` | Pasted into both of the above as `{{contract}}`              | `ConnectorScaffold`              |
+| `workflow-author.md`    | New workflow from a description, before the draft run starts | `WorkflowAuthor.createPrompt`    |
+| `workflow-repair.md`    | A draft that came back unreadable or with errors in it       | `WorkflowAuthor.repairPrompt`    |
+| `skill-use-one.md`      | A node with one skill zopf had to name                       | `SkillPlan.withInvocation`       |
+| `skill-use-many.md`     | Same, with more than one                                     | `SkillPlan.withInvocation`       |
 
 ## Editing
 
@@ -27,6 +29,10 @@ comments, no front matter, nothing but the text.
 - Prompts are read from the classpath at session start, not cached. An edit takes effect the next
   time you launch the app — no Kotlin recompiles, but Gradle does have to copy the resource, so
   `./gradlew :desktopApp:run` rather than reaching for a running window.
+- `{{guide}}` in the workflow prompts is a directory, not text: the `zopf-workflows` skill, packaged
+  from `plugins/zopf/skills` into `:core`'s resources and unpacked next to `settings.json` for the
+  agent to read. Edit the skill, not a copy. It stays a path for the rule above — the skill is full of
+  `${node.field}` examples, and pasting it in would report every one of them as unresolved.
 - `connector-contract.md` is a **specification, not a request**: it restates `ConnectorManifest`
   and the stdin/stdout contract that `ConnectorRunner` enforces. Those two and this file have to
   agree — changing one means changing the others.

@@ -97,6 +97,7 @@ fun usage(out: PrintStream) {
           --provider <name>       claude, codex or dsh, for agent nodes that don't name one
           --timeout <seconds>     stop the run if it hasn't finished by then
           --format <format>       text (default), json (the archive's NDJSON) or quiet
+          --resume <run-id>       redo the run from where it stopped ("last" is the newest)
           --dry-run               print the order nodes would run in, start nothing
 
         zopf list                 list the workflows here, including the ones that don't parse

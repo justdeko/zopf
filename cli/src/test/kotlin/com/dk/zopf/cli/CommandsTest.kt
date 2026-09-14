@@ -608,3 +608,83 @@ class RunCommandTest {
         assertEquals(listOf("build", "ship"), executor.started)
     }
 }
+
+class ResumeCommandTest {
+    private val sandbox = Sandbox()
+
+    @AfterTest
+    fun cleanup() = sandbox.cleanup()
+
+    private fun chain() = workflow(nodes = listOf(shell("a"), shell("b"), shell("c")), edges = listOf("a" to "b", "b" to "c"))
+
+    private fun failedRun(): Int {
+        sandbox.save(chain())
+        return sandbox.run(listOf("demo"), FakeExecutor(fail = setOf("b"), output = { "$it-first" })).first
+    }
+
+    @Test
+    fun `run --resume runs what didn't succeed`() {
+        assertEquals(EXIT_FAILED, failedRun())
+        val executor = FakeExecutor(output = { "$it-again" })
+
+        val (code, streams) = sandbox.run(listOf("--resume", "last"), executor)
+
+        assertEquals(EXIT_OK, code)
+        assertEquals(listOf("b", "c"), executor.started)
+        assertContains(streams.output(), "carrying over a")
+    }
+
+    @Test
+    fun `run --resume hands on what the carried node produced`() {
+        failedRun()
+        val executor = FakeExecutor(output = { "$it-again" })
+
+        sandbox.run(listOf("--resume", "last"), executor)
+
+        assertEquals("a-first", executor.upstream["b"]?.get("a"))
+    }
+
+    @Test
+    fun `run --resume doesn't ask an answered gate again`() {
+        sandbox.save(
+            workflow(nodes = listOf(gate("approve"), shell("ship")), edges = listOf("approve" to "ship")),
+        )
+        assertEquals(EXIT_FAILED, sandbox.run(listOf("demo", "--on-gate", "approve"), FakeExecutor(fail = setOf("ship"))).first)
+
+        val (code, _) = sandbox.run(listOf("--resume", "last"), FakeExecutor())
+
+        assertEquals(EXIT_OK, code)
+    }
+
+    @Test
+    fun `run --resume --dry-run starts nothing`() {
+        failedRun()
+        val executor = FakeExecutor()
+
+        val (code, streams) = sandbox.run(listOf("--resume", "last", "--dry-run"), executor)
+
+        assertEquals(EXIT_OK, code)
+        assertEquals(emptyList(), executor.started)
+        assertContains(streams.output(), "carrying over a")
+        assertContains(streams.output(), "running b, c")
+    }
+
+    @Test
+    fun `run --resume on an unknown id is a usage error`() {
+        failedRun()
+
+        val thrown = assertFailsWith<UsageError> { sandbox.run(listOf("--resume", "nope")) }
+
+        assertContains(thrown.message.orEmpty(), "zopf runs")
+    }
+
+    @Test
+    fun `run --resume refuses a workflow it isn't a run of`() {
+        failedRun()
+        sandbox.save(workflow(nodes = listOf(shell("a")), name = "other"))
+
+        val thrown = assertFailsWith<UsageError> { sandbox.run(listOf("other", "--resume", "last")) }
+
+        assertContains(thrown.message.orEmpty(), "That run is of demo")
+    }
+}

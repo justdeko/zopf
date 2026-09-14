@@ -3,6 +3,8 @@ package com.dk.zopf.ui.workflows
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -12,6 +14,7 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -19,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runDesktopComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -59,6 +63,7 @@ class WorkflowListInteractionTest {
         onOpen: (Workflow) -> Unit = {},
         showing: WorkflowListing = listing,
         onCreate: (String, String?) -> Unit = { _, _ -> },
+        onDescribe: (String, String) -> Unit = { _, _ -> },
         body: ComposeUiTest.() -> Unit,
     ) = runDesktopComposeUiTest(900, 760) {
         val root = Files.createTempDirectory("ws")
@@ -73,6 +78,7 @@ class WorkflowListInteractionTest {
                         onOpen = onOpen,
                         onRun = {},
                         onCreate = onCreate,
+                        onDescribe = onDescribe,
                         onRename = { _, _ -> },
                         onDelete = {},
                         onReveal = {},
@@ -118,7 +124,7 @@ class WorkflowListInteractionTest {
             waitForIdle()
 
             val wanted = Templates.names.last()
-            onNodeWithText(Templates.label(wanted), useUnmergedTree = true).performClick()
+            onNodeWithText(Templates.label(wanted), useUnmergedTree = true).performScrollTo().performClick()
             waitForIdle()
             onNodeWithText("Create", useUnmergedTree = true).performClick()
             waitForIdle()
@@ -155,24 +161,75 @@ class WorkflowListInteractionTest {
             onNodeWithText("New workflow", useUnmergedTree = true).performClick()
             waitForIdle()
 
+            onNodeWithText("Empty", useUnmergedTree = true).performScrollTo().performClick()
+            waitForIdle()
             onNode(hasSetTextAction()).performTextReplacement("mine")
-            onNodeWithText("Empty", useUnmergedTree = true).performClick()
+            onNodeWithText(Templates.label(Templates.names.first()), useUnmergedTree = true).performScrollTo().performClick()
             waitForIdle()
             onNodeWithText("Create", useUnmergedTree = true).performClick()
             waitForIdle()
 
-            assertEquals(listOf<Pair<String, String?>>("mine" to null), created)
+            assertEquals(listOf<Pair<String, String?>>("mine" to Templates.names.first()), created)
         }
     }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    fun `a workspace with workflows is only asked for a name`() {
+    fun `a workspace with workflows is offered no templates`() {
         runList {
             onNodeWithText("New workflow", useUnmergedTree = true).performClick()
             waitForIdle()
 
             onNodeWithText("Empty", useUnmergedTree = true).assertDoesNotExist()
+            onNodeWithText("Describe it", useUnmergedTree = true).assertExists()
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `the description box is only there once it is asked for`() {
+        runList {
+            onNodeWithText("New workflow", useUnmergedTree = true).performClick()
+            waitForIdle()
+            onNodeWithText("What should it do?", useUnmergedTree = true).assertDoesNotExist()
+
+            onNodeWithText("Describe it", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            onNodeWithText("What should it do?", useUnmergedTree = true).assertExists()
+        }
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `describing hands over the name and what was asked for`() {
+        val described = mutableListOf<Pair<String, String>>()
+        runList(onDescribe = { name, description -> described += name to description }) {
+            onNodeWithText("New workflow", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            onNodeWithText("Describe it", useUnmergedTree = true).performClick()
+            waitForIdle()
+            onAllNodes(hasSetTextAction())[0].performTextReplacement("lint-fix")
+            onAllNodes(hasSetTextAction())[1].performTextReplacement("lint the repo then fix it")
+            waitForIdle()
+            onNodeWithText("Draft it", useUnmergedTree = true).performClick()
+            waitForIdle()
+        }
+
+        assertEquals(listOf("lint-fix" to "lint the repo then fix it"), described)
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `describing nothing can't be confirmed`() {
+        runList {
+            onNodeWithText("New workflow", useUnmergedTree = true).performClick()
+            waitForIdle()
+            onNodeWithText("Describe it", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            onNodeWithText("Draft it").assertIsNotEnabled()
         }
     }
 }
@@ -249,6 +306,66 @@ class WorkflowMinimapTest {
 
             val moved = before.indices.count { before[it] != strip.pixels()[it] }
             assertEquals(0, moved, "the thumbnail was dragged out of place")
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    private fun ComposeUiTest.carded(
+        workflow: Workflow,
+        onClick: () -> Unit = {},
+    ): Pair<SemanticsNodeInteraction, KuiverViewerState> {
+        lateinit var viewerState: KuiverViewerState
+        setContent {
+            ZopfTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    Card(onClick = onClick) {
+                        viewerState = rememberMinimapViewerState(workflow)
+                        WorkflowThumbnail(
+                            workflow = workflow,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxSize(),
+                            viewerState = viewerState,
+                        )
+                    }
+                }
+            }
+        }
+        waitUntil { viewerState.hasFittedInitially }
+        waitForIdle()
+        return onNodeWithContentDescription("${workflow.nodes.size} nodes") to viewerState
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a gesture over a thumbnail in a card leaves the graph where it was`() =
+        runDesktopComposeUiTest(200, 200) {
+            val (thumbnail, viewer) = carded(chain(listOf(NodeType.AGENT, NodeType.SHELL, NodeType.GATE)))
+            val offset = viewer.offset
+            val scale = viewer.scale
+
+            thumbnail.performMouseInput {
+                moveTo(center)
+                press()
+                moveBy(Offset(40f, 30f))
+                release()
+                scroll(4f)
+            }
+            waitForIdle()
+
+            assertEquals(offset, viewer.offset, "the preview panned")
+            assertEquals(scale, viewer.scale, "the preview zoomed")
+        }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `a click on a thumbnail still reaches the card`() =
+        runDesktopComposeUiTest(200, 200) {
+            var clicks = 0
+            val (thumbnail, _) = carded(chain(listOf(NodeType.AGENT, NodeType.SHELL)), onClick = { clicks += 1 })
+
+            thumbnail.performClick()
+            waitForIdle()
+
+            assertEquals(1, clicks)
         }
 
     private fun Color.isNear(other: Color): Boolean = abs(red - other.red) < 0.02f && abs(green - other.green) < 0.02f && abs(blue - other.blue) < 0.02f

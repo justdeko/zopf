@@ -1,5 +1,6 @@
 package com.dk.zopf.ui.workflows
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
@@ -25,6 +26,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -60,6 +62,8 @@ private val TemplateGridWidth = 512.dp
 
 private val TemplatePreviewHeight = 76.dp
 
+private val IconSize = 18.dp
+
 @Composable
 fun WorkflowListScreen(
     workspace: OpenWorkspace?,
@@ -68,6 +72,7 @@ fun WorkflowListScreen(
     onOpen: (Workflow) -> Unit,
     onRun: (Workflow) -> Unit,
     onCreate: (String, String?) -> Unit,
+    onDescribe: (String, String) -> Unit,
     onRename: (Workflow, String) -> Unit,
     onDelete: (Workflow) -> Unit,
     onReveal: (Path) -> Unit,
@@ -105,7 +110,9 @@ fun WorkflowListScreen(
             isEmpty ->
                 EmptyMessage(
                     title = "No workflows yet",
-                    detail = "New workflow starts you from a template. They live in ${workspace.workspace?.workflowsDir}.",
+                    detail =
+                        "New workflow drafts one from a description, or starts you from a template. " +
+                            "They live in ${workspace.workspace?.workflowsDir}.",
                 )
 
             else ->
@@ -151,26 +158,18 @@ fun WorkflowListScreen(
     }
 
     if (creating) {
-        if (isEmpty) {
-            FirstWorkflowDialog(
-                onDismiss = { creating = false },
-                onConfirm = { name, template ->
-                    creating = false
-                    onCreate(name, template)
-                },
-            )
-        } else {
-            NameDialog(
-                title = "New workflow",
-                initial = "",
-                confirmLabel = "Create",
-                onDismiss = { creating = false },
-                onConfirm = {
-                    creating = false
-                    onCreate(it, null)
-                },
-            )
-        }
+        NewWorkflowDialog(
+            showTemplates = isEmpty,
+            onDismiss = { creating = false },
+            onCreate = { name, template ->
+                creating = false
+                onCreate(name, template)
+            },
+            onDescribe = { name, description ->
+                creating = false
+                onDescribe(name, description)
+            },
+        )
     }
 
     renaming?.let { workflow ->
@@ -337,53 +336,28 @@ private fun BrokenRow(
 }
 
 @Composable
-private fun FirstWorkflowDialog(
+private fun NewWorkflowDialog(
+    showTemplates: Boolean,
     onDismiss: () -> Unit,
-    onConfirm: (String, String?) -> Unit,
+    onCreate: (String, String?) -> Unit,
+    onDescribe: (String, String) -> Unit,
 ) {
     val templates = remember { Templates.names.map { it to Templates.workflow(it, it) } }
-    var template by remember { mutableStateOf<String?>(Templates.names.first()) }
-    var value by remember { mutableStateOf(Templates.names.first()) }
+    var template by remember { mutableStateOf(Templates.names.first().takeIf { showTemplates }) }
+    var name by remember { mutableStateOf(template.orEmpty()) }
     var typed by remember { mutableStateOf(false) }
+    var describing by remember { mutableStateOf(false) }
+    var description by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Start a workflow") },
+        title = { Text("New workflow") },
         text = {
             Column(Modifier.width(TemplateGridWidth).verticalScroll(rememberScrollState())) {
-                Text(
-                    "Pick a starting point. You can change everything in it after.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(16.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    (templates + listOf(null)).chunked(2).forEach { row ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            row.forEach { entry ->
-                                TemplateCard(
-                                    title = entry?.let { Templates.label(it.first) } ?: "Empty",
-                                    detail =
-                                        entry?.second?.description?.firstParagraph()
-                                            ?: "Draw your own graph from nothing.",
-                                    workflow = entry?.second,
-                                    isSelected = template == entry?.first,
-                                    onClick = {
-                                        template = entry?.first
-                                        if (!typed) value = entry?.first.orEmpty()
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                            if (row.size == 1) Spacer(Modifier.weight(1f))
-                        }
-                    }
-                }
-                Spacer(Modifier.height(20.dp))
                 OutlinedTextField(
-                    value = value,
+                    value = name,
                     onValueChange = {
-                        value = it
+                        name = it
                         typed = true
                     },
                     singleLine = true,
@@ -391,10 +365,64 @@ private fun FirstWorkflowDialog(
                     label = { Text("Name") },
                     supportingText = { Text("Becomes the filename: lower-cased and hyphenated.") },
                 )
+                FilterChip(
+                    selected = describing,
+                    onClick = { describing = !describing },
+                    label = { Text("Describe it") },
+                    leadingIcon = { Icon(ZopfIcons.Edit, contentDescription = null, modifier = Modifier.size(IconSize)) },
+                )
+                AnimatedVisibility(describing) {
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        minLines = 2,
+                        maxLines = 6,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        label = { Text("What should it do?") },
+                        supportingText = {
+                            Text("A sentence or two. An agent reads this workspace and drafts the graph for you.")
+                        },
+                    )
+                }
+                if (showTemplates) {
+                    Spacer(Modifier.height(20.dp))
+                    Text(
+                        "Or start from a template",
+                        style = MaterialTheme.typography.labelLargeEmphasized,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (templates + listOf(null)).chunked(2).forEach { row ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                row.forEach { entry ->
+                                    TemplateCard(
+                                        title = entry?.let { Templates.label(it.first) } ?: "Empty",
+                                        detail =
+                                            entry?.second?.description?.firstParagraph()
+                                                ?: "Draw your own graph from nothing.",
+                                        workflow = entry?.second,
+                                        isSelected = !describing && template == entry?.first,
+                                        onClick = {
+                                            template = entry?.first
+                                            describing = false
+                                            if (!typed) name = entry?.first.orEmpty()
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                if (row.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(value, template) }, enabled = value.isNotBlank()) { Text("Create") }
+            TextButton(
+                onClick = { if (describing) onDescribe(name, description) else onCreate(name, template) },
+                enabled = name.isNotBlank() && (!describing || description.isNotBlank()),
+            ) { Text(if (describing) "Draft it" else "Create") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

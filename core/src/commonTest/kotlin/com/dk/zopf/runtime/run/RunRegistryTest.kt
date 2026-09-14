@@ -15,6 +15,7 @@ import com.dk.zopf.store.NodeRunRecord
 import com.dk.zopf.store.NotifyLevel
 import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.RunRecord
+import com.dk.zopf.store.workflow.WorkflowStore
 import com.dk.zopf.store.workspace.Workspace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -151,7 +152,42 @@ class RunRegistryTest {
     }
 
     @Test
-    fun `a run restored from the archive cannot be retried`() {
+    fun `a run read back from the archive is retried against the file`() {
+        val archiveRoot = tempDir()
+        val executor = RecordingExecutor(fail = setOf("fix"))
+        val workspace = workspace()
+        val chain =
+            workflow(
+                listOf(
+                    WorkflowNode(id = "analyze", type = NodeType.SHELL, command = "true"),
+                    node("fix", prompt = "apply \${analyze.result}"),
+                ),
+                listOf("analyze" to "fix"),
+            )
+        WorkflowStore(workspace).save(chain)
+
+        val first =
+            runBlocking {
+                val run = registry(executor, archiveRoot = archiveRoot).startWorkflow(workspace, chain).getOrThrow()
+                withTimeout(10.seconds) { run.job?.join() }
+                run
+            }
+        assertEquals(RunStatus.FAILED, first.status)
+
+        val afterRestart = registry(executor, archiveRoot = archiveRoot)
+        afterRestart.loadHistory()
+        val restored = afterRestart.runs.single { it.id == first.id }
+        executor.fail = emptySet()
+
+        val retried = afterRestart.retryToCompletion(restored, "fix")
+
+        assertEquals(RunStatus.SUCCEEDED, retried.status)
+        assertEquals(listOf("analyze", "fix", "fix"), executor.started)
+        assertEquals("apply analyze-output", executor.prompts["fix"])
+    }
+
+    @Test
+    fun `a run whose workflow is gone says so instead of retrying`() {
         val registry = registry(RecordingExecutor())
         val restored =
             WorkflowRun.restored(
@@ -161,7 +197,7 @@ class RunRegistryTest {
 
         val failure = registry.retry(restored, "fix").exceptionOrNull()
 
-        assertTrue(failure != null && "quit" in failure.message.orEmpty(), "unhelpful: ${failure?.message}")
+        assertTrue(failure != null && "isn't in" in failure.message.orEmpty(), "unhelpful: ${failure?.message}")
     }
 
     @Test
@@ -467,6 +503,7 @@ private class RecordingExecutor(
         val id = execution.node.id
         started.add(id)
         prompts[id] = execution.outputs.interpolate(execution.node.prompt).text
+        execution.archive.appendRaw(id, output(id))
 
         peak.accumulateAndGet(running.incrementAndGet()) { a, b -> maxOf(a, b) }
         try {
