@@ -19,11 +19,11 @@ object TerminalLauncher {
     ): Result<Unit> = open(script(cwd, provider.terminalArgs(sessionId), provider.executable), terminalApp)
 
     fun openIn(
+        provider: AgentProvider,
         cwd: Path,
         terminalApp: String = DEFAULT_TERMINAL_APP,
         prompt: String? = null,
-        executable: String = "claude",
-    ): Result<Unit> = open(script(cwd, listOfNotNull(prompt?.trim()?.ifBlank { null }), executable), terminalApp)
+    ): Result<Unit> = open(script(cwd, listOfNotNull(prompt?.trim()?.ifBlank { null }), provider.executable), terminalApp)
 
     private fun open(
         contents: String,
@@ -47,8 +47,8 @@ object TerminalLauncher {
 
     internal fun script(
         cwd: Path,
-        args: List<String> = emptyList(),
-        executable: String = "claude",
+        args: List<String>,
+        executable: String,
     ): String {
         val tail = args.joinToString("") { " " + shellQuote(it) }
         return """

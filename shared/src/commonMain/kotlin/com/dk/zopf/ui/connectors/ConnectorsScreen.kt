@@ -63,6 +63,7 @@ import java.nio.file.Path
 fun ConnectorsScreen(
     workspace: OpenWorkspace?,
     listing: ConnectorListing,
+    agent: String,
     onCreate: (name: String, shared: Boolean) -> Unit,
     onChange: (Connector) -> Unit,
     onFixBroken: (BrokenConnector) -> Unit,
@@ -84,7 +85,7 @@ fun ConnectorsScreen(
 
     Box(modifier.fillMaxSize()) {
         if (listing.isEmpty) {
-            EmptyState(workspace)
+            EmptyState(workspace, agent)
         } else {
             LazyColumn(
                 contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 88.dp),
@@ -95,7 +96,7 @@ fun ConnectorsScreen(
                     ContextMenuArea(
                         items = {
                             listOf(
-                                ContextMenuItem("Change in Claude") { onChange(connector) },
+                                ContextMenuItem("Change in $agent") { onChange(connector) },
                                 ContextMenuItem("Show in Finder") { onReveal(connector.dir) },
                                 ContextMenuItem("Delete…") { deleting = connector.name to connector.dir },
                             )
@@ -103,6 +104,7 @@ fun ConnectorsScreen(
                     ) {
                         ConnectorCard(
                             connector = connector,
+                            agent = agent,
                             onChange = { onChange(connector) },
                             onDelete = { deleting = connector.name to connector.dir },
                             onReveal = { onReveal(connector.dir) },
@@ -122,7 +124,7 @@ fun ConnectorsScreen(
                         ContextMenuArea(
                             items = {
                                 listOf(
-                                    ContextMenuItem("Fix in Claude") { onFixBroken(broken) },
+                                    ContextMenuItem("Fix in $agent") { onFixBroken(broken) },
                                     ContextMenuItem("Show in Finder") { onReveal(broken.dir) },
                                     ContextMenuItem("Delete…") { deleting = broken.name to broken.dir },
                                 )
@@ -130,6 +132,7 @@ fun ConnectorsScreen(
                         ) {
                             BrokenCard(
                                 broken = broken,
+                                agent = agent,
                                 onFix = { onFixBroken(broken) },
                                 onDelete = { deleting = broken.name to broken.dir },
                                 onReveal = { onReveal(broken.dir) },
@@ -158,6 +161,7 @@ fun ConnectorsScreen(
 
     if (creating) {
         NewConnectorDialog(
+            agent = agent,
             onDismiss = { creating = false },
             onConfirm = { name, shared ->
                 creating = false
@@ -185,6 +189,7 @@ fun ConnectorsScreen(
 @Composable
 private fun ConnectorCard(
     connector: Connector,
+    agent: String,
     onChange: () -> Unit,
     onDelete: () -> Unit,
     onReveal: () -> Unit,
@@ -230,7 +235,7 @@ private fun ConnectorCard(
                 TextButton(onClick = onChange) {
                     Icon(ZopfIcons.NodeAgent, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Change in Claude")
+                    Text("Change in $agent")
                 }
                 IconButton(onClick = onReveal) {
                     Icon(ZopfIcons.Folder, contentDescription = "Show in Finder", Modifier.size(18.dp))
@@ -367,6 +372,7 @@ private fun Tag(
 @Composable
 private fun BrokenCard(
     broken: BrokenConnector,
+    agent: String,
     onFix: () -> Unit,
     onDelete: () -> Unit,
     onReveal: () -> Unit,
@@ -400,7 +406,7 @@ private fun BrokenCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            TextButton(onClick = onFix) { Text("Fix in Claude") }
+            TextButton(onClick = onFix) { Text("Fix in $agent") }
             IconButton(onClick = onReveal) {
                 Icon(
                     ZopfIcons.Folder,
@@ -418,6 +424,7 @@ private fun BrokenCard(
 
 @Composable
 private fun NewConnectorDialog(
+    agent: String,
     onDismiss: () -> Unit,
     onConfirm: (name: String, shared: Boolean) -> Unit,
 ) {
@@ -448,7 +455,7 @@ private fun NewConnectorDialog(
                     }
                 }
                 Text(
-                    "zopf creates the folder and opens Claude Code in it, in your terminal. It knows " +
+                    "zopf creates the folder and opens $agent in it, in your terminal. It knows " +
                         "the connector contract and will ask what this one should do.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -466,7 +473,10 @@ private fun NewConnectorDialog(
 }
 
 @Composable
-private fun EmptyState(workspace: OpenWorkspace?) {
+private fun EmptyState(
+    workspace: OpenWorkspace?,
+    agent: String,
+) {
     Column(
         Modifier.fillMaxSize().padding(48.dp),
         verticalArrangement = Arrangement.Center,
@@ -476,7 +486,7 @@ private fun EmptyState(workspace: OpenWorkspace?) {
         Spacer(Modifier.height(8.dp))
         Text(
             "A connector is a folder with a manifest and a script. zopf pipes JSON into it and reads " +
-                "JSON back. Name one and Claude Code opens in its folder to write it with you.",
+                "JSON back. Name one and $agent opens in its folder to write it with you.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -498,6 +508,7 @@ private fun ConnectorCardPreview() {
             Box(Modifier.padding(16.dp)) {
                 ConnectorCard(
                     connector = PreviewFixtures.connector(),
+                    agent = "Claude Code",
                     onChange = {},
                     onDelete = {},
                     onReveal = {},

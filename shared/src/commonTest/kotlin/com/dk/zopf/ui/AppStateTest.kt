@@ -1,5 +1,6 @@
 package com.dk.zopf.ui
 
+import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
@@ -338,5 +339,25 @@ class PrunedRunsMessageTest {
             "Deleted 400 archived runs, keeping the last 50. See Settings › History.",
             prunedRunsMessage(400, 50),
         )
+    }
+}
+
+class ConnectorAgentTest {
+    private fun installed(vararg ids: AgentProviderId): (AgentProviderId) -> Boolean = { it in ids }
+
+    @Test
+    fun `a connector opens in the installed cli nearest the default`() {
+        listOf(
+            Triple(AgentProviderId.CLAUDE, installed(AgentProviderId.CLAUDE, AgentProviderId.CODEX), "claude"),
+            Triple(AgentProviderId.CODEX, installed(AgentProviderId.CLAUDE, AgentProviderId.CODEX), "codex"),
+            Triple(AgentProviderId.CODEX, installed(AgentProviderId.CLAUDE), "claude"),
+            Triple(AgentProviderId.DSH, installed(AgentProviderId.CLAUDE, AgentProviderId.DSH), "claude"),
+            Triple(AgentProviderId.DSH, installed(AgentProviderId.CODEX), "codex"),
+            Triple(AgentProviderId.DSH, installed(AgentProviderId.DSH), "claude"),
+            Triple(AgentProviderId.CODEX, installed(), "codex"),
+            Triple(AgentProviderId.CLAUDE, installed(), "claude"),
+        ).forEach { (default, isInstalled, expected) ->
+            assertEquals(expected, authoringAgent(default, isInstalled).executable, "default ${default.cliValue}")
+        }
     }
 }

@@ -284,6 +284,7 @@ class AgentCapabilitiesTest {
             AgentProviderId.DSH.ignoredFields(WorkflowNode(id = "n", type = NodeType.AGENT, model = "deepseek-chat")),
         )
         assertEquals(emptyList(), DshProvider.terminalArgs("s-1"), "the headless profile leaves nothing to reopen")
+        assertFalse(dsh.authorsInTerminal, "one headless turn cannot write a connector")
     }
 
     @Test
@@ -385,14 +386,14 @@ class ModelResolutionTest {
 class TerminalLauncherTest {
     @Test
     fun `the handoff script cds to the node's directory`() {
-        val script = TerminalLauncher.script(Paths.get("/Users/someone/dev/my repo"), listOf("-r", "abc-123"))
+        val script = TerminalLauncher.script(Paths.get("/Users/someone/dev/my repo"), listOf("-r", "abc-123"), ClaudeProvider.executable)
         assertTrue("cd '/Users/someone/dev/my repo'" in script, script)
         assertTrue("exec 'claude' '-r' 'abc-123'" in script, script)
     }
 
     @Test
     fun `with no arguments it starts a fresh session`() {
-        val script = TerminalLauncher.script(Paths.get("/Users/someone/zopf/connectors/slack-post"))
+        val script = TerminalLauncher.script(Paths.get("/Users/someone/zopf/connectors/slack-post"), emptyList(), ClaudeProvider.executable)
         assertTrue("cd '/Users/someone/zopf/connectors/slack-post'" in script, script)
         assertTrue(script.trimEnd().endsWith("exec 'claude'"), script)
     }
@@ -403,6 +404,7 @@ class TerminalLauncherTest {
             TerminalLauncher.script(
                 Paths.get("/tmp/c"),
                 listOf("Write a connector.\nDon't invent what it does."),
+                ClaudeProvider.executable,
             )
         assertTrue("-p" !in script, script)
         assertTrue("""exec 'claude' 'Write a connector.""" in script, script)
@@ -411,7 +413,7 @@ class TerminalLauncherTest {
 
     @Test
     fun `a quote in a path is escaped`() {
-        val script = TerminalLauncher.script(Paths.get("/tmp/it's here"), listOf("-r", "s"))
+        val script = TerminalLauncher.script(Paths.get("/tmp/it's here"), listOf("-r", "s"), ClaudeProvider.executable)
         assertTrue("""cd '/tmp/it'\''s here'""" in script, script)
     }
 }

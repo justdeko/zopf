@@ -3,13 +3,16 @@ package com.dk.zopf.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.model.WorkflowNode
+import com.dk.zopf.model.capabilities
 import com.dk.zopf.model.providerFor
 import com.dk.zopf.runtime.Release
 import com.dk.zopf.runtime.UpdateCheck
+import com.dk.zopf.runtime.agent.AgentProvider
 import com.dk.zopf.runtime.agent.AgentProviders
 import com.dk.zopf.runtime.errors
 import com.dk.zopf.runtime.exec.ConnectorScaffold
@@ -74,6 +77,8 @@ class AppState(
     var connectors by mutableStateOf(ConnectorListing())
         private set
 
+    private var installedAgents by mutableStateOf<Set<AgentProviderId>>(emptySet())
+
     var selectedWorkflow by mutableStateOf<Workflow?>(null)
         private set
 
@@ -121,6 +126,19 @@ class AppState(
     private val connectorStore: ConnectorStore
         get() = ConnectorStore(activeWorkspace?.workspace)
 
+    private fun defaultProvider(from: AppSettings = settings.current): AgentProviderId =
+        activeWorkspace
+            ?.workspace
+            ?.config
+            ?.defaults
+            ?.provider ?: from.defaultProvider
+
+    fun connectorAgentLabel(from: AppSettings): String = authoringAgent(defaultProvider(from)) { it in installedAgents }.id.label
+
+    private fun refreshInstalledAgents() {
+        installedAgents = AgentProviderId.entries.filterTo(mutableSetOf(), AgentProviders::isInstalled)
+    }
+
     fun start() {
         Log.info("starting · ${settings.current.concurrency} at once · ${settings.current.theme.label}")
         settingsRead.exceptionOrNull()?.let { message = "${it.message}. Using the defaults." }
@@ -139,12 +157,7 @@ class AppState(
     }
 
     private fun checkAgent() {
-        val fallback =
-            activeWorkspace
-                ?.workspace
-                ?.config
-                ?.defaults
-                ?.provider ?: settings.current.defaultProvider
+        val fallback = defaultProvider()
         val wanted =
             listing.workflows
                 .flatMap { workflow ->
@@ -332,6 +345,7 @@ class AppState(
 
     fun refreshConnectors() {
         connectors = connectorStore.list()
+        scope.launch(Dispatchers.IO) { refreshInstalledAgents() }
     }
 
     fun createConnector(
@@ -366,11 +380,22 @@ class AppState(
         prompt: String? = null,
     ) {
         val terminal = runs.terminalApp
-        TerminalLauncher
-            .openIn(dir, terminal, prompt)
-            .onSuccess {
-                message = "Opened $name in $terminal. Refresh when you're done."
-            }.onFailure { message = "Couldn't open $terminal: ${it.message}" }
+        val default = defaultProvider()
+        scope.launch(Dispatchers.IO) {
+            refreshInstalledAgents()
+            val agent = authoringAgent(default) { it in installedAgents }
+            if (agent.id !in installedAgents) {
+                message =
+                    "Can't find ${agent.executable}. Install ${agent.id.label} to write \"$name\" with it, " +
+                    "or write connector.json and the script yourself."
+                return@launch
+            }
+            TerminalLauncher
+                .openIn(agent, dir, terminal, prompt)
+                .onSuccess {
+                    message = "Opened $name in $terminal. Refresh when you're done."
+                }.onFailure { message = "Couldn't open $terminal: ${it.message}" }
+        }
     }
 
     fun reveal(path: Path) {
@@ -435,3 +460,13 @@ internal fun prunedRunsMessage(
 internal fun RunRegistry.runForEditor(workflowName: String): WorkflowRun? = selectedRun?.takeIf { it.workflowName == workflowName }
 
 internal fun WorkflowRunState?.onCanvas(panelOpen: Boolean): WorkflowRunState? = this?.takeIf { panelOpen || it.isActive }
+
+internal fun authoringAgent(
+    default: AgentProviderId,
+    isInstalled: (AgentProviderId) -> Boolean = AgentProviders::isInstalled,
+): AgentProvider =
+    AgentProviders.all
+        .filter { it.capabilities.authorsInTerminal }
+        .sortedByDescending { it.id == default }
+        .firstOrNull { isInstalled(it.id) }
+        ?: AgentProviders.of(default.takeIf { it.capabilities.authorsInTerminal } ?: AgentProviderId.CLAUDE)

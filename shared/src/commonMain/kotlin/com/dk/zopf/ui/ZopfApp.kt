@@ -289,6 +289,7 @@ fun ZopfApp(state: AppState = remember { AppState() }) {
                             ConnectorsScreen(
                                 workspace = state.activeWorkspace,
                                 listing = state.connectors,
+                                agent = state.connectorAgentLabel(settings),
                                 onCreate = state::createConnector,
                                 onChange = state::changeConnector,
                                 onFixBroken = state::fixConnector,
