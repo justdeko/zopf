@@ -19,6 +19,7 @@ import java.nio.file.Path
 import java.util.Collections
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.isExecutable
+import kotlin.io.path.useLines
 
 const val CONNECTOR_TIMEOUT_EXIT = 124
 
@@ -29,7 +30,23 @@ data class ConnectorInvocation(
     val timeoutSeconds: Int = DEFAULT_CONNECTOR_TIMEOUT_SECONDS,
     val env: Map<String, String> = emptyMap(),
 ) {
-    fun argv(): List<String> = listOf(script.toString())
+    fun argv(): List<String> = if (script.isExecutable()) listOf(script.toString()) else interpreter() + script.toString()
+
+    private fun interpreter(): List<String> {
+        val first = runCatching { script.useLines { it.firstOrNull() } }.getOrNull().orEmpty()
+        if (!first.startsWith("#!")) return listOf(FALLBACK_INTERPRETER)
+        return first
+            .removePrefix("#!")
+            .trim()
+            .split(WHITESPACE)
+            .filter { it.isNotBlank() }
+            .ifEmpty { listOf(FALLBACK_INTERPRETER) }
+    }
+
+    private companion object {
+        const val FALLBACK_INTERPRETER = "/bin/sh"
+        val WHITESPACE = Regex("\\s+")
+    }
 
     fun stdinJson(): String = buildJsonObject { inputs.forEach { (key, value) -> put(key, value) } }.toString()
 }
@@ -38,17 +55,9 @@ class ConnectorRunner(
     private val spawn: (List<String>, Path, Map<String, String>) -> Process = ::spawnProcess,
 ) {
     fun start(invocation: ConnectorInvocation): ConnectorSession {
-        if (!invocation.script.isExecutable()) {
-            invocation.script.toFile().setExecutable(true)
-        }
-
-        val process =
-            spawn(
-                invocation.argv(),
-                invocation.cwd,
-                CommandLookup.childEnvironment() + invocation.env,
-            )
-        val session = ConnectorSession(process, invocation.argv(), invocation.timeoutSeconds)
+        val argv = invocation.argv()
+        val process = spawn(argv, invocation.cwd, CommandLookup.childEnvironment() + invocation.env)
+        val session = ConnectorSession(process, argv, invocation.timeoutSeconds)
         session.writeInputs(invocation.stdinJson())
         return session
     }

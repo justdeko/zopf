@@ -11,8 +11,8 @@ Things that are by design:
 - Secrets resolve from the environment or the keychain into a connector's environment, never to a file or the log. A
   connector script you write can still print one.
 - The run archive under `~/Library/Application Support/zopf/runs/` keeps full transcripts.
-- The app checks GitHub daily for a release; `ZOPF_NO_UPDATE_CHECK=1` or `DO_NOT_TRACK=1` stops it. Nothing else leaves
-  your machine, unless you write a script or connector that does that.
+- The app checks GitHub once a week for a release; `ZOPF_NO_UPDATE_CHECK=1` or `DO_NOT_TRACK=1` stops it. Nothing
+  else leaves your machine, unless you write a script or connector that does that.
 
 A workflow file is executable content. Read it before you run it, same goes for connectors or shell scripts within the workflow.
 

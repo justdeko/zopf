@@ -31,11 +31,7 @@ interface AgentProvider {
 object AgentProviders {
     val all: List<AgentProvider> = listOf(ClaudeProvider, CodexProvider, DshProvider)
 
-    private val onPath: Set<AgentProviderId> by lazy {
-        all.filter { CommandLookup.which(it.executable) != null }.mapTo(mutableSetOf()) { it.id }
-    }
-
     fun of(id: AgentProviderId): AgentProvider = all.first { it.id == id }
 
-    fun isInstalled(id: AgentProviderId): Boolean = id in onPath
+    fun isInstalled(id: AgentProviderId): Boolean = CommandLookup.which(of(id).executable) != null
 }

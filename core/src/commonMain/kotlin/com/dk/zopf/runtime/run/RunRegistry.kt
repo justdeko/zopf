@@ -391,6 +391,7 @@ class RunRegistry(
 
     fun watchArchive() {
         scope.launch(Dispatchers.IO) {
+            loadHistory()
             while (isActive) {
                 delay(ARCHIVE_POLL_MILLIS.milliseconds)
                 readArchive()
@@ -400,12 +401,22 @@ class RunRegistry(
 
     internal fun readArchive() {
         val watched = runs.filter { it.isElsewhere }
-        val known = runs.mapTo(mutableSetOf()) { it.id }
-        val arrived = RunHistory.list(archiveRoot).filterNot { it.id in known }
-
-        _state.update { it.copy(runs = arrived + it.runs) }
+        val arrived = admit(RunHistory.list(archiveRoot, skipOursInFlight = true), front = true)
         arrived.filterNot { it.isActive }.forEach(::announceElsewhere)
         watched.forEach(::follow)
+    }
+
+    private fun admit(
+        candidates: List<WorkflowRun>,
+        front: Boolean,
+    ): List<WorkflowRun> {
+        var admitted: List<WorkflowRun> = emptyList()
+        _state.update { current ->
+            val known = current.runs.mapTo(mutableSetOf()) { it.id }
+            admitted = candidates.filterNot { it.id in known }
+            if (admitted.isEmpty()) current else current.copy(runs = if (front) admitted + current.runs else current.runs + admitted)
+        }
+        return admitted
     }
 
     private fun follow(run: WorkflowRun) {
@@ -435,9 +446,7 @@ class RunRegistry(
     }
 
     fun loadHistory() {
-        val known = runs.mapTo(mutableSetOf()) { it.id }
-        val archived = RunHistory.list(archiveRoot).filterNot { it.id in known }
-        if (archived.isNotEmpty()) _state.update { it.copy(runs = it.runs + archived) }
+        admit(RunHistory.list(archiveRoot, skipOursInFlight = true), front = false)
     }
 
     fun forget(run: WorkflowRun): Result<Unit> {
@@ -452,7 +461,10 @@ class RunRegistry(
     fun reconcile() {
         scope.launch(Dispatchers.IO) {
             val found = SessionReconciler.reconcile(archiveRoot)
-            if (found.orphans.isNotEmpty()) _state.update { it.copy(runs = found.orphans + it.runs) }
+            if (found.orphans.isNotEmpty()) {
+                val ids = found.orphans.mapTo(mutableSetOf()) { it.id }
+                _state.update { it.copy(runs = found.orphans + it.runs.filterNot { run -> run.id in ids }) }
+            }
             loadHistory()
 
             if (found.orphans.isEmpty()) return@launch

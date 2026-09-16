@@ -445,6 +445,8 @@ class BranchesTest {
             "ok != ok" to false,
             "\"ship it\" == \"ship it\"" to true,
             "'ship it' == ship it" to true,
+            "'a != b' == 'a != b'" to true,
+            "'a != b' == 'c'" to false,
             "\${build.exitCode} == 0" to false,
             "" to false,
             "  " to false,

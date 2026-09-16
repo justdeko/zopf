@@ -5,6 +5,7 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.store.encodeYaml
 import com.dk.zopf.store.writeTextAtomically
 import com.dk.zopf.store.zopfYaml
+import com.dk.zopf.util.Strings
 import kotlinx.serialization.Serializable
 import java.nio.file.Files
 import java.nio.file.Path
@@ -35,6 +36,7 @@ data class WorkspaceConfig(
 class Workspace(
     val root: Path,
     val config: WorkspaceConfig,
+    val configProblem: String? = null,
 ) {
     val name: String get() = config.name.ifBlank { defaultName(root) }
 
@@ -79,14 +81,12 @@ class Workspace(
                     isWorkspace(dir.resolve(WORKSPACE_DIR)) -> dir.resolve(WORKSPACE_DIR)
                     else -> return null
                 }
-            val config =
-                runCatching {
-                    zopfYaml.decodeFromString(
-                        WorkspaceConfig.serializer(),
-                        root.resolve(WORKSPACE_FILE).readText(),
-                    )
-                }.getOrElse { WorkspaceConfig() }
-            return Workspace(root.toAbsolutePath().normalize(), config)
+            val read = readConfig(root.resolve(WORKSPACE_FILE))
+            return Workspace(
+                root.toAbsolutePath().normalize(),
+                read.getOrDefault(WorkspaceConfig()),
+                read.exceptionOrNull()?.let { Strings.Workspaces.configBroken(it.message) },
+            )
         }
 
         fun create(
@@ -104,6 +104,12 @@ class Workspace(
                 file.writeTextAtomically(encodeYaml(WorkspaceConfig.serializer(), config))
             }
             return open(target)!!.also { it.ensureDirectories() }
+        }
+
+        private fun readConfig(file: Path): Result<WorkspaceConfig> {
+            val text = if (file.exists()) file.readText() else return Result.success(WorkspaceConfig())
+            if (text.isBlank()) return Result.success(WorkspaceConfig())
+            return runCatching { zopfYaml.decodeFromString(WorkspaceConfig.serializer(), text) }
         }
 
         private fun defaultName(root: Path): String = root.parent?.takeIf { it != homeDir() }?.name ?: "zopf"

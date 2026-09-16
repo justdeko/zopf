@@ -13,6 +13,16 @@ internal fun RunRecord.hasLiveOwner(): Boolean {
     val owner = pid ?: return false
     if (owner == ProcessHandle.current().pid()) return false
     val handle = ProcessHandle.of(owner).orElse(null)?.takeIf { it.isAlive } ?: return false
+    return startedUnder(handle)
+}
+
+internal fun RunRecord.isOursInFlight(): Boolean {
+    val current = ProcessHandle.current()
+    val active = runCatching { RunStatus.valueOf(status) }.getOrNull()?.isActive ?: false
+    return active && pid == current.pid() && startedUnder(current)
+}
+
+private fun RunRecord.startedUnder(handle: ProcessHandle): Boolean {
     val began = runCatching { Instant.parse(startedAt) }.getOrNull() ?: return true
     val started = handle.info().startInstant().orElse(null) ?: return true
     return !started.isAfter(began)
@@ -26,12 +36,13 @@ object RunHistory {
     fun list(
         root: Path = AppPaths.runsDir,
         limit: Int = DEFAULT_LIMIT,
+        skipOursInFlight: Boolean = false,
     ): List<WorkflowRun> =
         RunArchive
             .all(root)
             .take(limit)
             .mapNotNull { archive ->
-                archive.read()?.let { record ->
+                archive.read()?.takeUnless { skipOursInFlight && it.isOursInFlight() }?.let { record ->
                     WorkflowRun.restored(record, record.restoreAs()).also { it.archiveDir = archive.dir }
                 }
             }

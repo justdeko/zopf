@@ -28,9 +28,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 import java.time.Instant
 import kotlin.io.path.createDirectories
+import kotlin.io.path.name
 import kotlin.io.path.readLines
+import kotlin.io.path.setLastModifiedTime
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -91,6 +94,35 @@ class RunHistoryTest {
 
         assertEquals(AgentProviderId.CODEX, restored?.provider)
         assertEquals("gpt-5.5", restored?.model)
+    }
+
+    @Test
+    fun `an archived node comes back with its title`() {
+        val run = WorkflowRun("run-1", "demo", null, isInteractive = false)
+        run.add(NodeRun("run-1:diagnose", "demo", "diagnose", "Fix what broke", NodeType.AGENT, null))
+
+        val restored = WorkflowRun.restored(run.record(), Restore.SETTLED).node("diagnose")
+
+        assertEquals("Fix what broke", restored?.nodeTitle)
+    }
+
+    @Test
+    fun `an archive written before titles falls back to the id`() {
+        val record = unfinished(null).copy(nodes = unfinished(null).nodes.map { it.copy(title = "") })
+
+        assertEquals("checks", WorkflowRun.restored(record, Restore.SETTLED).node("checks")?.nodeTitle)
+    }
+
+    @Test
+    fun `runs are ordered by start time not by last write`() {
+        val root = tempDir()
+        val older = RunArchive.create("run-older", "ws-abcd1234", root)
+        val newer = RunArchive.create("run-newer", "ws-abcd1234", root)
+        newer.write(unfinished(null).copy(id = "run-newer", startedAt = "2026-08-05T21:06:10Z"))
+        older.write(unfinished(null).copy(id = "run-older", startedAt = "2026-08-05T20:00:00Z"))
+        older.dir.setLastModifiedTime(FileTime.from(Instant.now().plusSeconds(60)))
+
+        assertEquals(listOf("run-newer", "run-older"), RunArchive.all(root).map { it.dir.name })
     }
 
     @Test

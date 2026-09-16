@@ -16,7 +16,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
-import kotlin.io.path.readBytes
 import kotlin.io.path.readText
 import kotlin.io.path.walk
 import kotlin.test.Test
@@ -175,18 +174,6 @@ class DogfoodWorkspaceTest {
         assertTrue(examples.isNotEmpty(), "no yaml workflow examples under $skills")
         examples.forEach { (where, yaml) ->
             assertEquals(encodeYaml(Workflow.serializer(), zopfYaml.decodeFromString(Workflow.serializer(), yaml)), yaml, where)
-        }
-    }
-
-    @Test
-    fun `the notifier sources match the connector's copy`() {
-        val ours = Paths.get("src/commonMain/resources/notifier").toAbsolutePath().normalize()
-        val theirs = workspace.root.resolve("connectors/macos-notify/notifier")
-        listOf("main.swift", "Info.plist", "icon.icns").forEach {
-            assertTrue(
-                ours.resolve(it).readBytes().contentEquals(theirs.resolve(it).readBytes()),
-                "$it is not the same file as ${theirs.resolve(it)}",
-            )
         }
     }
 

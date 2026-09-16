@@ -216,6 +216,8 @@ class NodeRun(
 
     private val outputBuffer = StringBuilder()
 
+    private var lastMessage: String? = null
+
     private var outputFields: Map<String, String> = emptyMap()
     private val keys = AtomicLong(0)
 
@@ -309,7 +311,7 @@ class NodeRun(
                     notice(Strings.Transcript.denied(it.toolName, it.summary), isWarning = true)
                 }
 
-                event.text?.takeIf { it.isNotBlank() }?.let {
+                (event.text?.takeIf { it.isNotBlank() } ?: lastMessage)?.let {
                     outputBuffer.setLength(0)
                     outputBuffer.append(it)
                 }
@@ -332,7 +334,7 @@ class NodeRun(
                         status =
                             when {
                                 event.isError -> RunStatus.FAILED
-                                canFollowUp -> RunStatus.WAITING
+                                canFollowUp && owner?.isInteractive == true -> RunStatus.WAITING
                                 else -> RunStatus.RUNNING
                             },
                     )
@@ -359,7 +361,7 @@ class NodeRun(
     @Synchronized
     fun consume(line: ShellLine) {
         if (status == RunStatus.QUEUED || status == RunStatus.STARTING) update { copy(status = RunStatus.RUNNING) }
-        if (!line.isError) outputBuffer.appendLine(line.text)
+        outputBuffer.appendLine(line.text)
         add(ConsoleEntry.Output(nextKey, line.text, line.isError))
     }
 
@@ -379,6 +381,7 @@ class NodeRun(
         _transcript.value = 0
         outputBuffer.setLength(0)
         outputFields = emptyMap()
+        lastMessage = null
     }
 
     @Synchronized
@@ -479,12 +482,17 @@ class NodeRun(
         val live = synchronized(logLock) { log.lastOrNull() } as? ConsoleEntry.Message
         if (live != null && live.isStreaming) {
             live.settle(finalText)
-            if (!live.isThinking) outputBuffer.appendLine(live.text)
+            if (!live.isThinking) said(live.text)
             onEntrySettled?.invoke(live)
         } else if (finalText != null) {
             add(ConsoleEntry.Message(nextKey, finalText, isThinking, isStreaming = false))
-            if (!isThinking) outputBuffer.appendLine(finalText)
+            if (!isThinking) said(finalText)
         }
+    }
+
+    private fun said(text: String) {
+        outputBuffer.appendLine(text)
+        lastMessage = text
     }
 
     @Synchronized

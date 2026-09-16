@@ -1,5 +1,6 @@
 package com.dk.zopf.model
 
+import com.dk.zopf.model.NodeDefaults
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -39,6 +40,19 @@ class WorkflowValidationTest {
         assertEquals(1, issues.mentioning("runs in \"kuiver\"").size)
         assertEquals(1, issues.mentioning("also reads \"gone\"").size)
         assertTrue(issues.none { "app" in it.message })
+    }
+
+    @Test
+    fun `an implicit repo counts as declared`() {
+        val w =
+            Workflow(
+                name = "w",
+                defaults = NodeDefaults(repo = "self"),
+                nodes = listOf(WorkflowNode("a", NodeType.AGENT, prompt = "hi", repo = "self", alsoRead = listOf("self"))),
+            )
+
+        assertEquals(3, w.validate().mentioning("isn't declared").size)
+        assertEquals(emptyList(), w.validate(implicitRepos = setOf("self")).messages())
     }
 
     @Test

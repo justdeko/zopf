@@ -18,10 +18,11 @@ fun Workflow.validate(
     promptText: (String) -> String? = { null },
     defaultProvider: AgentProviderId = AgentProviderId.CLAUDE,
     executableExists: (AgentProviderId) -> Boolean = { true },
+    implicitRepos: Set<String> = emptySet(),
 ): List<WorkflowIssue> {
     val issues = mutableListOf<WorkflowIssue>()
     val nodeIds = nodes.mapTo(mutableSetOf()) { it.id }
-    val declaredRepos = repos.mapTo(mutableSetOf()) { it.id }
+    val declaredRepos = repos.mapTo(mutableSetOf()) { it.id } + implicitRepos
 
     if (isFromTheFuture) {
         issues += WorkflowIssue(Strings.Validation.FROM_THE_FUTURE)

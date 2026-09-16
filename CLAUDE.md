@@ -113,17 +113,24 @@ by autocomplete. Connector fields come from the manifest, so the check is skippe
 
 Both front ends gate on that: error → `zopf run` exits 3, Run button says what to fix, no node
 started. `workflowLookups()` (`runtime/WorkflowIssues.kt`) is the only builder of what `validate`
-reads from disk. Skills and prompt texts in it are a snapshot, since the editor asks for `issues` on
-every recomposition. Front ends choose when to rebuild it, never what goes in: `AppState` before the
-Run button gates, the editor's poll over its prompt files. Connectors are the app's one contribution,
+reads from disk. `issues()` folds workspace defaults first, the shape `start` runs, and takes `self`
+as declared when `Workspace.selfRepo` exists — the inspector offers it. Skills and prompt texts in it
+are a snapshot, since the editor asks for `issues` on every recomposition. Front ends choose when to
+rebuild it, never what goes in: `AppState` before the Run button gates, the editor's poll over its
+prompt files. Connectors are the app's one contribution,
 resolved against the listing the Connectors screen refreshes.
+
+`${shell.result}` = stdout and stderr in arrival order; test runners fail on stderr. Agent `result` =
+the `Result` event's text, else the last assistant message (codex sends none). `WAITING` after a
+result only in an interactive run. Connector timeout: node, then manifest, never workflow defaults. A
+non-executable connector script runs through its shebang, never `chmod` — `git status` stays clean.
 
 `NodeRun.onEntrySettled` is what the CLI prints its transcript from — on the node's own coroutine, in
 step with `onProgress`. Print from anywhere else and the verdict overtakes the lines.
 
 `store/RunArchive.kt`: NDJSON per run under `~/Library/Application Support/zopf/runs/`, shared by app
-and CLI, the same bytes as `--format json`. Replayability has to reach the archive, not just the
-composition.
+and CLI, the lines `--format json` prints, each wrapped with its node id. Replayability has to reach
+the archive, not just the composition.
 
 - Archive follows the run: a conflated collector on `records()`, writing on `Dispatchers.IO` (a record
   is a whole snapshot). The engine also writes twice, in order — at creation, so it is on disk before
@@ -131,7 +138,9 @@ composition.
   the terminal record. Cancel that collector in `NonCancellable`: `stop` cancels `run.job`, and a
   suspending call in a cancelled `finally` skips `finalize`, leaving a run with no outcome.
 - `RunRegistry.watchArchive` polls so CLI runs appear and notify while the app is open. Reads only,
-  starts nothing.
+  starts nothing. History loads silently before the first poll, or every finished archive gets
+  announced at startup. Records with our pid are skipped: `run.json` lands before `adopt`, and a poll
+  in that gap would restore our own run as a second, stopped entry.
 - Active record = running elsewhere, or dead with its writer. `RunRecord.pid` decides, only in
   `restoreAs()`. Rewritten as state moves; `isElsewhere` = not ours to stop, clear, take over, delete
   or close out.
@@ -143,8 +152,10 @@ prompt banner uses the UI's 540s, so it withdraws exactly when the question expi
 `jdk.httpserver` in `desktopApp`'s jlink modules: without it every agent node fails in the packaged
 `.app` and works fine under `:desktopApp:run`.
 
-Notifications go through one generated bundle, `zopf-notify.app` (`runtime/macos/MacNotifier.kt`),
-because `UNUserNotificationCenter` refuses a process with no bundle id — which `:desktopApp:run` is.
+Notifications post from `zopf.app` itself, through a JNI dylib (`core/src/commonMain/objc/notify.m`)
+in the app resources, which jpackage signs. Not a helper `.app`: jpackage would sign only its
+binary. `UNUserNotificationCenter` aborts the JVM outside an `APPL` bundle, past any `@catch`, and a
+bundle id alone isn't proof (a `.jdk` has one), so hot reload and `:desktopApp:run` get `osascript`.
 `Notifier.kt` is the seam, so headless runs and tests get `SilentNotifier`.
 
 ## Providers
@@ -171,7 +182,8 @@ Shell nodes: `zsh -lc`, stdin at `/dev/null`, so a prompting command gets EOF in
 `runtime/macos/AppUpdate.kt` for the app, `cli/Upgrade.kt` for the CLI. Trust is who signed it, with
 the team id read off the running bundle — notarization alone is not the check, and unsigned builds
 fail closed. Never replace the bundle you run from: the swap is a script waiting on the pid, fired
-from `quit()`.
+from `quit()`. Same for the CLI: `upgrade` prunes older `zopf-cli-*` trees except the one it runs
+from, whose jars the JVM still loads lazily; the next upgrade removes it.
 
 ## Workspaces and where state goes
 
@@ -181,10 +193,11 @@ return it, else make `.zopf/` inside. An older design let `zopf.yaml` claim a di
 rules and an ambiguous `create`.
 
 `zopf.yaml` is config, not a marker: optional, written by `create` only with a `name`. Holds
-`version` (via `isFromTheFuture`), `name`, `defaults`. Precedence: node → workflow `defaults` →
-workspace `defaults` → `settings.json`. Committed beats personal, and Settings says so, or a control
-that looks authoritative silently isn't. `defaultName` is the parent directory, "zopf" when that is
-home.
+`version` (via `isFromTheFuture`), `name`, `defaults`. Unparseable → empty config plus
+`Workspace.configProblem`, shown by both front ends, or a typo silently drops every default.
+Precedence: node → workflow `defaults` → workspace `defaults` → `settings.json`. Committed beats
+personal, and Settings says so, or a control that looks authoritative silently isn't. `defaultName`
+is the parent directory, "zopf" when that is home.
 
 `WorkflowEngine.start` folds both with `withDefaultsFrom` → `startResolved`, so placement, archive
 and resolvers see one settled `defaults`. Never fold in `WorkflowStore`: the editor loads through it
@@ -199,8 +212,8 @@ with a `.zopf/`. Exception: node positions go in the YAML, part of the document.
 YAML through kotaml with `encodeDefaults = false` (`store/Serialization.kt`), so a hand-written file
 survives an editor save byte-identical. kotaml is the maintained kaml fork and keeps the
 `com.charleskorn.kaml` package. `strictMode = false` keeps unknown keys from making a file
-unopenable; `store/workflow/UnknownKey.kt` reports them as warnings. Writes go through
-`store/AtomicWrite.kt`.
+unopenable; `store/workflow/UnknownKey.kt` reports them as warnings, root, `defaults`, `repos`, nodes
+and `schema` — a new nested object needs a line there. Writes go through `store/AtomicWrite.kt`.
 
 ## The workflow format version
 

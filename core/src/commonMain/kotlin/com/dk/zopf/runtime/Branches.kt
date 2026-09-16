@@ -17,9 +17,7 @@ object Branches {
     ): BranchVerdict {
         val text = expression.trim()
 
-        for (operator in OPERATORS) {
-            val at = text.indexOf(operator)
-            if (at < 0) continue
+        operatorOutsideQuotes(text)?.let { (at, operator) ->
             val left = interpolate(unquote(text.substring(0, at)))
             val right = interpolate(unquote(text.substring(at + operator.length)))
             val taken = if (operator == "!=") left != right else left == right
@@ -29,6 +27,18 @@ object Branches {
         val resolved = interpolate(text)
         val taken = resolved.lowercase() !in FALSEY
         return BranchVerdict(taken, Strings.Transcript.branchTruthy(resolved, taken))
+    }
+
+    private fun operatorOutsideQuotes(text: String): Pair<Int, String>? {
+        var quote: Char? = null
+        text.forEachIndexed { at, char ->
+            when {
+                quote != null -> if (char == quote) quote = null
+                char == '"' || char == '\'' -> quote = char
+                else -> OPERATORS.firstOrNull { text.startsWith(it, at) }?.let { return at to it }
+            }
+        }
+        return null
     }
 
     private fun unquote(value: String): String {

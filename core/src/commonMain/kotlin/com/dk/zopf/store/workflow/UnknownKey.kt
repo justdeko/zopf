@@ -4,6 +4,9 @@ import com.charleskorn.kaml.YamlList
 import com.charleskorn.kaml.YamlMap
 import com.charleskorn.kaml.YamlNode
 import com.charleskorn.kaml.YamlScalar
+import com.dk.zopf.model.NodeDefaults
+import com.dk.zopf.model.RepoRef
+import com.dk.zopf.model.SchemaField
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
@@ -21,10 +24,22 @@ fun unknownKeysIn(yaml: String): List<UnknownKey> {
     val found = mutableListOf<UnknownKey>()
 
     found += root.strayKeys(Workflow.serializer().descriptor, Strings.Validation.THE_WORKFLOW)
+    found += root.map("defaults")?.strayKeys(NodeDefaults.serializer().descriptor, Strings.Validation.THE_DEFAULTS).orEmpty()
 
+    root.list("repos").forEachIndexed { index, repo ->
+        val map = repo as? YamlMap ?: return@forEachIndexed
+        val name = map.text("id")?.let(Strings.Validation::repo) ?: Strings.Validation.repoAt(index)
+        found += map.strayKeys(RepoRef.serializer().descriptor, name)
+    }
     root.list("nodes").forEachIndexed { index, node ->
-        val name = (node as? YamlMap)?.text("id") ?: Strings.Validation.nodeAt(index)
-        found += (node as? YamlMap)?.strayKeys(WorkflowNode.serializer().descriptor, name).orEmpty()
+        val map = node as? YamlMap ?: return@forEachIndexed
+        val name = map.text("id") ?: Strings.Validation.nodeAt(index)
+        found += map.strayKeys(WorkflowNode.serializer().descriptor, name)
+        map.list("schema").forEachIndexed { at, field ->
+            val fieldMap = field as? YamlMap ?: return@forEachIndexed
+            val label = fieldMap.text("name") ?: "${at + 1}"
+            found += fieldMap.strayKeys(SchemaField.serializer().descriptor, Strings.Validation.schemaField(name, label))
+        }
     }
     root.list("edges").forEachIndexed { index, edge ->
         found += (edge as? YamlMap)?.strayKeys(WorkflowEdge.serializer().descriptor, Strings.Validation.edgeAt(index)).orEmpty()
@@ -44,5 +59,7 @@ private fun YamlMap.strayKeys(
 }
 
 private fun YamlMap.list(key: String): List<YamlNode> = (entries.entries.firstOrNull { it.key.content == key }?.value as? YamlList)?.items.orEmpty()
+
+private fun YamlMap.map(key: String): YamlMap? = entries.entries.firstOrNull { it.key.content == key }?.value as? YamlMap
 
 private fun YamlMap.text(key: String): String? = (entries.entries.firstOrNull { it.key.content == key }?.value as? YamlScalar)?.content

@@ -133,6 +133,27 @@ class NodeTimeoutTest {
     }
 
     @Test
+    fun `stderr is part of the result`() {
+        val run =
+            runWorkflow(
+                Workflow(
+                    name = "w",
+                    nodes = listOf(WorkflowNode(id = "tests", type = NodeType.SHELL, command = "echo out; echo FAIL >&2")),
+                ),
+            )
+
+        assertEquals(
+            setOf("out", "FAIL"),
+            run
+                .node("tests")
+                ?.output()
+                ?.result
+                ?.lines()
+                ?.toSet(),
+        )
+    }
+
+    @Test
     fun `a workflow deadline applies to a node naming none`() {
         val run =
             runWorkflow(

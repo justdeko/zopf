@@ -5,6 +5,7 @@ import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.runtime.run.ResumePoint
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
+import com.dk.zopf.store.RunArchive
 import com.dk.zopf.util.Strings
 import com.dk.zopf.util.format
 import com.dk.zopf.util.spend
@@ -160,8 +161,9 @@ class JsonRenderer(
         nodeId: String,
         line: String,
     ) {
+        val wrapped = RunArchive.envelope(nodeId, line)
         synchronized(lock) {
-            out.println(line)
+            out.println(wrapped)
             out.flush()
         }
     }

@@ -15,8 +15,10 @@ import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
 import kotlin.io.path.isExecutable
 import kotlin.io.path.isSymbolicLink
+import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
 
 val UPGRADE_OPTIONS = setOf("version")
@@ -106,6 +108,7 @@ fun upgradeCli(
             error("${archive.name} holds no bin/zopf")
         }
         relink(install.link, binary)
+        pruneOldVersions(install, keep = setOf(target, install.current))
     } finally {
         staging.toFile().deleteRecursively()
     }
@@ -161,6 +164,16 @@ private fun untar(
         }
         check(process.exitValue() == 0) { output.trim().lines().lastOrNull() ?: "tar failed" }
     }
+
+private fun pruneOldVersions(
+    install: CliInstall,
+    keep: Set<Path>,
+) {
+    install.opt
+        .listDirectoryEntries("$INSTALL_PREFIX*")
+        .filter { it.isDirectory() && it !in keep }
+        .forEach { runCatching { it.toFile().deleteRecursively() } }
+}
 
 private fun relink(
     link: Path,

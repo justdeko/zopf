@@ -126,6 +126,7 @@ class WorkflowRun(
                 nodes.map { node ->
                     NodeRunRecord(
                         nodeId = node.nodeId,
+                        title = node.nodeTitle,
                         type = node.nodeType,
                         provider = node.provider,
                         model = node.model,
@@ -191,7 +192,7 @@ class WorkflowRun(
                         id = "${record.id}:${node.nodeId}",
                         workflowName = record.workflow,
                         nodeId = node.nodeId,
-                        nodeTitle = node.nodeId,
+                        nodeTitle = node.title.ifBlank { node.nodeId },
                         nodeType = node.type,
                         cwd = node.cwd?.let { Paths.get(it) },
                         startedAt = parseInstant(node.startedAt),

@@ -15,6 +15,7 @@ import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.RunRecord
 import java.net.UnknownHostException
 import java.nio.file.Path
+import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -57,6 +58,34 @@ class CommandsTest {
 
         assertEquals(EXIT_OK, code)
         assertContains(streams.output(), "demo: ok")
+    }
+
+    @Test
+    fun `validate accepts self inside a git repo`() {
+        sandbox.workspace.root.parent
+            .resolve(".git")
+            .createDirectories()
+        sandbox.save(workflow(nodes = listOf(shell("build").copy(repo = "self"))))
+        val streams = Streams()
+
+        val code = validateWorkflows(options(), streams.out)
+
+        assertEquals(EXIT_OK, code, streams.output())
+        assertContains(streams.output(), "demo: ok")
+    }
+
+    @Test
+    fun `validate warns about a zopf yaml that does not parse`() {
+        sandbox.workspace.root
+            .resolve("zopf.yaml")
+            .writeText("defaults: [")
+        sandbox.save(workflow(nodes = listOf(shell("build"))))
+        val streams = Streams()
+
+        val code = validateWorkflows(options(), streams.out)
+
+        assertEquals(EXIT_OK, code)
+        assertContains(streams.output(), "warning: zopf.yaml doesn't parse")
     }
 
     @Test
@@ -567,13 +596,13 @@ class RunCommandTest {
     }
 
     @Test
-    fun `run --format json prints only archive lines`() {
+    fun `run --format json prints only archive lines, each with its node`() {
         sandbox.save(workflow(nodes = listOf(shell("build"))))
 
         val (code, streams) = sandbox.run(listOf("demo", "--format", "json"), FakeExecutor(output = { """{"a":1}""" }))
 
         assertEquals(EXIT_OK, code)
-        assertEquals(listOf("""{"a":1}"""), streams.output().trim().lines())
+        assertEquals(listOf("""{"node":"build","event":{"a":1}}"""), streams.output().trim().lines())
     }
 
     @Test

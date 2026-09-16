@@ -252,7 +252,7 @@ class ProcessNodeExecutor(
             .takeIf { it.isNotEmpty() }
             ?.let { run.notice(Strings.Transcript.secretsOptionalMissing(it.joinToString { s -> s.name })) }
 
-        val timeoutSeconds = execution.deadline() ?: manifest.timeoutSeconds
+        val timeoutSeconds = node.timeoutSeconds ?: manifest.timeoutSeconds
         val invocation =
             ConnectorInvocation(
                 script = connectorDef.script,

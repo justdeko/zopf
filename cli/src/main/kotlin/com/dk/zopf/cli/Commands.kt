@@ -87,6 +87,7 @@ fun validateWorkflows(
         }
 
     var refused = broken.isNotEmpty()
+    workspace.configProblem?.let { out.println("${Strings.Words.WARNING}: $it") }
     broken.forEach { out.println(Strings.Cli.brokenFile(it.file.fileName, it.message)) }
 
     workflows.forEach { workflow ->

@@ -376,6 +376,26 @@ class RunRegistryTest {
     }
 
     @Test
+    fun `a record this process is still writing is not restored by a poll`() {
+        val root = tempDir()
+        val registry = registry(RecordingExecutor(), archiveRoot = root)
+        RunArchive.create("run-ours", "ws-abcd1234", root).write(
+            RunRecord(
+                id = "run-ours",
+                workflow = "release-cut",
+                startedAt = Instant.now().toString(),
+                status = RunStatus.RUNNING.name,
+                pid = ProcessHandle.current().pid(),
+            ),
+        )
+
+        registry.readArchive()
+        registry.loadHistory()
+
+        assertTrue(registry.runs.isEmpty(), registry.runs.map { it.id }.toString())
+    }
+
+    @Test
     fun `a run that finishes elsewhere is announced once`() {
         val notifier = RecordingNotifier()
         val root = tempDir()

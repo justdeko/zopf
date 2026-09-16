@@ -48,7 +48,40 @@ val stageAppResources =
         into(layout.buildDirectory.dir("appResources/common"))
     }
 
-tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(stageAppResources) }
+val buildNotifier =
+    tasks.register<Exec>("buildNotifier") {
+        description = "Compiles the JNI notification library into the Apple Silicon app resources jpackage signs."
+        onlyIf { System.getProperty("os.name").startsWith("Mac") }
+        val source = rootProject.file("core/src/commonMain/objc/notify.m")
+        val output = layout.buildDirectory.file("appResources/macos-arm64/libzopf-notify.dylib")
+        val javaHome = providers.systemProperty("java.home")
+        inputs.file(source)
+        outputs.file(output)
+        argumentProviders.add(
+            CommandLineArgumentProvider {
+                listOf(
+                    "-dynamiclib",
+                    "-fobjc-arc",
+                    "-O2",
+                    "-arch",
+                    "arm64",
+                    "-mmacosx-version-min=11.0",
+                    "-I${javaHome.get()}/include",
+                    "-I${javaHome.get()}/include/darwin",
+                    "-framework",
+                    "Foundation",
+                    "-framework",
+                    "UserNotifications",
+                    "-o",
+                    output.get().asFile.absolutePath,
+                    source.absolutePath,
+                )
+            },
+        )
+        executable = "clang"
+    }
+
+tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(stageAppResources, buildNotifier) }
 
 val appName = "zopf"
 

@@ -74,7 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/justdeko/zopf/main/install.sh | sh
 That unpacks the newest release into `~/.local/opt`, links `~/.local/bin/zopf`, and adds that directory to your shell rc
 if it isn't on PATH already.
 
-The CLI does need a **JDK 17 or newer** on your PATH, you can install one e.g. with homebrew:
+The CLI does need a **JDK 21 or newer** on your PATH, you can install one e.g. with homebrew:
 
 ```bash
 brew install --cask temurin
@@ -127,8 +127,9 @@ edges:
 Some things that are crucial to understanding workflow nodes:
 
 - data along edges is implicit, you can embed it in the next node execution using literals: `${tests.result}`
-- some edges have implicit assumptions like true/false from gates or `on: failure` in the example
+- edges can carry a condition: `on: failure` in the example, or `when: true` / `when: false` for branch nodes
 - an `on: failure` edge does not fail the run (node still shows as failed)
+- a node with several incoming edges waits for all of them to finish
 - generally, follow the [schema reference](plugins/zopf/skills/zopf-workflows/references/schema.md)
 
 The editor reads and writes to workflow files, so you can hand-edit it or draw it on the canvas. You can also describe
@@ -211,7 +212,7 @@ Exit codes:
 
 Two things are a bit different in the cli vs. the app:
 
-- no gate, the run just stops there
+- no gate, the run just stops there unless you specify `--on-gate approve`
 - inline approval is off, so a stricter permission mode can block the run
 
 ## Security

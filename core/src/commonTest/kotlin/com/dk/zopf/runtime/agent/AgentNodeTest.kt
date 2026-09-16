@@ -8,6 +8,7 @@ import com.dk.zopf.runtime.exec.ShellLine
 import com.dk.zopf.runtime.run.ConsoleEntry
 import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.runtime.run.RunStatus
+import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.runtime.run.showing
 import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.util.tokens
@@ -295,10 +296,9 @@ class NodeRunTest {
             provider = AgentProviderId.CLAUDE,
         )
 
-    private fun replayFixture(name: String = "/claude-stream.jsonl"): NodeRun {
-        val text = checkNotNull(javaClass.getResourceAsStream(name)).bufferedReader().readText()
-        return run().apply { ClaudeEvents.parseAll(text).forEach(::consume) }
-    }
+    private fun fixtureText(name: String): String = checkNotNull(javaClass.getResourceAsStream(name)).bufferedReader().readText()
+
+    private fun replayFixture(name: String = "/claude-stream.jsonl"): NodeRun = run().apply { ClaudeEvents.parseAll(fixtureText(name)).forEach(::consume) }
 
     private fun labelled(
         provider: AgentProviderId?,
@@ -368,8 +368,32 @@ class NodeRunTest {
         assertEquals(0.071205, run.costUsd)
         assertTrue(run.canTakeOver, "a claude run with a session id can be handed to a terminal")
 
-        assertEquals(RunStatus.WAITING, run.status)
+        assertEquals(RunStatus.RUNNING, run.status)
         assertEquals("It printed `hello`.", run.output().result)
+    }
+
+    @Test
+    fun `a result parks the node only in an interactive run`() {
+        listOf(true to RunStatus.WAITING, false to RunStatus.RUNNING).forEach { (interactive, expected) ->
+            val run = run()
+            WorkflowRun("run-1", "demo", null, isInteractive = interactive).add(run)
+            ClaudeEvents.parseAll(fixtureText("/claude-stream.jsonl")).forEach(run::consume)
+
+            assertEquals(expected, run.status, "interactive = $interactive")
+        }
+    }
+
+    @Test
+    fun `a codex result is the last message not every message`() {
+        val run =
+            NodeRun("r", "demo", "analyze", "Analyze", NodeType.AGENT, Paths.get("/tmp"), provider = AgentProviderId.CODEX)
+        listOf(
+            """{"type":"item.completed","item":{"id":"a","item_type":"agent_message","text":"Looking around."}}""",
+            """{"type":"item.completed","item":{"id":"b","item_type":"agent_message","text":"Done: two files changed."}}""",
+            """{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}""",
+        ).forEach { line -> run.consume(CodexEvents.parse(line)!!) }
+
+        assertEquals("Done: two files changed.", run.output().result)
     }
 
     @Test
@@ -544,7 +568,7 @@ class NodeRunTest {
         }
 
     @Test
-    fun `shell output keeps stdout and stderr apart`() {
+    fun `shell output tags stderr in the console and keeps it in the result`() {
         val run = NodeRun("r", "demo", "build", "Build", NodeType.SHELL, Paths.get("/tmp"))
         run.consume(ShellLine("compiling", isError = false))
         run.consume(ShellLine("warning: deprecated", isError = true))
@@ -552,7 +576,7 @@ class NodeRunTest {
         val output = run.entries.filterIsInstance<ConsoleEntry.Output>()
         assertEquals(listOf(false, true), output.map { it.isError })
 
-        assertEquals("compiling", run.output().result)
+        assertEquals("compiling\nwarning: deprecated", run.output().result)
     }
 
     @Test

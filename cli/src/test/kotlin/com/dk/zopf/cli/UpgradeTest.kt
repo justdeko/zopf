@@ -119,6 +119,18 @@ class UpgradeTest {
     }
 
     @Test
+    fun `an upgrade removes every version older than the one running`() {
+        val stale = dir.resolve("opt/zopf-cli-1.2.0").also { it.resolve("bin").createDirectories() }
+
+        val (code, streams) = upgrade()
+
+        assertEquals(EXIT_OK, code, streams.errors())
+        assertTrue(!stale.exists(), "1.2.0 should be gone")
+        assertTrue(install.current.exists(), "the running version stays until the next upgrade")
+        assertTrue(dir.resolve("opt/zopf-cli-1.4.0").exists())
+    }
+
+    @Test
     fun `a tarball that is not what github published is refused`() {
         val (code, streams) = upgrade(checksum = { Result.success("${"0".repeat(64)}  zopf-cli-1.4.0.tar.gz") })
 

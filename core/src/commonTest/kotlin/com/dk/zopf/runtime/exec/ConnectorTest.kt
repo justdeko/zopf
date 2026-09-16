@@ -1,5 +1,6 @@
 package com.dk.zopf.runtime.exec
 
+import com.dk.zopf.model.NodeDefaults
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
@@ -134,7 +135,7 @@ class ConnectorRunnerTest {
         }
 
     @Test
-    fun `a script without the execute bit is made runnable`() {
+    fun `a script without the execute bit runs through its shebang and keeps its mode`() {
         val script = script("""cat > /dev/null; echo '{"result": "ran anyway"}'""", executable = false)
         assertFalse(script.isExecutable())
 
@@ -142,6 +143,7 @@ class ConnectorRunnerTest {
 
         assertEquals(0, exit)
         assertEquals("ran anyway", output.result)
+        assertFalse(script.isExecutable(), "running a connector must not change a committed file's mode")
     }
 
     @Test
@@ -540,6 +542,22 @@ class ConnectorNodeTest {
         assertEquals(RunStatus.FAILED, post.status)
         assertEquals(NODE_TIMEOUT_EXIT, post.exitCode)
         assertTrue(post.entries.any { it is ConsoleEntry.Notice && "Gave up after 1s" in it.text })
+    }
+
+    @Test
+    fun `a workflow deadline does not cut a connector short of its manifest`() {
+        val workspace = workspace()
+        connector(workspace, "steady", manifest = """{"timeoutSeconds": 30}""", body = "cat > /dev/null; sleep 2; echo '{\"result\": \"done\"}'")
+
+        val run =
+            runWorkflow(
+                workspace,
+                connectorWorkflow("steady").copy(defaults = NodeDefaults(timeoutSeconds = 1)),
+            )
+
+        val post = assertNotNull(run.node("post"))
+        assertEquals(RunStatus.SUCCEEDED, post.status)
+        assertEquals("done", post.output().result)
     }
 
     @Test

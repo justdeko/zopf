@@ -89,7 +89,7 @@ class AppState(
     var connectors by mutableStateOf(ConnectorListing())
         private set
 
-    private var installedAgents by mutableStateOf<Set<AgentProviderId>>(emptySet())
+    private var installedAgents by mutableStateOf<Set<AgentProviderId>?>(null)
 
     var selectedWorkflow by mutableStateOf<Workflow?>(null)
         private set
@@ -158,7 +158,9 @@ class AppState(
             ?.defaults
             ?.provider ?: from.defaultProvider
 
-    fun connectorAgentLabel(from: AppSettings): String = authoringAgent(defaultProvider(from)) { it in installedAgents }.id.label
+    fun connectorAgentLabel(from: AppSettings): String = authoringAgent(defaultProvider(from), ::knownInstalled).id.label
+
+    private fun knownInstalled(id: AgentProviderId): Boolean = installedAgents?.contains(id) ?: true
 
     private fun refreshInstalledAgents() {
         installedAgents = AgentProviderId.entries.filterTo(mutableSetOf(), AgentProviders::isInstalled)
@@ -180,6 +182,7 @@ class AppState(
         activeWorkspace?.workspace?.takeIf { it.config.isFromTheFuture }?.let {
             message = Strings.Workspaces.fromTheFuture(it.name)
         }
+        activeWorkspace?.workspace?.configProblem?.let { message = it }
     }
 
     private fun checkAgent() {
@@ -194,7 +197,8 @@ class AppState(
                 .distinct()
 
         scope.launch(Dispatchers.IO) {
-            val missing = wanted.filterNot(AgentProviders::isInstalled).map(AgentProviders::of)
+            refreshInstalledAgents()
+            val missing = wanted.filterNot(::knownInstalled).map(AgentProviders::of)
             if (missing.isEmpty()) return@launch
             Log.warn("${missing.joinToString { it.executable }} isn't on the login shell's PATH")
             message =
@@ -317,6 +321,7 @@ class AppState(
                 defaultProvider = settings.current.defaultProvider,
                 defaultModel = settings.current.defaultModel,
                 workspaceDefaults = workspace.config.defaults,
+                executableExists = ::knownInstalled,
             ) { edited ->
                 WorkflowStore(workspace).save(edited)
                 refreshWorkflows()
@@ -529,8 +534,8 @@ class AppState(
         val default = defaultProvider()
         scope.launch(Dispatchers.IO) {
             refreshInstalledAgents()
-            val agent = authoringAgent(default) { it in installedAgents }
-            if (agent.id !in installedAgents) {
+            val agent = authoringAgent(default, ::knownInstalled)
+            if (!knownInstalled(agent.id)) {
                 message =
                     Strings.Connectors.missingAgent(agent.executable, agent.id.label, name)
                 return@launch
@@ -586,7 +591,10 @@ class AppState(
         workspaces = registry.workspaces.value
         activeWorkspace = registry.active.value
 
-        if (activeWorkspace?.path != was) editing = null
+        if (activeWorkspace?.path != was) {
+            editing = null
+            activeWorkspace?.workspace?.configProblem?.let { message = it }
+        }
         refreshWorkflows()
         refreshConnectors()
     }

@@ -120,6 +120,8 @@ object Strings {
 
         fun fromTheFuture(name: String) = "$name was written by a newer zopf. Some of it may not mean what it says here."
 
+        fun configBroken(reason: String?) = "zopf.yaml doesn't parse, so its defaults don't apply. ${reason.orEmpty()}".trim()
+
         fun settingsFellBack(reason: String?) = "$reason. Using the defaults."
     }
 
@@ -929,10 +931,20 @@ object Strings {
         ) = "$where sets \"$key\", which zopf ignores. Check the spelling"
 
         const val THE_WORKFLOW = "the workflow"
+        const val THE_DEFAULTS = "defaults"
 
         fun nodeAt(index: Int) = "node ${index + 1}"
 
         fun edgeAt(index: Int) = "edge ${index + 1}"
+
+        fun repoAt(index: Int) = "repo ${index + 1}"
+
+        fun repo(id: String) = "repo $id"
+
+        fun schemaField(
+            node: String,
+            field: String,
+        ) = "$node's schema field $field"
     }
 
     object Transcript {

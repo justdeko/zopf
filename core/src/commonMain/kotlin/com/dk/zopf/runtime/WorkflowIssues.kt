@@ -2,13 +2,16 @@ package com.dk.zopf.runtime
 
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.ConnectorManifest
+import com.dk.zopf.model.NodeDefaults
 import com.dk.zopf.model.RepoRef
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.model.validate
+import com.dk.zopf.model.withDefaultsFrom
 import com.dk.zopf.runtime.agent.AgentProviders
 import com.dk.zopf.store.workspace.ConnectorStore
 import com.dk.zopf.store.workspace.DiscoveredSkill
+import com.dk.zopf.store.workspace.SELF_REPO_ID
 import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.store.workspace.availableSkills
 import kotlin.io.path.exists
@@ -23,6 +26,8 @@ class WorkflowLookups(
     val promptTexts: Map<String, String> = emptyMap(),
     val defaultProvider: AgentProviderId = AgentProviderId.CLAUDE,
     val executableExists: (AgentProviderId) -> Boolean = { true },
+    val implicitRepos: Set<String> = emptySet(),
+    val workspaceDefaults: NodeDefaults = NodeDefaults(),
 ) {
     val skillNames: Set<String>? by lazy { skills?.mapTo(mutableSetOf(), DiscoveredSkill::name) }
 }
@@ -47,6 +52,8 @@ fun workflowLookups(
         promptTexts = workflow.readPromptFiles(workspace),
         defaultProvider = workspace.config.defaults.provider ?: defaultProvider,
         executableExists = executableExists,
+        implicitRepos = if (workspace.selfRepo != null) setOf(SELF_REPO_ID) else emptySet(),
+        workspaceDefaults = workspace.config.defaults,
     )
 }
 
@@ -62,7 +69,7 @@ private fun Workflow.readPromptFiles(workspace: Workspace): Map<String, String> 
         .toMap()
 
 fun Workflow.issues(lookups: WorkflowLookups): List<WorkflowIssue> =
-    validate(
+    withDefaultsFrom(lookups.workspaceDefaults).validate(
         repoExists = lookups.repoExists,
         fileExists = lookups.fileExists,
         connector = lookups.connector,
@@ -70,6 +77,7 @@ fun Workflow.issues(lookups: WorkflowLookups): List<WorkflowIssue> =
         promptText = lookups.promptTexts::get,
         defaultProvider = lookups.defaultProvider,
         executableExists = lookups.executableExists,
+        implicitRepos = lookups.implicitRepos,
     )
 
 fun Workflow.issues(

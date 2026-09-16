@@ -273,6 +273,36 @@ class UnknownKeyTest {
     }
 
     @Test
+    fun `an unknown key inside defaults, a repo or a schema field is named`() {
+        val stray =
+            unknownKeysIn(
+                """
+                name: w
+                defaults:
+                  modle: sonnet
+                repos:
+                  - id: app
+                    pth: ~/dev/app
+                nodes:
+                  - id: review
+                    type: agent
+                    schema:
+                      - name: verdict
+                        typ: string
+                """.trimIndent(),
+            )
+
+        assertEquals(
+            listOf(
+                UnknownKey("modle", "defaults"),
+                UnknownKey("pth", "repo app"),
+                UnknownKey("typ", "review's schema field verdict"),
+            ),
+            stray,
+        )
+    }
+
+    @Test
     fun `an unknown edge key is named`() {
         val stray =
             unknownKeysIn(

@@ -110,7 +110,7 @@ auto-laying-out the graph and the author's arrangement is frozen. Leave it out a
 | `type:`     | needs                              | `${id.result}` is                              | can fail? |
 |-------------|------------------------------------|------------------------------------------------|-----------|
 | `agent`     | `prompt:` or `promptFile:`         | the model's **final message**, nothing earlier | yes       |
-| `shell`     | `command:`                         | **stdout only**, trimmed                       | yes       |
+| `shell`     | `command:`                         | stdout and stderr, in arrival order, trimmed   | yes       |
 | `connector` | `connector:`                       | what the connector's JSON returned as `result` | yes       |
 | `gate`      | `title:` is the question           | `approved` or `rejected`                       | no        |
 | `branch`    | `expression:`                      | the expression as evaluated                    | no        |
@@ -194,9 +194,8 @@ characters.
 
 Two facts about what actually lands in `result` decide how you write the producing node:
 
-- **`shell` gives you stdout only.** stderr is shown in the console and archived, but it is not in
-  `${id.result}`. A command whose interesting output goes to stderr — many compilers, many test runners — needs `2>&1`
-  in the command, or the consuming node gets an empty string.
+- **`shell` gives you stdout and stderr together**, each line as it arrived, so a test runner that reports on stderr
+  still lands in `${id.result}`. Add `2>&1` only when you also want one ordered stream in the console.
 - **`agent` gives you the final message only**, unless you declare a `schema:`. Everything the model said mid-turn is
   gone either way. If a later node consumes the answer, either declare the fields it needs (below) or say so in the
   prompt: end with a verdict line, a list, a path — whatever the next step needs.

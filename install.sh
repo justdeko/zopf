@@ -97,6 +97,10 @@ unpack() {
     tar xzf "$TMP/$asset" -C "$PREFIX/opt"
     [ -x "$dest/bin/zopf" ] || err "this release is broken. Please report it on GitHub."
     ln -sf "$dest/bin/zopf" "$PREFIX/bin/zopf"
+    # older releases only take up space once the link has moved on
+    for old in "$PREFIX"/opt/zopf-cli-*; do
+        [ -d "$old" ] && [ "$old" != "$dest" ] && rm -rf "$old"
+    done
 }
 
 rc_file() {
@@ -142,14 +146,14 @@ check_java() {
     [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ] && java_bin="$JAVA_HOME/bin/java"
     command -v "$java_bin" >/dev/null 2>&1 || {
         note ""
-        note "zopf needs a JDK 17 or newer and there is no java on your PATH."
+        note "zopf needs a JDK 21 or newer and there is no java on your PATH."
         note "  brew install temurin"
         return 0
     }
     major=$("$java_bin" -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')
-    [ -n "$major" ] && [ "$major" -ge 17 ] 2>/dev/null && return 0
+    [ -n "$major" ] && [ "$major" -ge 21 ] 2>/dev/null && return 0
     note ""
-    note "zopf needs a JDK 17 or newer; the java on your PATH reports ${major:-an unreadable version}."
+    note "zopf needs a JDK 21 or newer; the java on your PATH reports ${major:-an unreadable version}."
     note "  brew install temurin"
 }
 

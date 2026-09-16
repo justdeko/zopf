@@ -170,7 +170,7 @@ Cycles, self-edges, duplicate node ids and edges naming a node that doesn't exis
 | type        | fields                                                            |
 |-------------|-------------------------------------------------------------------|
 | `agent`     | `result`, `sessionId`, `costUsd`, plus every name in `schema`     |
-| `shell`     | `result` (**stdout only**, trimmed), `exitCode`                   |
+| `shell`     | `result` (stdout and stderr, trimmed), `exitCode`                 |
 | `connector` | `result`, `exitCode`, plus every name in the manifest's `outputs` |
 | `gate`      | `result` — `approved` or `rejected`                               |
 | `branch`    | `result`                                                          |

@@ -8,6 +8,8 @@ import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.runtime.ProcessNodeExecutor
 import com.dk.zopf.runtime.WorkflowEngine
+import com.dk.zopf.runtime.errors
+import com.dk.zopf.runtime.issues
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.store.AppPaths
@@ -72,6 +74,49 @@ class WorkspaceTest {
         val workflow = Workflow(name = "w")
         assertEquals(repo.normalize(), workspace.resolveRepo(workflow, SELF_REPO_ID)?.normalize())
         assertTrue(SELF_REPO_ID in workspace.availableRepoIds(workflow))
+    }
+
+    @Test
+    fun `a workflow running in self validates inside a git repo`() {
+        val repo = tempDir().resolve("myrepo")
+        repo.resolve(".git").createDirectories()
+        val workflow =
+            Workflow(
+                name = "w",
+                defaults = NodeDefaults(repo = SELF_REPO_ID),
+                nodes = listOf(WorkflowNode(id = "a", type = NodeType.SHELL, command = "pwd", repo = SELF_REPO_ID)),
+            )
+
+        assertEquals(emptyList(), workflow.issues(Workspace.create(repo.resolve(".zopf"))).errors())
+        assertEquals(2, workflow.issues(Workspace.create(tempDir().resolve("standalone"))).errors().size)
+    }
+
+    @Test
+    fun `a workspace default is validated like a workflow default`() {
+        val workspace = Workspace.create(tempDir().resolve("ws"))
+        workspace.root.resolve(WORKSPACE_FILE).writeText("defaults:\n  repo: nope\n")
+        val workflow = Workflow(name = "w", nodes = listOf(WorkflowNode(id = "a", type = NodeType.SHELL, command = "pwd")))
+
+        val errors = Workspace.open(workspace.root)!!.let(workflow::issues).errors()
+
+        assertEquals(1, errors.size, errors.toString())
+        assertTrue("\"nope\" isn't declared" in errors.single().message, errors.single().message)
+    }
+
+    @Test
+    fun `a zopf yaml that does not parse opens with the problem named`() {
+        listOf(
+            "defaults: [" to true,
+            "" to false,
+            "name: x\n" to false,
+        ).forEach { (text, broken) ->
+            val root = Workspace.create(tempDir().resolve("ws")).root
+            root.resolve(WORKSPACE_FILE).writeText(text)
+
+            val opened = assertNotNull(Workspace.open(root))
+            assertEquals(broken, opened.configProblem != null, text)
+            assertEquals(if (broken) WorkspaceConfig() else opened.config, opened.config, text)
+        }
     }
 
     @Test

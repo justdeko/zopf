@@ -3,6 +3,10 @@ package com.dk.zopf.store
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.BufferedWriter
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -32,6 +36,7 @@ data class RunRecord(
 @Serializable
 data class NodeRunRecord(
     val nodeId: String,
+    val title: String = "",
     val type: NodeType,
     val provider: AgentProviderId? = null,
     val model: String? = null,
@@ -83,6 +88,8 @@ class RunArchive(
 
     fun rawPath(nodeId: String): Path = dir.resolve("${sanitize(nodeId)}.jsonl")
 
+    fun startedAt(): Instant? = read()?.startedAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
+
     fun close() {
         synchronized(writers) {
             writers.values.forEach { runCatching { it.close() } }
@@ -107,8 +114,8 @@ class RunArchive(
                 .filter { it.isDirectory() }
                 .flatMap { workspace -> workspace.listDirectoryEntries().filter { it.isDirectory() } }
                 .filter { it.resolve(RUN_FILE).exists() }
-                .sortedByDescending { it.getLastModifiedTime() }
                 .map { RunArchive(it) }
+                .sortedByDescending { it.startedAt() ?: it.dir.getLastModifiedTime().toInstant() }
         }
 
         fun prune(
@@ -128,6 +135,17 @@ class RunArchive(
         fun delete(dir: Path) {
             dir.toFile().deleteRecursively()
             runCatching { dir.parent?.takeIf { it.listDirectoryEntries().isEmpty() }?.deleteExisting() }
+        }
+
+        fun envelope(
+            nodeId: String,
+            line: String,
+        ): String {
+            val event = runCatching { Json.parseToJsonElement(line) }.getOrNull() as? JsonObject
+            return buildJsonObject {
+                put("node", nodeId)
+                if (event != null) put("event", event) else put("text", line)
+            }.toString()
         }
 
         fun workspaceId(root: Path?): String {
