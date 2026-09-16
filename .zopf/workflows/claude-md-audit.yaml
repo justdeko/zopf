@@ -1,10 +1,5 @@
 name: claude-md-audit
-description: |-
-  Read the recent commits against CLAUDE.md, show the drift, and correct the file once you agree.
-
-  CLAUDE.md is the only design record this repo has, and it says so: a change that contradicts it
-  and leaves it standing is how the next session gets misled. Nothing is written until the gate is
-  approved, so the audit itself is safe to run whenever.
+description: Check CLAUDE.md against recent commits and apply the fixes you approve.
 repos:
   - id: self
     path: ..
@@ -25,7 +20,7 @@ nodes:
     promptFile: prompts/claude-md-audit.md
   - id: approve
     type: gate
-    title: Apply these corrections to CLAUDE.md?
+    title: Apply these corrections?
     prompt: ${audit.result}
   - id: apply
     type: agent

@@ -15,10 +15,7 @@ to an `agent` node through a reference.
 
 ```yaml
 name: review-diff
-description: |-
-  Read the working tree's diff and say whether it should ship.
-
-  The reviewer gets the diff by reference rather than a Bash grant, so it is read-only.
+description: Review the working tree's diff and say whether it should ship.
 repos:
   - id: self
     path: ..
@@ -114,10 +111,7 @@ Two things run at once against the same state, and a third joins them. A diamond
 
 ```yaml
 name: review-changes
-description: |-
-  Read the diff and run the suite at once, then join both into one verdict.
-
-  The suite ends in `echo "exit=$?"` so it succeeds either way and the verdict sees both results.
+description: Review the diff and run the tests, then give one verdict.
 repos:
   - id: self
     path: ..
@@ -191,10 +185,7 @@ the gate writes anything.
 
 ```yaml
 name: claude-md-audit
-description: |-
-  Read the recent commits against CLAUDE.md, show the drift, and correct the file once you agree.
-
-  Nothing is written until the gate is approved, so the audit itself is safe to run whenever.
+description: Check CLAUDE.md against recent commits and apply the fixes you approve.
 repos:
   - id: self
     path: ..
@@ -220,7 +211,7 @@ nodes:
       Read CLAUDE.md and list, precisely, where it no longer describes the code.
   - id: approve
     type: gate
-    title: Apply these corrections to CLAUDE.md?
+    title: Apply these corrections?
     prompt: ${audit.result}
   - id: apply
     type: agent
@@ -266,10 +257,7 @@ Two paths, one taken. Use it when both arms are real work; use an `on: failure` 
 
 ```yaml
 name: release-check
-description: |-
-  Ask which environment, then take the path that environment needs.
-
-  choices: makes it answerable from the menu bar, and gives the branch an exact string to match.
+description: Ask which environment, then run the checks it needs.
 repos:
   - id: self
     path: ..
@@ -324,6 +312,6 @@ expressions).
 | `allowedTools: [Bash]` so the model can run `git diff`       | costs permissions and turns                                             | a `shell` node upstream, handed over by reference                                                       |
 | `allowedTools` without `Bash`, to keep a node read-only      | the list grants, never takes a tool away                                | feed it from a `shell` node                                                                             |
 | a hand-written `position:`                                   | one manual position freezes auto-layout for the whole graph             | leave it out                                                                                            |
-| `# a comment explaining the graph`                           | the editor rewrites the file on save and eats it                        | `description:` and `title:`                                                                             |
+| `# a comment explaining the graph`                           | the editor rewrites the file on save and eats it                        | your reply to the user                                                                                  |
 | a graph of nothing but `shell` nodes                         | no judgment anywhere, so zopf is buying you nothing over CI or a script | say so, and offer the simpler tool                                                                      |
-| a four-paragraph `description:`                              | only the first paragraph is ever shown in the list                      | one line, and a second only if the shape is surprising                                                  |
+| a multi-paragraph `description:` or a sentence-long `title:` | both are labels, shown by `zopf list`, `validate` and the app           | one short line for the description, a few words for a title                                             |

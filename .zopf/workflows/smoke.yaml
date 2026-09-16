@@ -1,11 +1,5 @@
 name: smoke
-description: |-
-  The engine end to end without spending anything — run it after touching WorkflowEngine.
-
-  Shell, an `on: failure` edge, both arms of a branch, a gate and a connector, with a ${...}
-  crossing between them; the one workflow here with no agent node, so it is also free after a
-  change to ConnectorRunner. The branch pins the `claude` version this was last run against, so the
-  false arm tells you the CLI moved under the run rather than that the engine broke.
+description: Test the engine end to end for free. Run it after touching WorkflowEngine.
 repos:
   - id: self
     path: ..
@@ -27,11 +21,11 @@ nodes:
       sound: Basso
   - id: expected
     type: branch
-    title: Still the version this was last run against?
+    title: Same version as last run?
     expression: ${probe.result} == 2.1.234 (Claude Code)
   - id: confirm
     type: gate
-    title: Version matches — send the notification?
+    title: Send the notification?
     prompt: ${probe.result}
   - id: notify
     type: connector

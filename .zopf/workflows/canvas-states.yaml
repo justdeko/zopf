@@ -1,13 +1,5 @@
 name: canvas-states
-description: |-
-  Drive the canvas through every node status at once, to look at the editor rather than to get
-  anything done.
-
-  It costs nothing and needs no CLI installed: shells that sleep, one that fails into a repair arm,
-  a branch whose false arm is left dead, and a gate and an input that park until you answer. Run it
-  from the editor and watch the graph — a node running, a path taken, an arm skipped and a failure
-  handled all show at the same time. The last node fails on purpose and nothing catches it, so the
-  run settles red.
+description: Show every node status on the canvas at once, without spending anything.
 repos:
   - id: self
     path: ..
@@ -36,7 +28,7 @@ nodes:
     prompt: You answered ${ask.result}.
   - id: untaken
     type: shell
-    title: Skipped — the branch went the other way
+    title: Skipped by the branch
     command: echo "this never runs either"
   - id: flaky
     type: shell
@@ -48,7 +40,7 @@ nodes:
     command: sleep 3; echo "repaired"
   - id: never
     type: shell
-    title: Skipped — its dependency failed
+    title: Skipped by a failed dependency
     command: echo "this never runs"
   - id: slow
     type: shell

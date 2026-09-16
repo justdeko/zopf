@@ -1,10 +1,5 @@
 name: verify
-description: |-
-  Run the suite, and only when it goes red spend a turn on it.
-
-  The edge to "diagnose" is `on: failure`, so the failing run is what triggers it and
-  ${tests.result} is the output that failed — no exit-code file, no branch, and nothing that has to
-  succeed in order to report that it didn't.
+description: Run the tests, and have an agent fix them only if they fail.
 repos:
   - id: self
     path: ..
@@ -13,7 +8,7 @@ defaults:
 nodes:
   - id: tests
     type: shell
-    title: ./gradlew :shared:jvmTest
+    title: Run the tests
     command: ./gradlew --console=plain :shared:jvmTest
   - id: passed
     type: connector

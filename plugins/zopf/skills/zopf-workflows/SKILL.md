@@ -52,10 +52,7 @@ The filename must be the slugified `name:` — `name: review-changes` lives in `
 
 ```yaml
 name: verify
-description: |-
-  One line that stands alone as a summary.
-
-  Then the detail, in as many paragraphs as it takes.
+description: Run the tests, and fix them when they fail.
 repos:
   - id: self
     path: ..
@@ -305,16 +302,19 @@ node has side effects.
 
 **Never put comments in the YAML.** zopf's editor rewrites the whole file from the model on save, and a comment is not
 in the model — so the first time the user opens the workflow in the window and saves, every comment you wrote silently
-disappears. Anything you want to say goes in `description:`
-and in each node's `title:`, both of which survive.
+disappears. Why the graph is shaped the way it is belongs in your reply to the user, not in their file.
 
-**Keep `description:` short.** One line saying what the workflow does, and stop. Only add a second short paragraph when
-the graph's shape would genuinely puzzle the next reader — a branch where a failure edge looks more natural, a node fed
-by reference instead of a tool grant. Two or three sentences is the ceiling; the workflow list shows only the first
-paragraph anyway, and a description that runs to four paragraphs is a design memo nobody asked for. The reasoning that
-doesn't fit belongs in your reply to the user, not in their file.
+**`description:` and `title:` are labels, not documentation.** The description is the workflow's line in `zopf list`
+and the app's workflow list. A title names the node on the canvas, in the run view and in `zopf validate` messages.
+Keep them that size:
 
-`title:` carries the rest: one short line per node saying what that step is.
+- `description:` is one line saying what the workflow does, under about 80 characters. No second paragraph, no design
+  notes, no explanation of why an edge is `on: failure`.
+- `title:` is a short phrase that still says what the step does: `Draft the release notes`, `Clean enough to offer?`,
+  not a sentence and not a bare `Ready?`. A gate's title is its question: `Commit, tag and push the release?`.
+
+Detail the model needs goes in its `prompt:`, and detail a person needs before answering goes in a gate's or input's
+`prompt:`.
 
 ### The canonical form
 
@@ -327,7 +327,8 @@ file the way the editor writes it:
   `allowedTools: [Read, Glob]`.
 - **The only blank lines in the file are inside a block scalar.** A node starts on the line after the last line of the
   one before it; a blank line you put between two nodes to space them out is gone on the first save.
-- **Literal block scalars**: `prompt: |` for prompts, `description: |-` for descriptions. Never folded (`>-`).
+- **`prompt: |` for prompts**, a literal block scalar. Never folded (`>-`), which saving rewrites.
+- **`description:` as a plain one-line scalar**, which is how the editor writes a single line. Not `|-`.
 - **`${node.result}` goes unquoted.** `$` starts nothing in YAML, so the quotes are dropped on save.
 - **One trailing newline**, and only keys whose value differs from the default — no `on: success`, no `required: true`.
 - **No `version:`.** Absent means the current format, which is what you want, and the editor strips it on save.
@@ -340,12 +341,6 @@ file the way the editor writes it:
 
   The tail matters more than the rest: put `allowedTools:` after a twenty-line prompt and the editor moves it back,
   because everything below a block scalar reads as detached from the node it belongs to.
-
-One of these repays a second look. **`|-` keeps your line breaks exactly**, and that is what makes a description
-round-trip untouched: what the file shows is what the string holds. So hard-wrap the detail paragraphs yourself at the
-width the rest of the file uses, keep the summary on **one** line (the workflow list shows the first line, and a wrap
-would cut it in half), and separate paragraphs with a blank line. A folded `>-` looks tidier and is not stable — saving
-rewrites it as `|-`, and the whole paragraph lands on one very long line.
 
 ## More detail
 

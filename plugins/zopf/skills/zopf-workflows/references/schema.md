@@ -23,7 +23,7 @@ nothing until `zopf validate` reports it as a stray key.
 |---------------|----------------|--------------|-----------------------------------------------------------------------------------------------------------------|
 | `version`     | int            | *this one*   | The workflow format the file is written in. **Don't write it** — see below.                                     |
 | `name`        | string         | **required** | Slugified, and must match the filename stem. `zopf run` resolves through the filename.                          |
-| `description` | string         | `""`         | Summary line, blank line, detail. First paragraph is what the workflow list shows.                              |
+| `description` | string         | `""`         | One short line. Shown by `zopf list` and the app.                                                               |
 | `repos`       | list of repo   | `[]`         | Every directory a node may run in.                                                                              |
 | `skills`      | list of string | `[]`         | Paths to skill directories outside the normal search, declared once here and then referenced by name on a node. |
 | `defaults`    | object         | `{}`         | Fallbacks for every node.                                                                                       |
@@ -69,7 +69,7 @@ node → workflow `defaults` → workspace `defaults` → the app's Settings.
 |------------------|-------------------|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | `id`             | string            | all                           | **Required.** Unique. Must match `[A-Za-z0-9_-]+` to be referenceable as `${id.field}`.                                             |
 | `type`           | enum              | all                           | **Required.** `agent` \| `shell` \| `connector` \| `gate` \| `branch` \| `input`.                                                   |
-| `title`          | string            | all                           | Display name. Falls back to `id`. **Not interpolated.**                                                                             |
+| `title`          | string            | all                           | Display name, a few words. Falls back to `id`. **Not interpolated.**                                                                |
 | `provider`       | enum              | `agent`                       | `claude` \| `codex` \| `dsh`. Which agent CLI runs the node. Absent means `defaults.provider`, then the app's default, then claude. |
 | `repo`           | string            | `agent`, `shell`              | Repo id to run in. Must be declared.                                                                                                |
 | `timeoutSeconds` | int               | `agent`, `shell`, `connector` | Overrides `defaults`.                                                                                                               |

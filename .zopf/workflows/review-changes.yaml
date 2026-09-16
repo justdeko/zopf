@@ -1,12 +1,5 @@
 name: review-changes
-description: |-
-  Read the diff and run the suite at once, then join both into one verdict.
-
-  A diamond. The reviewing node gets the diff through ${changes.result} rather than a Bash grant, so
-  it is read-only by construction and never stops for a permission. The suite's command ends in
-  `echo "exit=$?"` so that the node succeeds either way and the verdict is written whether the tests
-  were green or red — an `on: failure` edge would give you one or the other, and this is the graph
-  that wants both.
+description: Review the working tree and run the tests, then give one ship or hold verdict.
 repos:
   - id: self
     path: ..
@@ -46,7 +39,7 @@ nodes:
       answer — a review that manufactures findings costs more than one that doesn't.
   - id: tests
     type: shell
-    title: ./gradlew :shared:jvmTest
+    title: Run the tests
     command: ./gradlew --console=plain :shared:jvmTest; echo "exit=$?"
   - id: verdict
     type: agent

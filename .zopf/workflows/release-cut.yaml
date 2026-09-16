@@ -1,12 +1,5 @@
 name: release-cut
-description: |-
-  Draft the notes, run the checks and cut the tag, with a person between the verdict and the push.
-
-  The notes, the impact read and the suite run at once and join on one verdict. The suite writes its
-  own exit code and always succeeds, because a fan-in runs as soon as one edge arrives — a failing
-  arm would not stop it, it would leave it reading ${checks.result} verbatim. The branch before the
-  notes are offered is what keeps an unattended run from parking on a question nobody is there to
-  answer.
+description: Draft notes, run checks, and push the release tag once you approve.
 repos:
   - id: self
     path: ..
@@ -25,7 +18,7 @@ nodes:
       How big is the release?
   - id: history
     type: shell
-    title: What has landed since the last tag
+    title: What landed since the last tag
     command: |
       last=$(git describe --tags --abbrev=0 2>/dev/null || true)
       echo "Previous tag: ${last:-none}"
@@ -95,7 +88,7 @@ nodes:
       note about what you left out or how you drafted it.
   - id: impact
     type: agent
-    title: Is this the right size of release?
+    title: Is the bump the right size?
     model: haiku
     allowedTools:
       - Read
@@ -193,7 +186,7 @@ nodes:
       a new line.
   - id: final
     type: shell
-    title: The notes as they will be published
+    title: Notes as they will be published
     command: |
       set -eu
       answer=$(mktemp)
@@ -211,7 +204,7 @@ nodes:
       rm -f "$answer" "$drafted"
   - id: approve
     type: gate
-    title: Commit the bump, push the tag and let the release build?
+    title: Commit, tag and push the release?
     prompt: |
       v${version.result} — ${reconcile.because}
 
@@ -222,7 +215,7 @@ nodes:
       ${final.result}
   - id: prepare
     type: shell
-    title: Bump the version and write the changelog entry
+    title: Bump the version and changelog
     command: |
       set -eu
       [ -z "$(git status --porcelain)" ] ||

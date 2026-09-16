@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.nio.file.Files
@@ -370,7 +371,7 @@ class WorkflowEngineTest {
             val run = engine.start(workspace(), workflow).getOrThrow()
 
             val gate = assertNotNull(run.node("approve"))
-            awaitStatus(gate, RunStatus.WAITING)
+            awaitEntry<ConsoleEntry.Prompt>(gate)
 
             val shown = gate.entries.filterIsInstance<ConsoleEntry.Prompt>().single()
             assertEquals("Apply these?\nreview-output", shown.text)
@@ -390,7 +391,7 @@ class WorkflowEngineTest {
             val run = engine.start(workspace(), workflow).getOrThrow()
 
             val gate = assertNotNull(run.node("approve"))
-            awaitStatus(gate, RunStatus.WAITING)
+            awaitEntry<ConsoleEntry.Notice>(gate)
             assertTrue(gate.entries.filterIsInstance<ConsoleEntry.Prompt>().isEmpty())
             assertEquals(
                 "Waiting for you",
@@ -793,7 +794,13 @@ class WorkflowEngineTest {
         status: RunStatus,
     ) {
         withTimeout(5.seconds) {
-            while (node.status != status) delay(5.milliseconds)
+            node.state.first { it.status == status }
+        }
+    }
+
+    private suspend inline fun <reified T : ConsoleEntry> awaitEntry(node: NodeRun) {
+        withTimeout(5.seconds) {
+            node.transcript.first { node.entries.any { it is T } }
         }
     }
 

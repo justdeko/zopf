@@ -208,11 +208,14 @@ def check_common(wf, raw, repo, stem, out):
                       not d, f"dangling: {d}" if d else "all resolve"))
 
     desc = (wf.get("description") or "").strip()
-    paras = [p for p in desc.split("\n") if p.strip()]
-    short = len(paras) <= 2 and len(desc) <= 400
+    short = "\n" not in desc and len(desc) <= 100
     out.append(result(
-        "The description is short — at most two paragraphs and under 400 characters",
-        short, f"{len(paras)} paragraph(s), {len(desc)} chars"))
+        "The description is one line under 100 characters",
+        short, f"{desc.count(chr(10)) + 1} line(s), {len(desc)} chars"))
+    long_titles = [n.get("id") for n in wf.get("nodes") or [] if len(n.get("title") or "") > 40]
+    out.append(result(
+        "Every node title is under 40 characters",
+        not long_titles, f"too long: {long_titles}" if long_titles else "all short"))
 
     leaky = leaky_shell_nodes(wf, repo)
     out.append(result(
