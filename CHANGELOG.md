@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0
+
+- generate workflows from a prompt
+- app and cli can now update themselves
+- resume a run from where it stopped
+- terminal notification and gate approval fixes
+
 ## 1.3.1
 
 - fix background notification issues
