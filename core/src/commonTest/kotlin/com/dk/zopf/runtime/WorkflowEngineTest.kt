@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -36,6 +37,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -504,12 +506,11 @@ class WorkflowEngineTest {
             val (engine, run, waiting) = watchingWaits(input(question = "Which branch?"))
 
             val ask = assertNotNull(run.node("ask"))
-            awaitStatus(ask, RunStatus.WAITING)
-            assertEquals(listOf("ask"), waiting)
+            assertEquals("ask", withTimeout(5.seconds) { waiting.receive() })
 
             engine.resolveInput(ask, "main")
             run.job?.join()
-            assertEquals(listOf("ask"), waiting)
+            assertNull(waiting.tryReceive().getOrNull())
         }
 
     @Test
@@ -518,12 +519,11 @@ class WorkflowEngineTest {
             val (engine, run, waiting) = watchingWaits(gate())
 
             val approve = assertNotNull(run.node("approve"))
-            awaitStatus(approve, RunStatus.WAITING)
-            assertEquals(listOf("approve"), waiting)
+            assertEquals("approve", withTimeout(5.seconds) { waiting.receive() })
 
             engine.resolveGate(approve, approved = true)
             run.job?.join()
-            assertEquals(listOf("approve"), waiting)
+            assertNull(waiting.tryReceive().getOrNull())
         }
 
     @Test
@@ -773,8 +773,8 @@ class WorkflowEngineTest {
             run
         }
 
-    private fun watchingWaits(node: WorkflowNode): Triple<WorkflowEngine, WorkflowRun, List<String>> {
-        val waiting = Collections.synchronizedList(mutableListOf<String>())
+    private fun watchingWaits(node: WorkflowNode): Triple<WorkflowEngine, WorkflowRun, Channel<String>> {
+        val waiting = Channel<String>(Channel.UNLIMITED)
         val scope = CoroutineScope(Job() + Dispatchers.Default).also { scopes.add(it) }
         val engine =
             WorkflowEngine(
@@ -782,7 +782,7 @@ class WorkflowEngineTest {
                 executor = FakeExecutor(),
                 archiveRoot = tempDir(),
                 settings = LiveSettings(AppSettings()),
-                onWaiting = { waiting.add(it.nodeId) },
+                onWaiting = { waiting.trySend(it.nodeId) },
             )
         val run = engine.start(workspace(), workflow(nodes = listOf(node), edges = emptyList())).getOrThrow()
         return Triple(engine, run, waiting)
