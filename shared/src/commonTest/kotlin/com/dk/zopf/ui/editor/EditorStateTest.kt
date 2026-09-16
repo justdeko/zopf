@@ -126,12 +126,12 @@ class EditorStateTest {
         val state = calling({ installed })
 
         assertNull(state.connector("slack-post"))
-        assertTrue(state.issuesFor("post").any { "isn't a connector" in it.message })
+        assertTrue(state.issuesFor("post").any { "no connector with that name" in it.message })
 
         installed = listOf(connector("slack-post"))
 
         assertEquals("slack-post", state.connector("slack-post")?.name)
-        assertTrue(state.issuesFor("post").none { "isn't a connector" in it.message })
+        assertTrue(state.issuesFor("post").none { "no connector with that name" in it.message })
 
         assertNull(state.connector(""))
     }

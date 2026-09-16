@@ -77,7 +77,7 @@ fun WorkflowOverview(
 
         if (workflow.repos.isNotEmpty()) {
             Gap()
-            SectionLabel(Strings.EditorOverview.REPOS)
+            SectionLabel(Strings.Labels.REPOS)
             Gap(6)
             workflow.repos.forEach { Repo(it) }
         }
@@ -203,7 +203,7 @@ private fun NodeChip(
         Icon(node.type.icon, contentDescription = null, Modifier.size(11.dp), tint = tint)
         Spacer(Modifier.width(4.dp))
         Text(
-            Strings.EditorOverview.OPEN,
+            Strings.Actions.OPEN,
             style = MaterialTheme.typography.labelSmall,
             color = tint,
             maxLines = 1,

@@ -141,26 +141,12 @@ class RunRegistry(
         run: WorkflowRun,
         nodeId: String,
     ): Result<WorkflowRun> {
-        if (run.isActive) {
-            return Result.failure(IllegalStateException(Strings.RunErrors.stillRunning(run.workflowName)))
-        }
-        if (run.isInteractive) {
-            return Result.failure(
-                IllegalStateException(Strings.RunErrors.NOT_A_GRAPH),
-            )
-        }
+        if (run.isActive || run.isInteractive) return Result.failure(IllegalStateException("retry of ${run.id}, active or single-node"))
         val workspace = run.workspace ?: run.workspaceRoot?.let(Workspace::open)
         val workflow =
             run.workflow
                 ?: workspace?.let { WorkflowStore(it).load(run.workflowName) }
-                ?: return Result.failure(
-                    IllegalStateException(
-                        Strings.RunErrors.workflowGone(
-                            run.workflowName,
-                            "${run.workspaceRoot ?: Strings.RunErrors.THE_WORKSPACE_IT_RAN_IN}",
-                        ),
-                    ),
-                )
+                ?: return Result.failure(IllegalStateException(Strings.RunErrors.workflowGone(run.workflowName)))
         if (workflow.node(nodeId) == null) {
             return Result.failure(IllegalStateException(Strings.RunErrors.nodeGone(nodeId, workflow.name)))
         }
@@ -264,7 +250,7 @@ class RunRegistry(
             notification =
                 RunNotification(
                     runId = runIdOf(node),
-                    title = Strings.Notifications.needsAnAnswer(node.nodeTitle),
+                    title = "${node.nodeTitle} · ${Strings.Tray.NEEDS_AN_ANSWER}",
                     body = question.question,
                     isFailure = false,
                     key = "node-${node.id}",
@@ -290,7 +276,7 @@ class RunRegistry(
             notification =
                 RunNotification(
                     runId = runIdOf(node),
-                    title = Strings.Notifications.needsApproval(node.nodeTitle),
+                    title = "${node.nodeTitle} · ${Strings.Tray.NEEDS_APPROVAL}",
                     body = asking ?: Strings.Notifications.GATE_FALLBACK_BODY,
                     isFailure = false,
                     key = "node-${node.id}",
@@ -299,8 +285,8 @@ class RunRegistry(
                     thread = runIdOf(node),
                     actions =
                         listOf(
-                            NotificationAction("approve", Strings.Notifications.APPROVE),
-                            NotificationAction("reject", Strings.Notifications.REJECT),
+                            NotificationAction("approve", Strings.Actions.APPROVE),
+                            NotificationAction("reject", Strings.Actions.REJECT),
                         ),
                 ),
         ) { answer ->
@@ -321,7 +307,7 @@ class RunRegistry(
             notification =
                 RunNotification(
                     runId = runIdOf(node),
-                    title = Strings.Notifications.needsYou(node.nodeTitle),
+                    title = "${node.nodeTitle} · ${Strings.Tray.NEEDS_YOU}",
                     body = Strings.Notifications.permissionBody(request.toolName, request.summary),
                     isFailure = false,
                     key = "node-${node.id}",
@@ -330,9 +316,9 @@ class RunRegistry(
                     thread = runIdOf(node),
                     actions =
                         listOf(
-                            NotificationAction("allow", Strings.Notifications.ALLOW),
-                            NotificationAction("allow-run", Strings.Notifications.ALLOW_FOR_THIS_RUN),
-                            NotificationAction("deny", Strings.Notifications.DENY),
+                            NotificationAction("allow", Strings.Actions.ALLOW),
+                            NotificationAction("allow-run", Strings.Actions.ALLOW_FOR_THIS_RUN),
+                            NotificationAction("deny", Strings.Actions.DENY),
                         ),
                 ),
             timeoutSeconds = APPROVAL_DEADLINE_SECONDS,
@@ -353,7 +339,7 @@ class RunRegistry(
         val live = node.live ?: return
         node.echoFollowUp(text)
         node.update { copy(status = RunStatus.RUNNING) }
-        live.send(text).onFailure { node.notice(Strings.Transcript.couldntSend(it.message), isWarning = true) }
+        live.send(text).onFailure { node.notice("Couldn't send that: ${it.message}", isWarning = true) }
     }
 
     fun finishInput(node: NodeRun) {
@@ -362,20 +348,12 @@ class RunRegistry(
     }
 
     fun takeOver(node: NodeRun): Result<Unit> {
-        val provider =
-            node.agent
-                ?: return Result.failure(IllegalStateException(Strings.RunErrors.NO_SESSION_TO_TAKE_OVER))
-        if (!provider.capabilities.resumeInTerminal) {
-            return Result.failure(
-                IllegalStateException(Strings.RunErrors.cannotResumeHeadless(provider.id.label)),
-            )
+        val provider = node.agent
+        val sessionId = node.sessionId
+        val cwd = node.cwd
+        if (provider == null || sessionId == null || cwd == null || !provider.capabilities.resumeInTerminal) {
+            return Result.failure(IllegalStateException("take over of ${node.id}, which has no session to resume"))
         }
-        val sessionId =
-            node.sessionId
-                ?: return Result.failure(IllegalStateException(Strings.RunErrors.NO_SESSION_ID_YET))
-        val cwd =
-            node.cwd
-                ?: return Result.failure(IllegalStateException(Strings.RunErrors.NO_DIRECTORY_TO_RESUME))
 
         val terminal = terminalApp
         val live = node.live
@@ -390,7 +368,7 @@ class RunRegistry(
                 val resume = (listOf(provider.executable) + provider.terminalArgs(sessionId)).joinToString(" ")
                 node.notice(Strings.Transcript.takenOver(terminal, resume))
                 if (live == null) node.update { copy(status = RunStatus.DETACHED) }
-            }.onFailure { node.notice(Strings.Transcript.couldntOpen(terminal, it.message), isWarning = true) }
+            }.onFailure { node.notice(Strings.RunErrors.couldntOpenTerminal(terminal, it.message), isWarning = true) }
     }
 
     fun select(run: WorkflowRun?) {
@@ -463,12 +441,8 @@ class RunRegistry(
     }
 
     fun forget(run: WorkflowRun): Result<Unit> {
-        if (run.isElsewhere) {
-            return Result.failure(IllegalStateException(Strings.RunErrors.stillRunningElsewhere(run.workflowName)))
-        }
-        val dir =
-            run.archiveDir
-                ?: return Result.failure(IllegalStateException(Strings.RunErrors.NOT_ON_DISK_YET))
+        val dir = run.archiveDir
+        if (run.isElsewhere || dir == null) return Result.failure(IllegalStateException("delete of ${run.id}, elsewhere or not archived"))
         return runCatching {
             RunArchive.delete(dir)
             remove(run)

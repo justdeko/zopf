@@ -84,9 +84,9 @@ download() {
         expected=$(cut -d' ' -f1 <"$TMP/$asset.sha256")
         actual=$(shasum -a 256 "$TMP/$asset" | cut -d' ' -f1)
         [ "$expected" = "$actual" ] ||
-            err "checksum mismatch: expected $expected, got $actual. Nothing was installed."
+            err "the download was damaged, so nothing was installed. Try again."
     else
-        note "note: $VERSION publishes no .sha256, so the download wasn't verified."
+        note "note: $VERSION has no checksum, so the download wasn't checked."
     fi
 }
 
@@ -95,7 +95,7 @@ unpack() {
     mkdir -p "$PREFIX/opt" "$PREFIX/bin"
     rm -rf "$dest"
     tar xzf "$TMP/$asset" -C "$PREFIX/opt"
-    [ -x "$dest/bin/zopf" ] || err "the tarball holds no bin/zopf where one was expected."
+    [ -x "$dest/bin/zopf" ] || err "this release is broken. Please report it on GitHub."
     ln -sf "$dest/bin/zopf" "$PREFIX/bin/zopf"
 }
 

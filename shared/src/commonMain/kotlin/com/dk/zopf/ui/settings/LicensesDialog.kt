@@ -60,7 +60,7 @@ fun LicensesDialog(onDismiss: () -> Unit) {
                     }
                 }
                 TextButton(onDismiss, Modifier.align(Alignment.End).padding(top = 8.dp)) {
-                    Text(Strings.Settings.LICENSES_DONE)
+                    Text(Strings.Actions.DONE)
                 }
             }
         }

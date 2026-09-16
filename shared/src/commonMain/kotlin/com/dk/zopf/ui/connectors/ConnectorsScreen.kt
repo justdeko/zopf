@@ -98,8 +98,8 @@ fun ConnectorsScreen(
                         items = {
                             listOf(
                                 ContextMenuItem(Strings.Connectors.changeIn(agent)) { onChange(connector) },
-                                ContextMenuItem(Strings.Connectors.SHOW_IN_FINDER) { onReveal(connector.dir) },
-                                ContextMenuItem(Strings.Connectors.DELETE_MENU) { deleting = connector.name to connector.dir },
+                                ContextMenuItem(Strings.Actions.SHOW_IN_FINDER) { onReveal(connector.dir) },
+                                ContextMenuItem(Strings.Actions.DELETE_MENU) { deleting = connector.name to connector.dir },
                             )
                         },
                     ) {
@@ -116,7 +116,7 @@ fun ConnectorsScreen(
                     item {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            Strings.Connectors.UNREADABLE,
+                            Strings.Labels.UNREADABLE,
                             style = MaterialTheme.typography.labelLargeEmphasized,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -126,8 +126,8 @@ fun ConnectorsScreen(
                             items = {
                                 listOf(
                                     ContextMenuItem(Strings.Connectors.fixIn(agent)) { onFixBroken(broken) },
-                                    ContextMenuItem(Strings.Connectors.SHOW_IN_FINDER) { onReveal(broken.dir) },
-                                    ContextMenuItem(Strings.Connectors.DELETE_MENU) { deleting = broken.name to broken.dir },
+                                    ContextMenuItem(Strings.Actions.SHOW_IN_FINDER) { onReveal(broken.dir) },
+                                    ContextMenuItem(Strings.Actions.DELETE_MENU) { deleting = broken.name to broken.dir },
                                 )
                             },
                         ) {
@@ -174,15 +174,15 @@ fun ConnectorsScreen(
     deleting?.let { (name, dir) ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text(Strings.Connectors.deleteTitle(name)) },
+            title = { Text(Strings.Actions.deleteTitle(name)) },
             text = { Text(Strings.Connectors.deleteBody(dir)) },
             confirmButton = {
                 TextButton(onClick = {
                     deleting = null
                     onDelete(dir)
-                }) { Text(Strings.Connectors.DELETE) }
+                }) { Text(Strings.Actions.DELETE) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text(Strings.Connectors.CANCEL) } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(Strings.Actions.CANCEL) } },
         )
     }
 }
@@ -239,10 +239,10 @@ private fun ConnectorCard(
                     Text(Strings.Connectors.changeIn(agent))
                 }
                 IconButton(onClick = onReveal) {
-                    Icon(ZopfIcons.Folder, contentDescription = Strings.Connectors.SHOW_IN_FINDER, Modifier.size(18.dp))
+                    Icon(ZopfIcons.Folder, contentDescription = Strings.Actions.SHOW_IN_FINDER, Modifier.size(18.dp))
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(ZopfIcons.Delete, contentDescription = Strings.Connectors.DELETE, Modifier.size(18.dp))
+                    Icon(ZopfIcons.Delete, contentDescription = Strings.Actions.DELETE, Modifier.size(18.dp))
                 }
             }
 
@@ -251,7 +251,7 @@ private fun ConnectorCard(
                 HorizontalDivider(color = scheme.outlineVariant)
                 Spacer(Modifier.height(12.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    DetailRow(Strings.Connectors.INPUTS, manifest.inputs.isNotEmpty()) {
+                    DetailRow(Strings.Labels.INPUTS, manifest.inputs.isNotEmpty()) {
                         manifest.inputs.forEach { input ->
                             Tag(
                                 input.name + if (input.required) Strings.Connectors.REQUIRED_MARKER else "",
@@ -260,7 +260,7 @@ private fun ConnectorCard(
                             )
                         }
                     }
-                    DetailRow(Strings.Connectors.OUTPUTS, manifest.outputs.isNotEmpty()) {
+                    DetailRow(Strings.Labels.OUTPUTS, manifest.outputs.isNotEmpty()) {
                         manifest.outputs.forEach { Tag(it.name, monospace = true) }
                     }
 
@@ -286,7 +286,7 @@ private fun ConnectorCard(
                         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                             fromKeychain.forEach { secret ->
                                 Text(
-                                    Strings.Connectors.secretRow(secret.name, secret.sourceLabel),
+                                    "${secret.name} · ${secret.sourceLabel}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = scheme.onSurfaceVariant,
                                 )
@@ -411,13 +411,13 @@ private fun BrokenCard(
             IconButton(onClick = onReveal) {
                 Icon(
                     ZopfIcons.Folder,
-                    contentDescription = Strings.Connectors.SHOW_IN_FINDER,
+                    contentDescription = Strings.Actions.SHOW_IN_FINDER,
                     Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
             IconButton(onClick = onDelete) {
-                Icon(ZopfIcons.Delete, contentDescription = Strings.Connectors.DELETE, Modifier.size(18.dp))
+                Icon(ZopfIcons.Delete, contentDescription = Strings.Actions.DELETE, Modifier.size(18.dp))
             }
         }
     }
@@ -441,7 +441,7 @@ private fun NewConnectorDialog(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
-                    label = { Text(Strings.Connectors.NAME_LABEL) },
+                    label = { Text(Strings.Labels.NAME) },
                     supportingText = { Text(Strings.Connectors.NAME_HINT) },
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -466,9 +466,9 @@ private fun NewConnectorDialog(
             TextButton(
                 onClick = { onConfirm(name, shared) },
                 enabled = name.isNotBlank(),
-            ) { Text(Strings.Connectors.CREATE) }
+            ) { Text(Strings.Actions.CREATE) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Connectors.CANCEL) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Actions.CANCEL) } },
     )
 }
 

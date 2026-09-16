@@ -37,7 +37,7 @@ class SkillPlan(
                 selected.filterNot { it.ambient }.takeIf { it.isNotEmpty() }?.let { passed ->
                     add(
                         SkillNotice(
-                            Strings.Transcript.skillsPassed(passed.joinToString { "${it.name} (${it.source})" }),
+                            "Skills: ${passed.joinToString { "${it.name} (${it.source})" }}, one --plugin-dir each",
                             isWarning = false,
                         ),
                     )
@@ -45,7 +45,7 @@ class SkillPlan(
                 selected.filter { it.ambient }.takeIf { it.isNotEmpty() }?.let { ambient ->
                     add(
                         SkillNotice(
-                            Strings.Transcript.skillsAmbient(ambient.joinToString { it.name }),
+                            "Already loaded, so not passed again: ${ambient.joinToString { it.name }}",
                             isWarning = false,
                         ),
                     )
@@ -63,7 +63,7 @@ class SkillPlan(
                 forced.firstOrNull()?.let {
                     add(
                         SkillNotice(
-                            Strings.Transcript.skillForcedCommand(it.name),
+                            "${it.name} sets disable-model-invocation, so it runs as /${it.name} with the prompt as arguments",
                             isWarning = false,
                         ),
                     )

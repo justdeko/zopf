@@ -24,7 +24,7 @@ fun Workflow.validate(
     val declaredRepos = repos.mapTo(mutableSetOf()) { it.id }
 
     if (isFromTheFuture) {
-        issues += WorkflowIssue(Strings.Validation.fromTheFuture(version, WORKFLOW_VERSION))
+        issues += WorkflowIssue(Strings.Validation.FROM_THE_FUTURE)
     }
 
     issues += graphIssues()
@@ -151,14 +151,14 @@ private fun Workflow.graphIssues(): List<WorkflowIssue> {
     edges
         .flatMap { edge ->
             listOfNotNull(
-                edge.from.takeIf { it !in known }?.let { it to edge.to },
-                edge.to.takeIf { it !in known }?.let { it to edge.from },
+                edge.from.takeIf { it !in known },
+                edge.to.takeIf { it !in known },
             )
         }.distinct()
-        .forEach { (missing, other) ->
+        .forEach { missing ->
             issues +=
                 WorkflowIssue(
-                    Strings.Validation.edgeToMissingNode(missing, name, other),
+                    Strings.Validation.edgeToMissingNode(missing),
                 )
         }
 
@@ -244,7 +244,7 @@ private fun WorkflowNode.schemaIssues(): List<WorkflowIssue> {
     schema.map { it.name }.filter { it in builtIn }.forEach {
         issues +=
             WorkflowIssue(
-                Strings.Validation.outputFieldShadowsBuiltIn(displayTitle, it, id),
+                Strings.Validation.outputFieldShadowsBuiltIn(displayTitle, it),
                 id,
             )
     }
@@ -252,7 +252,7 @@ private fun WorkflowNode.schemaIssues(): List<WorkflowIssue> {
     schema.filter { it.name.isNotBlank() && !NodeRefs.isFieldName(it.name) }.forEach {
         issues +=
             WorkflowIssue(
-                Strings.Validation.outputFieldUnreferenceable(displayTitle, it.name, id),
+                Strings.Validation.outputFieldUnreferenceable(displayTitle, it.name),
                 id,
                 WorkflowIssue.Severity.WARNING,
             )

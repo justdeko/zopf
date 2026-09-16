@@ -78,13 +78,13 @@ fun RunsScreen(
                             items = {
                                 val handover = run.nodes.firstOrNull { it.canTakeOver && it.status.isActive }
                                 buildList {
-                                    add(ContextMenuItem(Strings.Runs.SHOW) { registry.select(run) })
+                                    add(ContextMenuItem(Strings.Actions.SHOW) { registry.select(run) })
                                     if (run.isElsewhere) return@buildList
                                     if (run.isActive) {
-                                        add(ContextMenuItem(Strings.Runs.STOP) { registry.stop(run) })
+                                        add(ContextMenuItem(Strings.Actions.STOP) { registry.stop(run) })
                                         handover?.let { node ->
                                             add(
-                                                ContextMenuItem(Strings.Runs.takeOverIn(registry.terminalApp)) {
+                                                ContextMenuItem(Strings.Actions.takeOverIn(registry.terminalApp)) {
                                                     registry.takeOver(node)
                                                 },
                                             )
@@ -130,13 +130,13 @@ fun RunsScreen(
                             ContextMenuArea(
                                 items = {
                                     buildList {
-                                        add(ContextMenuItem(Strings.Runs.SHOW) { registry.select(run, node) })
+                                        add(ContextMenuItem(Strings.Actions.SHOW) { registry.select(run, node) })
                                         retry?.let {
                                             add(ContextMenuItem(Strings.Runs.RETRY_FROM_NODE, it))
                                         }
                                         if (node.canTakeOver && node.status.isActive && !run.isElsewhere) {
                                             add(
-                                                ContextMenuItem(Strings.Runs.takeOverIn(registry.terminalApp)) {
+                                                ContextMenuItem(Strings.Actions.takeOverIn(registry.terminalApp)) {
                                                     registry.takeOver(node)
                                                 },
                                             )
@@ -228,7 +228,7 @@ private fun RunRow(
                 )
             }
             Text(
-                Strings.Runs.rowSummary(state.summary(), format(state.elapsed(run.startedAt, now))),
+                "${state.summary()} · ${format(state.elapsed(run.startedAt, now))}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

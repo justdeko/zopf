@@ -22,12 +22,12 @@ fun zopf(
     try {
         dispatch(args, out, err)
     } catch (usage: UsageError) {
-        err.println(Strings.Cli.failed("${usage.message}"))
+        err.println("zopf: ${usage.message}")
         EXIT_USAGE
     } catch (failure: Throwable) {
         Log.error("zopf ${args.joinToString(" ")}", failure)
-        err.println(Strings.Cli.failed("${failure.message ?: failure}"))
-        err.println(Strings.Cli.moreIn(Log.file))
+        err.println("zopf: ${failure.message ?: failure}")
+        err.println("More in ${Log.file}")
         EXIT_FAILED
     }
 

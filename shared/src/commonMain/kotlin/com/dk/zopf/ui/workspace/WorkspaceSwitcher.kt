@@ -99,7 +99,7 @@ fun WorkspaceSwitcher(
                             {
                                 Icon(
                                     ZopfIcons.Warning,
-                                    contentDescription = Strings.Workspaces.UNAVAILABLE_SHORT,
+                                    contentDescription = Strings.Workspaces.UNAVAILABLE,
                                     tint = MaterialTheme.colorScheme.error,
                                 )
                             }

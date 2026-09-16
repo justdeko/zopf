@@ -347,14 +347,14 @@ class AppState(
     ) {
         val workspace = activeWorkspace?.workspace
         if (workspace == null) {
-            message = Strings.Workspaces.OPEN_BEFORE_DRAFTING
+            message = Strings.Workspaces.OPEN_FIRST
             return
         }
         val slug = slugify(name)
         when {
             slug.isBlank() -> message = Strings.Workflows.NAME_FIRST
             description.isBlank() -> message = Strings.Workflows.DESCRIPTION_FIRST
-            WorkflowStore(workspace).fileFor(slug).exists() -> message = Strings.Workflows.nameTaken(slug)
+            WorkflowStore(workspace).fileFor(slug).exists() -> message = Strings.RunErrors.workflowExists(slug)
             drafting != null -> message = Strings.Workflows.alreadyDrafting("$drafting")
             else -> {
                 drafting = slug
@@ -500,7 +500,7 @@ class AppState(
     ) {
         val workspace = activeWorkspace?.workspace
         if (workspace == null) {
-            message = Strings.Workspaces.OPEN_BEFORE_CONNECTOR
+            message = Strings.Workspaces.OPEN_FIRST
             return
         }
         ConnectorStore(workspace)
@@ -539,7 +539,7 @@ class AppState(
                 .openIn(agent, dir, terminal, prompt)
                 .onSuccess {
                     message = Strings.Connectors.openedIn(name, terminal)
-                }.onFailure { message = Strings.Connectors.couldntOpen(terminal, it.message) }
+                }.onFailure { message = Strings.RunErrors.couldntOpenTerminal(terminal, it.message) }
         }
     }
 
@@ -559,7 +559,7 @@ class AppState(
 
     fun updateSettings(change: (AppSettings) -> AppSettings) {
         settings.update(change).onFailure {
-            message = Strings.Workspaces.couldntSaveSettings(it.message)
+            message = "Couldn't save settings: ${it.message}"
         }
     }
 
@@ -599,7 +599,7 @@ internal fun prunedRunsMessage(
     if (gone <= keep) {
         null
     } else {
-        Strings.Cli.prunedRuns(gone, keep)
+        Strings.Settings.prunedRuns(gone, keep)
     }
 
 internal fun RunRegistry.runForEditor(workflowName: String): WorkflowRun? = selectedRun?.takeIf { it.workflowName == workflowName }

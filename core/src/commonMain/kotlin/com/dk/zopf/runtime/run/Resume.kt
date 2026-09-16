@@ -52,7 +52,7 @@ object Resume {
 
         val record =
             archive.read()
-                ?: return Result.failure(IllegalStateException(Strings.RunErrors.archiveEmpty(archive.dir)))
+                ?: return Result.failure(IllegalStateException("${archive.dir} has no run.json"))
         val run = WorkflowRun.restored(record, record.restoreAs()).also { it.archiveDir = archive.dir }
         if (run.isElsewhere) {
             return Result.failure(

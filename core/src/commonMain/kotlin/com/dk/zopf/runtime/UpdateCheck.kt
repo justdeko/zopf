@@ -5,7 +5,6 @@ import com.dk.zopf.store.BuildInfo
 import com.dk.zopf.store.Log
 import com.dk.zopf.store.writeTextAtomically
 import com.dk.zopf.store.zopfJson
-import com.dk.zopf.util.Strings
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.HttpURLConnection
@@ -150,7 +149,7 @@ class GitHubReleases(
                     readTimeout = REACH_TIMEOUT_MILLIS
                 }
             try {
-                check(connection.responseCode == HttpURLConnection.HTTP_OK) { Strings.Updates.githubAnswered(connection.responseCode) }
+                check(connection.responseCode == HttpURLConnection.HTTP_OK) { "GitHub answered ${connection.responseCode}" }
                 connection.inputStream.bufferedReader().use { it.readText() }
             } finally {
                 connection.disconnect()
@@ -160,7 +159,7 @@ class GitHubReleases(
     internal fun parse(payload: String): Result<Release> =
         runCatching {
             val release = zopfJson.decodeFromString(GitHubRelease.serializer(), payload)
-            val version = Version.parse(release.tagName) ?: error(Strings.Updates.notAVersion(release.tagName))
+            val version = Version.parse(release.tagName) ?: error("release tag ${release.tagName} isn't a version")
             Release(
                 version = version,
                 url = release.htmlUrl.takeIf { it.startsWith("https://") } ?: releasesPage,

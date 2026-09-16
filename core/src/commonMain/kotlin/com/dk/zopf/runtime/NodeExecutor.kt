@@ -166,7 +166,7 @@ class ProcessNodeExecutor(
                         session
                             .events { line -> execution.archive.appendRaw(node.id, line) }
                             .collect { event -> run.consume(event) }
-                    }.onFailure { run.notice(Strings.Transcript.streamEnded(it.message), isWarning = true) }
+                    }.onFailure { run.notice("Stream ended: ${it.message}", isWarning = true) }
                 },
                 awaitExit = session::awaitExit,
             )
@@ -190,7 +190,7 @@ class ProcessNodeExecutor(
         val session = shell.start(ShellInvocation(command, cwd))
         run.live = ShellLive(session)
         run.update { launched(sessionId = null, command = listOf(command)) }
-        run.notice(Strings.Transcript.shellCommand(command))
+        run.notice("$ $command")
 
         val exit =
             within(
@@ -204,7 +204,7 @@ class ProcessNodeExecutor(
                             execution.archive.appendRaw(node.id, line.text)
                             run.consume(line)
                         }
-                    }.onFailure { run.notice(Strings.Transcript.outputEnded(it.message), isWarning = true) }
+                    }.onFailure { run.notice("Output ended: ${it.message}", isWarning = true) }
                 },
                 awaitExit = session::awaitExit,
             )
@@ -264,7 +264,7 @@ class ProcessNodeExecutor(
         val session = connector.start(invocation)
         run.live = ConnectorLive(session)
         run.update { launched(sessionId = null, command = session.command) }
-        run.notice(Strings.Transcript.connectorSent(manifest.name, invocation.stdinJson()))
+        run.notice("${manifest.name} ← ${invocation.stdinJson()}")
 
         val exit =
             within(
@@ -278,7 +278,7 @@ class ProcessNodeExecutor(
                             execution.archive.appendRaw(node.id, line.text)
                             run.consume(line)
                         }
-                    }.onFailure { run.notice(Strings.Transcript.outputEnded(it.message), isWarning = true) }
+                    }.onFailure { run.notice("Output ended: ${it.message}", isWarning = true) }
                 },
                 awaitExit = session::awaitExit,
             )
@@ -286,7 +286,7 @@ class ProcessNodeExecutor(
 
         if (!output.sawJson) {
             run.notice(
-                Strings.Transcript.connectorPlainOutput(manifest.name),
+                "${manifest.name} printed no JSON object, so its plain output is the result",
                 isWarning = true,
             )
         }
@@ -301,7 +301,7 @@ class ProcessNodeExecutor(
             .takeIf { it.isNotEmpty() }
             ?.let {
                 run.notice(
-                    Strings.Transcript.connectorMissingOutputs(manifest.name, it.joinToString(), it.size),
+                    "${manifest.name} declares ${it.joinToString()} but didn't return them",
                     isWarning = true,
                 )
             }
@@ -438,7 +438,7 @@ private class ShellLive(
 ) : LiveProcess {
     override fun stop() = session.stop()
 
-    override fun send(text: String): Result<Unit> = Result.failure(UnsupportedOperationException(Strings.RunErrors.SHELL_TAKES_NO_FOLLOW_UPS))
+    override fun send(text: String): Result<Unit> = Result.failure(IllegalStateException("follow-up sent to a shell node"))
 
     override fun endInput() = Unit
 }
@@ -448,7 +448,7 @@ private class ConnectorLive(
 ) : LiveProcess {
     override fun stop() = session.stop()
 
-    override fun send(text: String): Result<Unit> = Result.failure(UnsupportedOperationException(Strings.RunErrors.CONNECTOR_TAKES_INPUTS_UP_FRONT))
+    override fun send(text: String): Result<Unit> = Result.failure(IllegalStateException("follow-up sent to a connector node"))
 
     override fun endInput() = Unit
 }

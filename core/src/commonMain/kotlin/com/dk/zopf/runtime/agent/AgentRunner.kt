@@ -93,7 +93,7 @@ class AgentSession internal constructor(
     fun send(text: String): Result<Unit> {
         if (provider.promptChannel != PromptChannel.STDIN) {
             return Result.failure(
-                UnsupportedOperationException(Strings.RunErrors.takesOneTurn(provider.id.label)),
+                IllegalStateException("follow-up sent to ${provider.id.label}, which takes one turn"),
             )
         }
         return runCatching {

@@ -117,7 +117,7 @@ fun runWorkflow(
         }
     val run =
         started.getOrElse {
-            err.println(Strings.Cli.failed("${it.message}"))
+            err.println("zopf: ${it.message}")
             return EXIT_USAGE
         }
     screen.starting(run)
@@ -145,7 +145,7 @@ private fun describeRun(
     point?.let { out.println(it.plan()) }
     out.println(Strings.Cli.dryRunHeader(workflow.name, workflow.nodes.size))
     workflow.runOrder().forEachIndexed { wave, ids ->
-        out.println(Strings.Cli.wave(wave, ids.joinToString()))
+        out.println("  ${wave + 1}. ${ids.joinToString()}")
     }
     return EXIT_OK
 }
@@ -196,12 +196,12 @@ private class Decisions(
     private fun decideGate(node: NodeRun) {
         when (policy) {
             GatePolicy.APPROVE -> {
-                node.notice(Strings.Cli.approvedByPolicy())
+                node.notice(Strings.Cli.APPROVED_BY_POLICY)
                 engine.resolveGate(node, approved = true)
             }
 
             GatePolicy.REJECT -> {
-                node.notice(Strings.Cli.rejectedByPolicy())
+                node.notice(Strings.Cli.REJECTED_BY_POLICY)
                 engine.resolveGate(node, approved = false)
             }
 

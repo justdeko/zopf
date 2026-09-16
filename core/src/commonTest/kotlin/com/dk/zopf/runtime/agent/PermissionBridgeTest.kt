@@ -268,7 +268,7 @@ class PermissionBridgeTest {
 
         assertEquals("deny", decisionIn(body))
         assertTrue(
-            node.entries.filterIsInstance<ConsoleEntry.Notice>().any { "Nobody answered" in it.text },
+            node.entries.filterIsInstance<ConsoleEntry.Notice>().any { "No one answered" in it.text },
             "the console has to say why the tool didn't run",
         )
     }

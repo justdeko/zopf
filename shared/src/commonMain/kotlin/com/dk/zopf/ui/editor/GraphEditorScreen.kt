@@ -583,11 +583,17 @@ private fun Canvas(
                     label = label,
                     color =
                         when (flow) {
-                            EdgeFlow.TAKEN ->
+                            EdgeFlow.TAKEN -> {
                                 if (failure) RunStatus.FAILED.colors().accent else RunStatus.SUCCEEDED.colors().accent
+                            }
 
-                            EdgeFlow.DEAD -> resting.copy(alpha = DeadEdgeAlpha)
-                            EdgeFlow.IDLE -> resting
+                            EdgeFlow.DEAD -> {
+                                resting.copy(alpha = DeadEdgeAlpha)
+                            }
+
+                            EdgeFlow.IDLE -> {
+                                resting
+                            }
                         },
                     dashed = failure || flow == EdgeFlow.DEAD || marching,
                     width = if (flow == EdgeFlow.TAKEN) TakenEdgeStroke else EdgeStroke,
@@ -624,9 +630,9 @@ private fun nodeMenu(
         if (node.type == NodeType.AGENT || node.type == NodeType.SHELL) {
             add(ContextMenuItem(Strings.Editor.RUN_THIS_NODE) { onRunNode(node) })
         }
-        add(ContextMenuItem(Strings.Editor.CONNECT_FROM_HERE) { state.startConnecting(node.id) })
+        add(ContextMenuItem(Strings.Actions.CONNECT_FROM_HERE) { state.startConnecting(node.id) })
         add(ContextMenuItem(Strings.Editor.DUPLICATE) { state.duplicateNode(node.id) })
-        add(ContextMenuItem(Strings.Editor.DELETE) { state.removeNode(node.id) })
+        add(ContextMenuItem(Strings.Actions.DELETE) { state.removeNode(node.id) })
     }
 
 @Composable
@@ -757,7 +763,7 @@ private fun EditorTopBar(
                 Button(onClick = onSave, enabled = isDirty) {
                     Icon(ZopfIcons.Check, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(Strings.Editor.SAVE)
+                    Text(Strings.Actions.SAVE)
                 }
             }
         }
@@ -845,7 +851,7 @@ private fun ConnectBanner(
             )
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = onCancel) {
-                Icon(ZopfIcons.Clear, contentDescription = Strings.Editor.CANCEL, Modifier.size(16.dp))
+                Icon(ZopfIcons.Clear, contentDescription = Strings.Actions.CANCEL, Modifier.size(16.dp))
             }
         }
     }

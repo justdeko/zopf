@@ -258,7 +258,7 @@ private fun ConnectHandle(
     ) {
         PathIcon(
             ZopfIcons.Link,
-            contentDescription = if (isArmed) Strings.EditorNodeCard.CANCEL_CONNECTION else Strings.EditorNodeCard.CONNECT_FROM_HERE,
+            contentDescription = if (isArmed) Strings.EditorNodeCard.CANCEL_CONNECTION else Strings.Actions.CONNECT_FROM_HERE,
             size = 12.dp,
             tint = if (isArmed) scheme.onPrimary else scheme.onSurfaceVariant,
         )

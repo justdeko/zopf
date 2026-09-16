@@ -62,9 +62,9 @@ class WorkflowValidationTest {
 
         val issues = w.validate()
 
-        assertEquals(1, issues.mentioning("more than once").size)
-        assertEquals(1, issues.mentioning("\${review.result} already means").size)
-        assertEquals(1, issues.mentioning("can't name").size)
+        assertEquals(1, issues.mentioning("more than one output field").size)
+        assertEquals(1, issues.mentioning("zopf uses that name").size)
+        assertEquals(1, issues.mentioning("letters, digits, - and _ only").size)
         assertEquals(1, issues.mentioning("no name").size)
     }
 
@@ -72,7 +72,7 @@ class WorkflowValidationTest {
     fun `only an agent node may declare an output schema`() {
         val w = wf(shell("build").copy(schema = listOf(SchemaField("severity"))))
 
-        assertEquals(1, w.validate().mentioning("only an agent node").size)
+        assertEquals(1, w.validate().mentioning("only agent nodes").size)
     }
 
     @Test
@@ -137,14 +137,14 @@ class WorkflowValidationTest {
         val issues = w.validate()
 
         assertTrue(issues.none { it.nodeId == "fix" })
-        assertEquals(1, issues.mentioning("nothing connects fix to it").size)
+        assertEquals(1, issues.mentioning("Connect fix to it").size)
     }
 
     @Test
     fun `a reference to a deleted node is an error`() {
         val w = wf(WorkflowNode("fix", NodeType.AGENT, prompt = "apply \${analyze.result}"))
 
-        assertEquals(1, w.validate().mentioning("no longer a node").size)
+        assertEquals(1, w.validate().mentioning("isn't a node").size)
     }
 
     @Test
@@ -165,7 +165,7 @@ class WorkflowValidationTest {
                 edges = listOf(WorkflowEdge("review", "act")),
             )
 
-        val issues = w.validate().mentioning("review produces")
+        val issues = w.validate().mentioning("but review only has")
 
         assertEquals(1, issues.size)
         assertEquals("act", issues.single().nodeId)
@@ -182,7 +182,7 @@ class WorkflowValidationTest {
                 edges = listOf(WorkflowEdge("build", "tell")),
             )
 
-        assertEquals(1, w.validate().mentioning("build produces").size)
+        assertEquals(1, w.validate().mentioning("but build only has").size)
     }
 
     @Test
@@ -194,16 +194,16 @@ class WorkflowValidationTest {
                 edges = listOf(WorkflowEdge("post", "tell")),
             )
 
-        assertEquals(emptyList(), w.validate().mentioning("post produces"))
+        assertEquals(emptyList(), w.validate().mentioning("but post only has"))
 
         val manifest =
             ConnectorManifest(
                 name = "slack-post",
                 outputs = listOf(ConnectorOutputField("permalink")),
             )
-        assertEquals(emptyList(), w.validate(connector = { manifest }).mentioning("post produces"))
+        assertEquals(emptyList(), w.validate(connector = { manifest }).mentioning("but post only has"))
 
-        assertEquals(1, w.validate(connector = { manifest.copy(outputs = emptyList()) }).mentioning("post produces").size)
+        assertEquals(1, w.validate(connector = { manifest.copy(outputs = emptyList()) }).mentioning("but post only has").size)
     }
 
     @Test
@@ -216,8 +216,8 @@ class WorkflowValidationTest {
 
         val issues = w.validate()
 
-        assertEquals(1, issues.mentioning("nothing connects analyze to it").size)
-        assertEquals(emptyList(), issues.mentioning("analyze produces"))
+        assertEquals(1, issues.mentioning("Connect analyze to it").size)
+        assertEquals(emptyList(), issues.mentioning("but analyze only has"))
     }
 
     @Test
@@ -249,7 +249,7 @@ class WorkflowValidationTest {
                 edges = listOf(WorkflowEdge("ok", "ship", true), WorkflowEdge("ok", "stop")),
             )
 
-        assertEquals(1, unlabelled.validate().mentioning("neither true nor false").size)
+        assertEquals(1, unlabelled.validate().mentioning("isn't true or false").size)
 
         val doubled =
             unlabelled.copy(
@@ -323,7 +323,7 @@ class WorkflowValidationTest {
         val issues =
             exampleWithConnector(
                 ConnectorManifest("slack-post", inputs = listOf(ConnectorInput("channel"))),
-            ).mentioning("doesn't declare")
+            ).mentioning("has no such input")
 
         assertEquals(1, issues.size)
         assertTrue("text" in issues.single().message)
@@ -387,7 +387,7 @@ class WorkflowValidationTest {
     fun `a prompt file reference to a node that is not upstream is an error`() {
         val w = twoNodesWithPromptFile().copy(edges = emptyList())
 
-        val issues = w.validate(promptText = { "\${build.result}" }).mentioning("nothing connects")
+        val issues = w.validate(promptText = { "\${build.result}" }).mentioning("Connect build to it")
 
         assertEquals(listOf("review"), issues.map { it.nodeId })
         assertTrue("prompts/review.md" in issues.single().message)
@@ -477,7 +477,7 @@ class WorkflowValidationTest {
             Triple(
                 "two nodes sharing an id",
                 wf(shell("a", command = "echo first"), shell("a", command = "echo second")),
-                listOf("unique", "2 nodes called \"a\""),
+                listOf("Rename all but one", "2 nodes have the id \"a\""),
             ),
             Triple(
                 "an edge naming a node that isn't there",
@@ -487,7 +487,7 @@ class WorkflowValidationTest {
             Triple(
                 "a node wired to itself",
                 wf(shell("a"), edges = listOf(WorkflowEdge("a", "a"))),
-                listOf("feeds itself", "a"),
+                listOf("to itself", "a"),
             ),
         ).forEach { (case, workflow, fragments) ->
             val errors = workflow.validate().filter { it.severity == WorkflowIssue.Severity.ERROR }

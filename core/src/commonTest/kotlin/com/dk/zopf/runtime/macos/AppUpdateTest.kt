@@ -49,6 +49,13 @@ class SwapScriptTest {
     fun `restarting reopens the new bundle`() {
         assertTrue("""open "/Applications/zopf.app"""" in swapScript(staged, target, reopen = true, pid = 1))
     }
+
+    @Test
+    fun `shell characters in the bundle path are escaped`() {
+        val script = swapScript(staged, Path.of("/Users/a\"b/\$c`d/zopf.app"), reopen = true, pid = 1)
+
+        assertTrue("open \"/Users/a\\\"b/\\\$c\\`d/zopf.app\"" in script, script)
+    }
 }
 
 class AppUpdateTest {
@@ -146,7 +153,7 @@ class AppUpdateTest {
         val app = update(tool = tools(inside = "1.3.1"))
 
         assertTrue(app.install(release).isFailure)
-        assertEquals("The download says it is 1.3.1, not 1.4.0.", (app.state.value as UpdateInstall.Failed).reason)
+        assertEquals("the 1.4.0 download says it is 1.3.1", (app.state.value as UpdateInstall.Failed).reason)
     }
 
     @Test

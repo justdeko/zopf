@@ -97,9 +97,7 @@ object WorkflowAuthor {
     ): Result<Workflow> {
         val yaml =
             yamlIn(answer)
-                ?: return Result.failure(
-                    IllegalStateException(Strings.RunErrors.NOTHING_WAS_A_WORKFLOW),
-                )
+                ?: return Result.failure(IllegalStateException("no workflow in the answer"))
         return runCatching { decodeWorkflow(yaml).copy(name = slugify(name)) }
     }
 

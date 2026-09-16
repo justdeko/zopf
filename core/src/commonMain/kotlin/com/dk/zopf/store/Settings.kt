@@ -151,7 +151,7 @@ class SettingsStore(
         }
         return runCatching { zopfJson.decodeFromString(AppSettings.serializer(), file.readText()).sanitized() }
             .recoverCatching { failure ->
-                throw IllegalStateException(Strings.RunErrors.settingsUnreadable(file, failure.message), failure)
+                throw IllegalStateException("$file couldn't be read: ${failure.message}", failure)
             }
     }
 

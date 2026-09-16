@@ -57,7 +57,7 @@ fun upgradeCli(
     val pinned = options.one("version")?.let { Version.parse(it) ?: throw UsageError(Strings.Cli.versionTakesSemver(it)) }
     val release =
         releases(pinned).getOrElse {
-            err.println(Strings.Cli.couldntAskGitHubFor(pinned?.toString() ?: Strings.Cli.THE_LATEST_RELEASE, it.message))
+            err.println("zopf: couldn't ask GitHub for ${pinned ?: "the latest release"}: ${it.message}")
             return EXIT_FAILED
         }
     if (pinned == null && running != null && release.version <= running) {
@@ -71,8 +71,7 @@ fun upgradeCli(
     }
     val url = release.cli
     if (url.isBlank()) {
-        err.println(Strings.Cli.noCliAsset("${release.version}", release.url))
-        return EXIT_FAILED
+        error("release ${release.version} has no CLI asset")
     }
     if (options.has("dry-run")) {
         out.println(Strings.Cli.wouldInstall("${release.version}", target, install.link))
@@ -84,35 +83,34 @@ fun upgradeCli(
         val archive = staging.resolve(url.substringAfterLast('/'))
         out.println(Strings.Cli.downloading("${release.version}"))
         download(url, archive).getOrElse {
-            err.println(Strings.Cli.couldntDownload(archive.name, it.message))
+            err.println("zopf: couldn't download ${archive.name}: ${it.message}")
             return EXIT_FAILED
         }
         when (val checked = verified(archive, checksum("$url.sha256").getOrNull())) {
-            null -> err.println(Strings.Cli.noChecksum("${release.version}"))
+            null -> err.println("note: ${release.version} publishes no .sha256, so the download wasn't verified")
             else ->
                 if (!checked) {
-                    err.println(Strings.Cli.checksumMismatch(archive.name))
+                    err.println("zopf: ${archive.name} doesn't match its .sha256. Nothing was installed.")
                     return EXIT_FAILED
                 }
         }
 
         target.toFile().deleteRecursively()
         untar(archive, install.opt).getOrElse {
-            err.println(Strings.Cli.couldntUnpack(archive.name, it.message))
+            err.println("zopf: couldn't unpack ${archive.name}: ${it.message}")
             return EXIT_FAILED
         }
         val binary = target.resolve("bin/zopf")
         if (!binary.isExecutable()) {
             target.toFile().deleteRecursively()
-            err.println(Strings.Cli.noBinaryInside(archive.name))
-            return EXIT_FAILED
+            error("${archive.name} holds no bin/zopf")
         }
         relink(install.link, binary)
     } finally {
         staging.toFile().deleteRecursively()
     }
 
-    out.println(Strings.Cli.updated(running?.toString() ?: Strings.Cli.UNKNOWN_VERSION, "${release.version}", install.link))
+    out.println(Strings.Cli.updated(running?.toString() ?: "unknown", "${release.version}", install.link))
     return EXIT_OK
 }
 
@@ -159,9 +157,9 @@ private fun untar(
         val output = process.inputStream.bufferedReader().readText()
         if (!process.waitFor(UNTAR_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             process.destroyForcibly()
-            error(Strings.Cli.TAR_TOOK_TOO_LONG)
+            error("tar took too long")
         }
-        check(process.exitValue() == 0) { output.trim().lines().lastOrNull() ?: Strings.Cli.TAR_FAILED }
+        check(process.exitValue() == 0) { output.trim().lines().lastOrNull() ?: "tar failed" }
     }
 
 private fun relink(

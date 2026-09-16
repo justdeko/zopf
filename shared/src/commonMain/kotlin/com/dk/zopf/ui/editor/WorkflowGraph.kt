@@ -105,9 +105,8 @@ fun Workflow.connect(
     from: String,
     to: String,
 ): Result<Workflow> {
-    if (from == to) return Result.failure(IllegalArgumentException(Strings.Editor.SELF_EDGE))
-    val fromNode = node(from) ?: return Result.failure(IllegalArgumentException(Strings.Editor.noSuchNode(from)))
-    if (node(to) == null) return Result.failure(IllegalArgumentException(Strings.Editor.noSuchNode(to)))
+    val fromNode = node(from)
+    if (from == to || fromNode == null || node(to) == null) return Result.failure(IllegalStateException("connect $from to $to"))
     if (hasEdge(from, to)) return Result.failure(IllegalStateException(Strings.Editor.ALREADY_CONNECTED))
     if (toKuiver().wouldCreateCycle(from, to)) {
         return Result.failure(IllegalStateException(Strings.Editor.WOULD_LOOP))

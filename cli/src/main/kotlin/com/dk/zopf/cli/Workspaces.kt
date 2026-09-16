@@ -21,7 +21,7 @@ fun locateWorkspace(
 
     return Workspace.open(AppPaths.defaultWorkspace)
         ?: throw UsageError(
-            Strings.RunErrors.noWorkspaceHere(from, AppPaths.defaultWorkspace),
+            Strings.RunErrors.noWorkspaceHere(AppPaths.defaultWorkspace),
         )
 }
 

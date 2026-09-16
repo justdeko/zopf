@@ -274,44 +274,44 @@ leaked value is a token to rotate.
 
 | when                          | message                                                                                |
 |-------------------------------|----------------------------------------------------------------------------------------|
-| `version:` is newer than zopf | `This workflow needs workflow format vN. This zopf reads vM, so update zopf`           |
-| two nodes share an id         | `There are N nodes called "x" — ids have to be unique`                                 |
-| an edge feeds its own source  | `The edge on "x" feeds itself, so it could never run`                                  |
-| an edge names a missing node  | `An edge connects "x", which isn't a node in <workflow>`                               |
-| a cycle                       | `... can never run: the edges into them make a loop`                                   |
+| `version:` is newer than zopf | `This workflow was made by a newer zopf. Update zopf to run it`                        |
+| two nodes share an id         | `N nodes have the id "x". Rename all but one`                                          |
+| an edge feeds its own source  | `"x" has an edge to itself. Remove it`                                                 |
+| an edge names a missing node  | `An edge uses "x", which isn't a node. Remove the edge or add the node`                |
+| a cycle                       | `... form a loop, so they never run`                                                   |
 | a repo path is gone           | `Repo "x" isn't at <path> any more`                                                    |
 | an undeclared repo            | `<node> runs in "x", which isn't declared`                                             |
 | an undeclared `alsoRead`      | `<node> also reads "x", which isn't declared`                                          |
-| a reference to a non-node     | `<node> reads ${x…}, which is no longer a node`                                        |
-| a reference to a non-ancestor | `<node> reads ${x…}, but nothing connects x to it`                                     |
-| a field the node doesn't have | `x produces result, exitCode, so <node> can't read ${x.summary}`                       |
+| a reference to a non-node     | `<node> reads ${x…}, but x isn't a node`                                               |
+| a reference to a non-ancestor | `<node> reads ${x…}. Connect x to it`                                                  |
+| a field the node doesn't have | `<node> reads ${x.summary}, but x only has result, exitCode`                           |
 | a required field is empty     | `<node> needs a prompt` / `a command` / `a connector` / `an expression` / `a question` |
 | `promptFile` doesn't exist    | `<node> reads its prompt from <path>, which isn't there`                               |
-| a branch edge with no `when`  | `<node> has an edge that is neither true nor false`                                    |
-| two branch edges the same way | `<node> has N "true" edges; it can only take one`                                      |
-| `when:` on a non-branch edge  | `<node> isn't a branch, so the "when" on its edge to <y> can never match`              |
-| an unknown connector          | `<node> calls "x", which isn't a connector in this workspace`                          |
+| a branch edge with no `when`  | `<node> has an edge that isn't true or false`                                          |
+| two branch edges the same way | `<node> has N "true" edges. Keep one`                                                  |
+| `when:` on a non-branch edge  | `<node> isn't a branch, so its "when" edge to <y> never runs`                          |
+| an unknown connector          | `<node> calls "x", but there is no connector with that name`                           |
 | a missing required input      | `<node> needs an input for "x"`                                                        |
-| `schema` on a non-agent node  | `<node> declares an output schema, which only an agent node can use`                   |
-| a schema field with no name   | `<node> declares an output field with no name`                                         |
-| a duplicated schema field     | `<node> declares the output field "x" more than once`                                  |
-| a schema field named `result` | `<node> declares an output field named "x", which ${id.x} already means`               |
+| `schema` on a non-agent node  | `<node> has an output schema, but only agent nodes use one`                            |
+| a schema field with no name   | `<node> has an output field with no name`                                              |
+| a duplicated schema field     | `<node> has more than one output field called "x"`                                     |
+| a schema field named `result` | `<node> can't name an output field "x". zopf uses that name`                           |
 
 An error stops a run before it starts. `zopf run` prints them and exits 3 without running a node, and the app says what
 to fix instead of starting.
 
 **Warnings** (exit 0, but read them):
 
-| when                                     | message                                                                                              |
-|------------------------------------------|------------------------------------------------------------------------------------------------------|
-| an unknown key                           | named, with the node it is on                                                                        |
-| an unconnected node                      | `<node> isn't connected to anything`                                                                 |
-| `on: failure` from a gate/branch/input   | `<node> is a gate, which never fails, so the edge to <y> can never be taken`                         |
-| both `prompt` and `promptFile`           | `<node> sends <file>, so its inline prompt is ignored`                                               |
-| a `default` outside `choices`            | `<node> offers a, b, so its default "c" can't be picked`                                             |
-| a field the node's CLI has no version of | `<node> runs codex, which ignores permissionMode, skills`                                            |
-| a CLI that isn't installed               | `<node> runs codex, which isn't on your PATH. The node will fail when it starts`                     |
-| an unknown skill name                    | `<node> uses the "x" skill, which isn't in this workflow's repos, the workspace or ~/.claude/skills` |
-| a schema field `${...}` can't name       | `<node> declares the output field "x", which ${id.…} can't name`                                     |
-| an input the connector doesn't declare   | `<node> sets "x", which <connector> doesn't declare`                                                 |
-| a declared output not returned           | `<connector> declares x but didn't return it` (at runtime)                                           |
+| when                                     | message                                                                                 |
+|------------------------------------------|-----------------------------------------------------------------------------------------|
+| an unknown key                           | `<where> sets "x", which zopf ignores. Check the spelling`                              |
+| an unconnected node                      | `<node> isn't connected to anything`                                                    |
+| `on: failure` from a gate/branch/input   | `<node> is a gate and never fails, so its failure edge to <y> never runs`               |
+| both `prompt` and `promptFile`           | `<node> uses <file>, so its typed prompt is ignored`                                    |
+| a `default` outside `choices`            | `<node>'s default "c" isn't one of its choices: a, b`                                   |
+| a field the node's CLI has no version of | `<node> runs codex, which ignores permissionMode, skills`                               |
+| a CLI that isn't installed               | `<node> runs codex, which isn't installed or isn't on your PATH`                        |
+| an unknown skill name                    | `<node> uses the "x" skill, which zopf can't find. Add its folder in workflow settings` |
+| a schema field `${...}` can't name       | `<node>'s field "x" can use letters, digits, - and _ only`                              |
+| an input the connector doesn't declare   | `<node> sets "x", but <connector> has no such input`                                    |
+| a declared output not returned           | `<connector> declares x but didn't return it` (at runtime)                              |

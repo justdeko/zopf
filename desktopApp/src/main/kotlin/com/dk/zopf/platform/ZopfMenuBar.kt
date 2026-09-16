@@ -89,12 +89,12 @@ private fun MenuScope.FileMenu(
     Separator()
 
     Item(
-        Strings.MenuBar.SAVE,
+        Strings.Actions.SAVE,
         shortcut = KeyShortcut(Key.S, meta = true),
         enabled = editor?.isDirty() == true,
     ) { editor?.save?.invoke() }
     Item(
-        Strings.MenuBar.SHOW_IN_FINDER,
+        Strings.Actions.SHOW_IN_FINDER,
         shortcut = KeyShortcut(Key.R, meta = true, alt = true),
         enabled = app.editing != null || app.selectedWorkflow != null,
     ) { app.revealCurrentWorkflow() }

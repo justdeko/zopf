@@ -63,7 +63,7 @@ fun WorkflowSettingsDialog(
                 InspectorField(
                     value = workflow.description,
                     onValueChange = { state.edit { w -> w.copy(description = it) } },
-                    label = Strings.WorkflowSettings.DESCRIPTION_LABEL,
+                    label = Strings.Labels.DESCRIPTION,
                     singleLine = false,
                     supportingText = Strings.WorkflowSettings.DESCRIPTION_HINT,
                 )
@@ -87,7 +87,7 @@ fun WorkflowSettingsDialog(
                     supportingText =
                         Strings.WorkflowSettings.SKILL_DIRS_HINT,
                     onBrowse = {
-                        chooseDirectory(Strings.WorkflowSettings.CHOOSE_SKILL_DIR, state.startIn(null, workspace))?.let {
+                        chooseDirectory(Strings.Labels.CHOOSE_SKILL_DIRECTORY, state.startIn(null, workspace))?.let {
                             state.addSkillDirectory(it, nodeId = null)
                         }
                     },
@@ -116,7 +116,7 @@ fun WorkflowSettingsDialog(
                     onSelect = { provider ->
                         state.edit { it.copy(defaults = it.defaults.copy(provider = provider)) }
                     },
-                    noneLabel = Strings.WorkflowSettings.providerNone(state.defaultProvider.label),
+                    noneLabel = Strings.Labels.defaultOf(state.defaultProvider.label),
                     supportingText = Strings.WorkflowSettings.PROVIDER_HINT,
                 )
                 if (defaultProvider.capabilities.modelSelection) {
@@ -125,37 +125,37 @@ fun WorkflowSettingsDialog(
                         provider = defaultProvider,
                         selected = workflow.defaults.model,
                         onSelect = { model -> state.edit { it.copy(defaults = it.defaults.copy(model = model)) } },
-                        noneLabel = Strings.WorkflowSettings.modelNone(defaultProvider.cliValue),
+                        noneLabel = Strings.Labels.cliDefault(defaultProvider.cliValue),
                         supportingText = Strings.WorkflowSettings.modelHint(defaultProvider.label),
                     )
                 }
                 Gap(8)
                 InspectorDropdown(
-                    label = Strings.WorkflowSettings.PERMISSION_MODE_LABEL,
+                    label = Strings.Labels.PERMISSION_MODE,
                     selected = workflow.defaults.permissionMode,
                     options = PermissionMode.entries,
                     optionLabel = { it.cliValue },
                     onSelect = { mode ->
                         state.edit { it.copy(defaults = it.defaults.copy(permissionMode = mode)) }
                     },
-                    noneLabel = Strings.WorkflowSettings.PERMISSION_MODE_NONE,
+                    noneLabel = Strings.Labels.CLI_DEFAULT,
                     supportingText = Strings.WorkflowSettings.PERMISSION_MODE_HINT,
                 )
                 Gap(8)
                 InspectorDropdown(
-                    label = Strings.WorkflowSettings.SANDBOX_LABEL,
+                    label = Strings.Labels.SANDBOX,
                     selected = workflow.defaults.sandbox,
                     options = Sandbox.entries,
                     optionLabel = { it.cliValue },
                     onSelect = { sandbox ->
                         state.edit { it.copy(defaults = it.defaults.copy(sandbox = sandbox)) }
                     },
-                    noneLabel = Strings.WorkflowSettings.SANDBOX_NONE,
+                    noneLabel = Strings.Labels.CLI_DEFAULT,
                     supportingText = Strings.WorkflowSettings.SANDBOX_HINT,
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(Strings.WorkflowSettings.DONE) } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(Strings.Actions.DONE) } },
     )
 }
 
@@ -167,7 +167,7 @@ private fun ReposSection(
     val workflow = state.workflow
     var adding by remember { mutableStateOf(false) }
 
-    SectionLabel(Strings.WorkflowSettings.REPOS)
+    SectionLabel(Strings.Labels.REPOS)
     if (workflow.repos.isEmpty()) {
         Text(
             Strings.WorkflowSettings.NO_REPOS_DECLARED,
@@ -231,7 +231,7 @@ private fun RepoRow(
             supportingText = resolved?.takeIf { it != repo.path },
         )
         IconButton(onClick = onRemove) {
-            Icon(ZopfIcons.Delete, contentDescription = Strings.WorkflowSettings.removeRepo(repo.id), Modifier.size(16.dp))
+            Icon(ZopfIcons.Delete, contentDescription = Strings.Actions.remove(repo.id), Modifier.size(16.dp))
         }
     }
 }
@@ -253,7 +253,7 @@ private fun AddRepoDialog(
                 InspectorField(
                     value = id,
                     onValueChange = { id = it },
-                    label = Strings.WorkflowSettings.REPO_ID_LABEL,
+                    label = Strings.Labels.ID,
                     monospace = true,
                     supportingText = Strings.WorkflowSettings.REPO_ID_HINT,
                 )
@@ -271,7 +271,7 @@ private fun AddRepoDialog(
 
                             if (id.isBlank()) id = it.fileName?.toString().orEmpty()
                         }
-                    }) { Text(Strings.WorkflowSettings.BROWSE) }
+                    }) { Text(Strings.Actions.BROWSE) }
                 }
                 if (suggestions.isNotEmpty()) {
                     SectionLabel(Strings.WorkflowSettings.USED_BY_OTHER_WORKFLOWS)
@@ -292,9 +292,9 @@ private fun AddRepoDialog(
             TextButton(
                 onClick = { onAdd(id, path) },
                 enabled = id.isNotBlank() && path.isNotBlank(),
-            ) { Text(Strings.WorkflowSettings.ADD) }
+            ) { Text(Strings.Actions.ADD) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.WorkflowSettings.CANCEL) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Actions.CANCEL) } },
     )
 }
 

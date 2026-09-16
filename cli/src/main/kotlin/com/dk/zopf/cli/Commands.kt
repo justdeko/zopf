@@ -38,7 +38,7 @@ fun listWorkflows(
     val workspace = locateWorkspace(options.one("workspace"))
     val listing = WorkflowStore(workspace).list()
 
-    out.println(Strings.Cli.header(workspace.name, workspace.root))
+    out.println("${workspace.name} · ${workspace.root}")
     if (listing.workflows.isEmpty() && listing.broken.isEmpty()) {
         out.println(Strings.Cli.NO_WORKFLOWS_YET)
     }
@@ -120,7 +120,7 @@ fun listRuns(
                 "${record.nodes.count { it.status == "SUCCEEDED" }}/${record.nodes.size}",
                 record.cost()?.let { money(it) },
             )
-        out.println("${record.startedAt.readable()}  " + Strings.Cli.header(record.workflow, detail.joinToString(" · ")))
+        out.println("${record.startedAt.readable()}  ${record.workflow} · ${detail.joinToString(" · ")}")
         out.println("  ${record.id.take(SHORT_ID)}  ${archive.dir}")
     }
 }
@@ -152,7 +152,7 @@ fun printVersion(
     check: UpdateCheck = UpdateCheck(),
     notify: Boolean = notifiable(),
 ) {
-    out.println(Strings.Cli.version(BuildInfo.version))
+    out.println(Strings.version(BuildInfo.version))
     if (!notify) return
     val release = check.cached() ?: return
     err.println(Strings.Cli.newerRelease("${release.version}"))
@@ -167,7 +167,7 @@ fun checkForUpdate(
         onSuccess = { release ->
             val running = check.running
             if (running != null && release.version > running) {
-                out.println(Strings.Cli.newerThanRunning("${release.version}", "$running"))
+                out.println(Strings.Updates.available("${release.version}", "$running"))
                 out.println(Strings.Cli.readRelease(release.url))
             } else {
                 out.println(Strings.Cli.latestAlready(BuildInfo.version))
@@ -175,7 +175,7 @@ fun checkForUpdate(
             EXIT_OK
         },
         onFailure = {
-            err.println(Strings.Cli.couldntAskGitHub(it.message))
+            err.println("zopf: couldn't ask GitHub for the latest release: ${it.message}")
             EXIT_FAILED
         },
     )
@@ -189,7 +189,7 @@ private fun notifiable(): Boolean =
 fun Workflow.issues(workspace: Workspace): List<WorkflowIssue> = issues(workspace, SettingsStore().load().defaultProvider)
 
 internal fun WorkflowIssue.render(): String {
-    val level = if (severity == WorkflowIssue.Severity.ERROR) Strings.Validation.ERROR else Strings.Validation.WARNING
+    val level = if (severity == WorkflowIssue.Severity.ERROR) Strings.Words.ERROR else Strings.Words.WARNING
     return "$level: $message"
 }
 

@@ -63,20 +63,19 @@ class AppUpdate(
 
     fun blocker(): String? =
         when {
-            bundle == null -> Strings.Updates.NOT_AN_APP
+            bundle == null -> "not running from an app bundle"
             bundle.toString().contains(TRANSLOCATION) ->
                 Strings.Updates.TRANSLOCATED
             bundle.parent?.isWritable() != true -> Strings.Updates.cannotWriteTo(bundle.parent)
-            '"' in bundle.toString() -> Strings.Updates.QUOTED_PATH
-            team == null -> Strings.Updates.UNSIGNED
+            team == null -> "this build isn't signed"
             else -> null
         }
 
     fun install(release: Release): Result<Unit> =
         runCatching {
             blocker()?.let { error(it) }
-            val signer = team ?: error(Strings.Updates.UNSIGNED)
-            val url = release.app.ifBlank { error(Strings.Updates.noAppAsset("${release.version}")) }
+            val signer = team ?: error("this build isn't signed")
+            val url = release.app.ifBlank { error("release ${release.version} has no app asset") }
 
             val waiting = stagedVersion()
             if (waiting != null && waiting >= release.version) {
@@ -93,7 +92,7 @@ class AppUpdate(
             try {
                 mounted(dmg) { volume ->
                     val app = volume.resolve(APP_BUNDLE_NAME)
-                    check(app.exists()) { Strings.Updates.noBundleInImage(APP_BUNDLE_NAME) }
+                    if (!app.exists()) error("the ${release.version} disk image holds no $APP_BUNDLE_NAME")
                     verify(app, signer, release.version)
                     stage(app)
                 }
@@ -103,16 +102,16 @@ class AppUpdate(
             _state.value = UpdateInstall.Ready(release.version)
             Log.info("zopf ${release.version} is staged at $staged")
         }.onFailure { failure ->
-            val reason = failure.message ?: Strings.Updates.INSTALL_FAILED
+            val reason = failure.message ?: "the update wouldn't install"
             _state.value = UpdateInstall.Failed(reason)
             Log.warn("update install failed: $reason")
         }
 
     fun swap(reopen: Boolean): Result<Unit> =
         runCatching {
-            val ready = _state.value as? UpdateInstall.Ready ?: error(Strings.RunErrors.NO_UPDATE_WAITING)
-            val target = bundle ?: error(Strings.Updates.NOT_RUNNING_FROM_BUNDLE)
-            check(staged.exists()) { Strings.Updates.stagedMissing("${ready.version}", cache) }
+            val ready = _state.value as? UpdateInstall.Ready ?: error("swap with no staged update")
+            val target = bundle ?: error("swap outside an app bundle")
+            check(staged.exists()) { "zopf ${ready.version} is no longer staged in $cache" }
             val script = cache.resolve("swap.sh")
             script.writeText(swapScript(staged, target, reopen))
             Log.info("swapping in zopf ${ready.version} at $target")
@@ -146,19 +145,19 @@ class AppUpdate(
     ) {
         val requirement = "identifier \"$APP_BUNDLE_ID\" and anchor apple generic and certificate leaf[subject.OU] = \"$team\""
         tool(listOf("/usr/bin/codesign", "--verify", "--deep", "--strict", "-R=$requirement", app.toString()))
-            .getOrElse { error(Strings.Updates.NOT_OUR_SIGNER) }
+            .getOrElse { error("the $version download isn't signed by team $team: ${it.message}") }
         tool(listOf("/usr/sbin/spctl", "--assess", "--type", "execute", app.toString()))
-            .getOrElse { error(Strings.Updates.NOT_NOTARIZED) }
+            .getOrElse { error("spctl rejected the $version download: ${it.message}") }
         val found = tool(listOf("/usr/bin/defaults", "read", app.resolve("Contents/Info.plist").toString(), VERSION_KEY))
         val inside = Version.parse(found.getOrNull()?.trim().orEmpty())
-        check(inside == version) { Strings.Updates.wrongVersionInside(inside?.toString() ?: Strings.Updates.NOTHING_IN_PARTICULAR, "$version") }
+        if (inside != version) error("the $version download says it is $inside")
     }
 
     private fun stage(app: Path) {
         staged.parent.toFile().deleteRecursively()
         staged.parent.createDirectories()
         tool(listOf("/usr/bin/ditto", app.toString(), staged.toString()))
-            .getOrElse { error(Strings.Updates.wouldntCopy(it.message)) }
+            .getOrElse { error("ditto failed: ${it.message}") }
     }
 
     private fun <T> mounted(
@@ -169,7 +168,7 @@ class AppUpdate(
         tool(listOf("/usr/bin/hdiutil", "attach", dmg.toString(), "-nobrowse", "-readonly", "-mountpoint", volume.toString()))
             .getOrElse {
                 runCatching { volume.deleteIfExists() }
-                error(Strings.Updates.wouldntMount(it.message))
+                error("hdiutil attach failed: ${it.message}")
             }
         try {
             return block(volume)
@@ -197,14 +196,16 @@ internal fun swapScript(
     # replaces the bundle once the running zopf has quit, keeping the old one until the new one is in place
     set -e
     while kill -0 $pid 2>/dev/null; do sleep 0.2; done
-    ditto "$staged" "$target.new"
-    rm -rf "$target.old"
-    mv "$target" "$target.old"
-    mv "$target.new" "$target" || { mv "$target.old" "$target"; exit 1; }
-    xattr -dr com.apple.quarantine "$target" 2>/dev/null || true
-    rm -rf "$target.old" "$staged"
-    ${if (reopen) "open \"$target\"" else ":"}
+    ditto ${quoted(staged)} ${quoted("$target.new")}
+    rm -rf ${quoted("$target.old")}
+    mv ${quoted(target)} ${quoted("$target.old")}
+    mv ${quoted("$target.new")} ${quoted(target)} || { mv ${quoted("$target.old")} ${quoted(target)}; exit 1; }
+    xattr -dr com.apple.quarantine ${quoted(target)} 2>/dev/null || true
+    rm -rf ${quoted("$target.old")} ${quoted(staged)}
+    ${if (reopen) "open ${quoted(target)}" else ":"}
     """.trimIndent() + "\n"
+
+private fun quoted(path: Any): String = "\"" + path.toString().replace(Regex("[\\\\\"$`]")) { "\\" + it.value } + "\""
 
 private fun runTool(argv: List<String>): Result<String> =
     runCatching {
@@ -216,9 +217,9 @@ private fun runTool(argv: List<String>): Result<String> =
         val output = process.inputStream.bufferedReader().readText()
         if (!process.waitFor(TOOL_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             process.destroyForcibly()
-            error(Strings.Updates.tookTooLong(argv.first()))
+            error("${argv.first()} took too long")
         }
-        check(process.exitValue() == 0) { output.trim().lines().lastOrNull() ?: Strings.Updates.toolFailed(argv.first()) }
+        check(process.exitValue() == 0) { output.trim().lines().lastOrNull() ?: "${argv.first()} failed" }
         output
     }
 

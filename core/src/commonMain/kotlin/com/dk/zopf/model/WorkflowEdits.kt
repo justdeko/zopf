@@ -84,7 +84,7 @@ fun Workflow.renameNode(
     if (!isValidNodeId(to)) {
         return Result.failure(IllegalArgumentException(Strings.Validation.ID_CHARACTERS))
     }
-    if (node(from) == null) return Result.failure(IllegalArgumentException(Strings.Validation.noSuchNode(from)))
+    if (node(from) == null) return Result.failure(IllegalStateException("rename of missing node $from"))
     if (node(to) != null) return Result.failure(IllegalStateException(Strings.Validation.idTaken(to)))
 
     return Result.success(

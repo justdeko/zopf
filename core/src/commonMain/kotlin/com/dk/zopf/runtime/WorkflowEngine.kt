@@ -3,10 +3,8 @@ package com.dk.zopf.runtime
 import com.dk.zopf.model.EdgeTrigger
 import com.dk.zopf.model.NodeDefaults
 import com.dk.zopf.model.NodeType
-import com.dk.zopf.model.WORKFLOW_VERSION
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowNode
-import com.dk.zopf.model.label
 import com.dk.zopf.model.withDefaultsFrom
 import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.runtime.run.RunStatus
@@ -74,7 +72,7 @@ class WorkflowEngine(
         if (workflow.isFromTheFuture) {
             return Result.failure(
                 IllegalArgumentException(
-                    Strings.RunErrors.formatTooNew(workflow.name, workflow.version, WORKFLOW_VERSION),
+                    Strings.Validation.FROM_THE_FUTURE,
                 ),
             )
         }
@@ -85,9 +83,7 @@ class WorkflowEngine(
         }
         if (only != null && !only.type.needsProcess()) {
             return Result.failure(
-                IllegalArgumentException(
-                    Strings.RunErrors.singleNodeNeedsGraph(only.type.label),
-                ),
+                IllegalStateException("${only.type} node started on its own"),
             )
         }
 
@@ -332,7 +328,7 @@ class WorkflowEngine(
         nodeRun.approval = approval
         nodeRun.update { copy(status = RunStatus.WAITING) }
         when (val asked = node.prompt.takeIf { it.isNotBlank() }) {
-            null -> nodeRun.notice(node.title.ifBlank { Strings.Transcript.WAITING_FOR_YOU })
+            null -> nodeRun.notice(node.title.ifBlank { Strings.RunStates.WAITING })
             else -> nodeRun.prompt(outputs.interpolate(asked).also { warnUnresolved(nodeRun, it) }.text)
         }
         onWaiting(nodeRun)
@@ -450,7 +446,7 @@ class WorkflowEngine(
 
                 else ->
                     workspace?.root
-                        ?: return Result.failure(IllegalStateException(Strings.Workspaces.OPEN_BEFORE_NODE_RUN))
+                        ?: return Result.failure(IllegalStateException(Strings.Workspaces.OPEN_FIRST))
             }
         if (!path.exists() || !path.isDirectory()) {
             return Result.failure(IllegalStateException(Strings.RunErrors.pathGone(path)))

@@ -57,10 +57,8 @@ class TextRenderer(
         width = run.nodes.maxOfOrNull { it.nodeId.length } ?: 0
         say(
             null,
-            Strings.Cli.header(
-                run.workflowName,
+            "${run.workflowName} · " +
                 Strings.Words.count(run.nodes.size, Strings.Words.NODE) + (run.workspaceRoot?.let { " · $it" } ?: ""),
-            ),
         )
     }
 
@@ -120,7 +118,7 @@ class TextRenderer(
                 format(run.elapsed()),
                 spend(run.costUsd, run.tokens),
             )
-        say(null, tint(run.status, Strings.Cli.header(run.workflowName, detail.joinToString(" · "))))
+        say(null, tint(run.status, "${run.workflowName} · ${detail.joinToString(" · ")}"))
         run.nodes
             .filter { it.status != RunStatus.SUCCEEDED }
             .forEach { say(null, dim("  ${it.nodeId}: ${it.status.label.lowercase()}")) }

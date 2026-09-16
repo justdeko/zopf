@@ -158,7 +158,7 @@ class UpgradeTest {
         val (code, streams) = upgrade(args = listOf("--version", "1.3.1"), release = Result.success(release(running)))
 
         assertEquals(EXIT_OK, code)
-        assertTrue("already what's installed" in streams.output(), streams.output())
+        assertTrue("already installed" in streams.output(), streams.output())
     }
 
     @Test

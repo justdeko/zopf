@@ -103,7 +103,7 @@ class MacNotifier(
     private fun positional(notification: RunNotification): List<String> =
         listOf(
             collapse(notification.body).ifBlank { Strings.Notifications.FALLBACK_BODY }.trimTo(MAX_BODY),
-            collapse(notification.title).ifBlank { Strings.Notifications.FALLBACK_TITLE },
+            collapse(notification.title).ifBlank { Strings.APP_NAME },
             collapse(notification.subtitle),
             notification.sound,
         )
@@ -116,7 +116,7 @@ class MacNotifier(
 
     private fun osascript(notification: RunNotification) {
         val body = collapse(notification.body).ifBlank { Strings.Notifications.FALLBACK_BODY }.trimTo(MAX_BODY)
-        val title = collapse(notification.title).ifBlank { Strings.Notifications.FALLBACK_TITLE }
+        val title = collapse(notification.title).ifBlank { Strings.APP_NAME }
         val subtitle = collapse(notification.subtitle)
         val clauses =
             buildList {

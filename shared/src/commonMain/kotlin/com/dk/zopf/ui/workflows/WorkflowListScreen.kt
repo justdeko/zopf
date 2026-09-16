@@ -132,7 +132,7 @@ fun WorkflowListScreen(
                         item {
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                Strings.Workflows.UNREADABLE,
+                                Strings.Labels.UNREADABLE,
                                 style = MaterialTheme.typography.labelLargeEmphasized,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -173,7 +173,7 @@ fun WorkflowListScreen(
         NameDialog(
             title = Strings.Workflows.RENAME_TITLE,
             initial = workflow.name,
-            confirmLabel = Strings.Workflows.RENAME,
+            confirmLabel = Strings.Actions.RENAME,
             onDismiss = { renaming = null },
             onConfirm = {
                 renaming = null
@@ -185,15 +185,15 @@ fun WorkflowListScreen(
     deleting?.let { workflow ->
         AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text(Strings.Workflows.deleteTitle(workflow.name)) },
+            title = { Text(Strings.Actions.deleteTitle(workflow.name)) },
             text = { Text(Strings.Workflows.DELETE_BODY) },
             confirmButton = {
                 TextButton(onClick = {
                     deleting = null
                     onDelete(workflow)
-                }) { Text(Strings.Workflows.DELETE) }
+                }) { Text(Strings.Actions.DELETE) }
             },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text(Strings.Workflows.CANCEL) } },
+            dismissButton = { TextButton(onClick = { deleting = null }) { Text(Strings.Actions.CANCEL) } },
         )
     }
 }
@@ -211,11 +211,11 @@ private fun WorkflowRow(
     ContextMenuArea(
         items = {
             listOf(
-                ContextMenuItem(Strings.Workflows.OPEN) { onOpen() },
-                ContextMenuItem(Strings.Workflows.RUN, enabled = workflow.nodes.isNotEmpty()) { onRun() },
-                ContextMenuItem(Strings.Workflows.RENAME_MENU) { onRename() },
-                ContextMenuItem(Strings.Workflows.SHOW_IN_FINDER) { onReveal() },
-                ContextMenuItem(Strings.Workflows.DELETE_MENU) { onDelete() },
+                ContextMenuItem(Strings.Actions.OPEN) { onOpen() },
+                ContextMenuItem(Strings.Actions.RUN, enabled = workflow.nodes.isNotEmpty()) { onRun() },
+                ContextMenuItem(Strings.Actions.RENAME_MENU) { onRename() },
+                ContextMenuItem(Strings.Actions.SHOW_IN_FINDER) { onReveal() },
+                ContextMenuItem(Strings.Actions.DELETE_MENU) { onDelete() },
             )
         },
     ) {
@@ -253,10 +253,8 @@ private fun WorkflowCard(
                 Text(workflow.name, style = MaterialTheme.typography.titleMediumEmphasized)
                 val summary =
                     workflow.description.firstParagraph().ifBlank {
-                        Strings.Workflows.summary(
-                            Strings.Words.count(workflow.nodes.size, Strings.Words.NODE),
-                            Strings.Words.count(workflow.repos.size, Strings.Words.REPO),
-                        )
+                        Strings.Words.count(workflow.nodes.size, Strings.Words.NODE) + " · " +
+                            Strings.Words.count(workflow.repos.size, Strings.Words.REPO)
                     }
                 Text(
                     text = summary,
@@ -269,16 +267,16 @@ private fun WorkflowCard(
             TextButton(onClick = onRun, enabled = workflow.nodes.isNotEmpty()) {
                 Icon(ZopfIcons.Play, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(Strings.Workflows.RUN)
+                Text(Strings.Actions.RUN)
             }
             IconButton(onClick = onReveal) {
-                Icon(ZopfIcons.Folder, contentDescription = Strings.Workflows.SHOW_IN_FINDER, modifier = Modifier.size(18.dp))
+                Icon(ZopfIcons.Folder, contentDescription = Strings.Actions.SHOW_IN_FINDER, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = onRename) {
-                Icon(ZopfIcons.Edit, contentDescription = Strings.Workflows.RENAME, modifier = Modifier.size(18.dp))
+                Icon(ZopfIcons.Edit, contentDescription = Strings.Actions.RENAME, modifier = Modifier.size(18.dp))
             }
             IconButton(onClick = onDelete) {
-                Icon(ZopfIcons.Delete, contentDescription = Strings.Workflows.DELETE, modifier = Modifier.size(18.dp))
+                Icon(ZopfIcons.Delete, contentDescription = Strings.Actions.DELETE, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -324,7 +322,7 @@ private fun BrokenRow(
             IconButton(onClick = onReveal) {
                 Icon(
                     ZopfIcons.Folder,
-                    contentDescription = Strings.Workflows.SHOW_IN_FINDER,
+                    contentDescription = Strings.Actions.SHOW_IN_FINDER,
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onErrorContainer,
                 )
@@ -360,7 +358,7 @@ private fun NewWorkflowDialog(
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text(Strings.Workflows.NAME_LABEL) },
+                    label = { Text(Strings.Labels.NAME) },
                     supportingText = { Text(Strings.Workflows.NAME_HINT) },
                 )
                 FilterChip(
@@ -418,9 +416,9 @@ private fun NewWorkflowDialog(
             TextButton(
                 onClick = { if (describing) onDescribe(name, description) else onCreate(name, template) },
                 enabled = name.isNotBlank() && (!describing || description.isNotBlank()),
-            ) { Text(if (describing) Strings.Workflows.DRAFT else Strings.Workflows.CREATE) }
+            ) { Text(if (describing) Strings.Workflows.DRAFT else Strings.Actions.CREATE) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Workflows.CANCEL) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Actions.CANCEL) } },
     )
 }
 
@@ -506,14 +504,14 @@ private fun NameDialog(
                 value = value,
                 onValueChange = { value = it },
                 singleLine = true,
-                label = { Text(Strings.Workflows.NAME_LABEL) },
+                label = { Text(Strings.Labels.NAME) },
                 supportingText = { Text(Strings.Workflows.NAME_HINT) },
             )
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(value) }, enabled = value.isNotBlank()) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Workflows.CANCEL) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Strings.Actions.CANCEL) } },
     )
 }
 

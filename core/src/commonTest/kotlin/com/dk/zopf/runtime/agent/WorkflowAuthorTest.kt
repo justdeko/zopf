@@ -109,12 +109,9 @@ class WorkflowAuthorTest {
     }
 
     @Test
-    fun `an answer with no workflow in it says what to do`() {
+    fun `an answer with no workflow in it fails`() {
         assertNull(WorkflowAuthor.yamlIn("I'd rather not."))
-
-        val failure = WorkflowAuthor.draftFrom("I'd rather not.", "demo").exceptionOrNull()
-
-        assertContains(failure?.message.orEmpty(), "Nothing in that answer was a workflow")
+        assertTrue(WorkflowAuthor.draftFrom("I'd rather not.", "demo").isFailure)
     }
 
     @Test

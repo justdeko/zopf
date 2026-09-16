@@ -115,7 +115,7 @@ class ResumeTest {
                 .exceptionOrNull()
                 ?.message
                 .orEmpty(),
-            "No runs are archived yet",
+            "no past runs to resume",
         )
     }
 

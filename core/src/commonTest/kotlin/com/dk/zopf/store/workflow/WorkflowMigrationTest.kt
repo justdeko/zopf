@@ -173,8 +173,7 @@ class WorkflowMigrationTest {
         assertEquals(NodeType.AGENT, loaded.nodes.single().type, "what this build does understand still loads")
 
         val issue = loaded.validate().first { it.severity == WorkflowIssue.Severity.ERROR }
-        assertContains(issue.message, "needs workflow format v${WORKFLOW_VERSION + 1}")
-        assertContains(issue.message, "update zopf")
+        assertContains(issue.message, "newer zopf")
     }
 
     @Test

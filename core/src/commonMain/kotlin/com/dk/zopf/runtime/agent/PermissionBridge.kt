@@ -134,7 +134,7 @@ class PermissionBridge(
         val node = sessionId?.let(nodeBySession)
 
         if (payload == null || node == null) {
-            exchange.respond(200, decisionJson(false, Strings.RunErrors.PERMISSION_UNKNOWN_SESSION))
+            exchange.respond(200, decisionJson(false, "zopf doesn't recognise this session"))
             return
         }
 
@@ -225,7 +225,7 @@ class PermissionBridge(
     private companion object {
         const val TOKEN_HEADER = "X-Zopf-Token"
 
-        val DENY_UNREACHABLE = Strings.RunErrors.PERMISSION_DENIED_UNREACHABLE
+        const val DENY_UNREACHABLE = "zopf could not be reached, so the answer is no"
 
         val OWNER_ONLY_FILE: Set<java.nio.file.attribute.PosixFilePermission> =
             PosixFilePermissions.fromString("rw-------")

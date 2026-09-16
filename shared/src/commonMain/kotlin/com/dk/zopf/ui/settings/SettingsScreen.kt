@@ -104,7 +104,7 @@ fun SettingsScreen(
                     provider = settings.defaultProvider,
                     selected = settings.defaultModel,
                     onSelect = { model -> onChange { it.copy(defaultModel = model) } },
-                    noneLabel = Strings.Settings.defaultModelNone(settings.defaultProvider.cliValue),
+                    noneLabel = Strings.Labels.cliDefault(settings.defaultProvider.cliValue),
                     supportingText = Strings.Settings.defaultModelHint(settings.defaultProvider.label),
                 )
             }
@@ -169,7 +169,7 @@ fun SettingsScreen(
 
             Gap(20)
             Text(
-                Strings.Settings.version(BuildInfo.version),
+                Strings.version(BuildInfo.version),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -288,7 +288,7 @@ private fun UpdateField(
     if (update != null) {
         Gap(8)
         Text(
-            Strings.Settings.updateAvailable("${update.version}", BuildInfo.version),
+            Strings.Updates.available("${update.version}", BuildInfo.version),
             style = MaterialTheme.typography.bodyMedium,
         )
         when (install) {

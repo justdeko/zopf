@@ -268,7 +268,9 @@ version is pinned in the root build, its own `prefer` constraint predating `hotM
   restatement of the line, never a paragraph copied from here.
 - Test names: backticked, lowercase, one clause, subject first — `a cycle fails the nodes in it`,
   `run --format quiet prints only the verdict`. No reasons, no second fact after a comma.
-- User-facing strings: in `util/Strings.kt`, nested by surface.
+- User-facing strings: in `util/Strings.kt`, nested by surface. Only what a user reads and acts on: labels,
+  hints, validation, usage errors. Can't-happen guards, tool and network failures, diagnostics: an exception
+  or inline message, English, never in `Strings.kt`.
 - ktlint everywhere. `.editorconfig` disables three rules on purpose: PascalCase composables,
   PascalCase constants (`ArrowSize`, `TitleBarHeight`), the filename rule on `main.kt`.
 

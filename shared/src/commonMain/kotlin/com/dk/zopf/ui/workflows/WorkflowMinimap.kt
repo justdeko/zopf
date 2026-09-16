@@ -91,7 +91,7 @@ fun WorkflowThumbnail(
             .clip(shape)
             .background(colors.graphSurface)
             .swallowingDrags()
-            .semantics { contentDescription = Strings.Editor.nodeCountDescription(workflow.nodes.size) },
+            .semantics { contentDescription = Strings.Words.count(workflow.nodes.size, Strings.Words.NODE) },
     ) {
         KuiverBridge {
             KuiverViewer(

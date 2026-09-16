@@ -255,7 +255,7 @@ fun ChipListField(
                         onClick = { onChange(values - value) },
                         label = { Text(value, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         trailingIcon = {
-                            Icon(ZopfIcons.Clear, contentDescription = Strings.Inspector.REMOVE, Modifier.size(16.dp))
+                            Icon(ZopfIcons.Clear, contentDescription = Strings.Actions.REMOVE, Modifier.size(16.dp))
                         },
                     )
                 }
@@ -271,11 +271,11 @@ fun ChipListField(
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
             )
             IconButton(onClick = { add(draft) }, enabled = draft.isNotBlank()) {
-                Icon(ZopfIcons.Add, contentDescription = Strings.Inspector.ADD, Modifier.size(18.dp))
+                Icon(ZopfIcons.Add, contentDescription = Strings.Actions.ADD, Modifier.size(18.dp))
             }
             onBrowse?.let {
                 IconButton(onClick = it) {
-                    Icon(ZopfIcons.Folder, contentDescription = Strings.Inspector.BROWSE, Modifier.size(18.dp))
+                    Icon(ZopfIcons.Folder, contentDescription = Strings.Actions.BROWSE, Modifier.size(18.dp))
                 }
             }
         }
@@ -363,7 +363,7 @@ fun KeyValueField(
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 )
                 IconButton(onClick = { onChange(values - key) }) {
-                    Icon(ZopfIcons.Delete, contentDescription = Strings.Inspector.removeInput(key), Modifier.size(16.dp))
+                    Icon(ZopfIcons.Delete, contentDescription = Strings.Actions.remove(key), Modifier.size(16.dp))
                 }
             }
         }

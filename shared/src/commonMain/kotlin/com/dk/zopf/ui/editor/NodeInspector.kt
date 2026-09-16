@@ -117,7 +117,7 @@ fun NodeInspector(
             Spacer(Modifier.width(10.dp))
             Text(node.type.label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             IconButton(onClick = { state.startConnecting(node.id) }) {
-                Icon(ZopfIcons.Link, contentDescription = Strings.Inspector.CONNECT_FROM_HERE, Modifier.size(18.dp))
+                Icon(ZopfIcons.Link, contentDescription = Strings.Actions.CONNECT_FROM_HERE, Modifier.size(18.dp))
             }
         }
 
@@ -176,7 +176,7 @@ private fun NodeIdField(
         value = draft,
         onValueChange = { draft = it },
         modifier = Modifier.fillMaxWidth(),
-        label = { Text(Strings.Inspector.ID_LABEL) },
+        label = { Text(Strings.Labels.ID) },
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
         supportingText = {
@@ -185,7 +185,7 @@ private fun NodeIdField(
         trailingIcon = {
             if (changed) {
                 IconButton(onClick = { onRename(draft.trim()) }) {
-                    Icon(ZopfIcons.Check, contentDescription = Strings.Inspector.RENAME, Modifier.size(18.dp))
+                    Icon(ZopfIcons.Check, contentDescription = Strings.Actions.RENAME, Modifier.size(18.dp))
                 }
             }
         },
@@ -213,7 +213,7 @@ private fun AgentFields(
         options = AgentProviderId.entries,
         optionLabel = { it.label },
         onSelect = { state.updateNode(node.copy(provider = it)) },
-        noneLabel = Strings.Inspector.providerNone(inherited.label),
+        noneLabel = Strings.Labels.defaultOf(inherited.label),
         supportingText = Strings.Inspector.PROVIDER_HINT,
     )
 
@@ -262,14 +262,14 @@ private fun AgentFields(
                 state.resolvedWorkflow
                     .inheritedModel(provider, state.defaultProvider, state.defaultModel)
                     ?.let { Strings.Inspector.inherited(it) }
-                    ?: Strings.Inspector.cliDefault(provider.cliValue),
+                    ?: Strings.Labels.cliDefault(provider.cliValue),
         )
     }
 
     if (can.toolPermissions) {
         Gap(8)
         InspectorDropdown(
-            label = Strings.Inspector.PERMISSION_MODE_LABEL,
+            label = Strings.Labels.PERMISSION_MODE,
             selected = node.permissionMode,
             options = PermissionMode.entries,
             optionLabel = { it.cliValue },
@@ -284,14 +284,14 @@ private fun AgentFields(
     if (can.sandbox) {
         Gap(8)
         InspectorDropdown(
-            label = Strings.Inspector.SANDBOX_LABEL,
+            label = Strings.Labels.SANDBOX,
             selected = node.sandbox,
             options = Sandbox.entries,
             optionLabel = { it.cliValue },
             onSelect = { state.updateNode(node.copy(sandbox = it)) },
             noneLabel =
                 workflow.defaults.sandbox?.let { Strings.Inspector.workflowDefault(it.cliValue) }
-                    ?: Strings.Inspector.cliConfiguredFor(provider.cliValue),
+                    ?: Strings.Labels.cliDefault(provider.cliValue),
             supportingText = Strings.Inspector.sandboxHint(provider.label),
         )
     }
@@ -362,14 +362,14 @@ private fun OutputSchemaSection(
             InspectorField(
                 value = field.description,
                 onValueChange = { change(node.schema.replacing(index, field.copy(description = it))) },
-                label = Strings.Inspector.FIELD_DESCRIPTION_LABEL,
+                label = Strings.Labels.DESCRIPTION,
                 supportingText = Strings.Inspector.FIELD_DESCRIPTION_HINT,
             )
             Gap(4)
             FilterChip(
                 selected = !field.required,
                 onClick = { change(node.schema.replacing(index, field.copy(required = !field.required))) },
-                label = { Text(Strings.Inspector.FIELD_OPTIONAL) },
+                label = { Text(Strings.Labels.OPTIONAL) },
             )
         }
 
@@ -383,7 +383,7 @@ private fun OutputSchemaSection(
         val named = node.schema.filter { it.name.isNotBlank() }
         if (named.isNotEmpty()) {
             Gap(8)
-            SectionLabel(Strings.Inspector.OUTPUTS)
+            SectionLabel(Strings.Labels.OUTPUTS)
             Gap(4)
             Text(
                 NodeRefs.reference(node.id, "result") + Strings.Inspector.RESULT_IS_WHOLE_OBJECT,
@@ -420,7 +420,7 @@ private fun SchemaField.outputNote(): String =
     when {
         isNested && description.isNotBlank() -> Strings.Inspector.nestedFieldDescription(description)
         isNested -> Strings.Inspector.NESTED_TOO_DEEP
-        description.isNotBlank() -> Strings.Inspector.fieldDescription(description)
+        description.isNotBlank() -> ": $description"
         else -> ""
     }
 
@@ -466,7 +466,7 @@ private fun PromptSection(
         supportingText = resolved?.toString()?.takeIf { it != node.promptFile },
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = { state.pickPromptFile(node, workspace) }) { Text(Strings.Inspector.BROWSE_LABEL) }
+        TextButton(onClick = { state.pickPromptFile(node, workspace) }) { Text(Strings.Actions.BROWSE) }
         TextButton(onClick = { state.updateNode(node.copy(promptFile = "")) }) { Text(Strings.Inspector.TYPE_IT_HERE_INSTEAD) }
     }
     preview?.let {
@@ -516,7 +516,7 @@ private fun SkillsSection(
 
         TextButton(
             onClick = {
-                chooseDirectory(Strings.Inspector.CHOOSE_SKILL_DIRECTORY, state.startIn(node, workspace))?.let {
+                chooseDirectory(Strings.Labels.CHOOSE_SKILL_DIRECTORY, state.startIn(node, workspace))?.let {
                     state.addSkillDirectory(it, node.id)
                 }
             },
@@ -618,7 +618,7 @@ private fun ConnectorFields(
 
     if (declared.isNotEmpty()) {
         Gap()
-        SectionLabel(Strings.Inspector.INPUTS)
+        SectionLabel(Strings.Labels.INPUTS)
         declared.forEach { input ->
             Gap(8)
             InspectorField(
@@ -635,7 +635,7 @@ private fun ConnectorFields(
                     buildString {
                         append(
                             input.description.ifBlank {
-                                if (input.required) Strings.Inspector.INPUT_REQUIRED else Strings.Inspector.INPUT_OPTIONAL
+                                if (input.required) Strings.Inspector.INPUT_REQUIRED else Strings.Labels.OPTIONAL
                             },
                         )
                         if (input.default.isNotBlank()) append(Strings.Inspector.inputDefault(input.default))
@@ -659,7 +659,7 @@ private fun ConnectorFields(
     if (extras.isNotEmpty() || declared.isEmpty()) {
         Gap(8)
         KeyValueField(
-            label = if (declared.isEmpty()) Strings.Inspector.INPUTS else Strings.Inspector.UNDECLARED_INPUTS,
+            label = if (declared.isEmpty()) Strings.Labels.INPUTS else Strings.Inspector.UNDECLARED_INPUTS,
             values = extras,
             onChange = { state.updateNode(node.copy(inputs = node.inputs.filterKeys { it !in extras } + it)) },
         )
@@ -668,14 +668,14 @@ private fun ConnectorFields(
     val outputs = connector?.manifest?.outputs.orEmpty()
     if (outputs.isNotEmpty()) {
         Gap()
-        SectionLabel(Strings.Inspector.OUTPUTS)
+        SectionLabel(Strings.Labels.OUTPUTS)
         Gap(4)
         outputs.forEach { output ->
             Text(
                 NodeRefs.reference(node.id, output.name) +
                     output.description
                         .takeIf { it.isNotBlank() }
-                        ?.let { Strings.Inspector.fieldDescription(it) }
+                        ?.let { ": $it" }
                         .orEmpty(),
                 style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -872,13 +872,13 @@ private fun Connections(
 
     incoming.forEach { edge ->
         EdgeRow(
-            text = Strings.Inspector.edgeFrom(workflow.node(edge.from)?.displayTitle ?: edge.from),
+            text = "← ${workflow.node(edge.from)?.displayTitle ?: edge.from}",
             onRemove = { state.disconnect(edge.from, edge.to) },
         )
     }
     outgoing.forEach { edge ->
         EdgeRow(
-            text = Strings.Inspector.edgeTo(workflow.node(edge.to)?.displayTitle ?: edge.to),
+            text = "→ ${workflow.node(edge.to)?.displayTitle ?: edge.to}",
             onRemove = { state.disconnect(edge.from, edge.to) },
             trailing = {
                 Row {

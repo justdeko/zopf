@@ -652,7 +652,6 @@ class WorkflowEngineTest {
                 only = gate(),
             )
         assertTrue(result.isFailure)
-        assertContains(result.exceptionOrNull()!!.message!!, "run the workflow instead")
     }
 
     @Test
@@ -668,7 +667,7 @@ class WorkflowEngineTest {
                     ),
             )
         assertTrue(result.isFailure)
-        assertContains(result.exceptionOrNull()!!.message!!, "so update zopf to run it")
+        assertContains(result.exceptionOrNull()!!.message!!, "Update zopf")
     }
 
     @Test

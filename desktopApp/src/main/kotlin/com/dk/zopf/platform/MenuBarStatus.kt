@@ -69,16 +69,16 @@ fun ApplicationScope.ZopfTray(
                 val run = snapshot.run
                 val asking = snapshot.state.of(node)
                 val request = asking.pendingPermission?.request
-                Menu(Strings.Tray.runLine(run.workflowName, request?.toolName ?: Strings.Tray.NEEDS_YOU)) {
+                Menu("${run.workflowName} · ${request?.toolName ?: Strings.Tray.NEEDS_YOU}") {
                     request?.summary?.takeIf { it.isNotBlank() }?.let {
                         Item(it.take(60), enabled = false, onClick = {})
                         Separator()
                     }
-                    Item(Strings.Tray.ALLOW, onClick = { runs.decide(node, allow = true) })
-                    Item(Strings.Tray.ALLOW_FOR_THIS_RUN, onClick = { runs.decide(node, allow = true, forRestOfRun = true) })
-                    Item(Strings.Tray.DENY, onClick = { runs.decide(node, allow = false) })
+                    Item(Strings.Actions.ALLOW, onClick = { runs.decide(node, allow = true) })
+                    Item(Strings.Actions.ALLOW_FOR_THIS_RUN, onClick = { runs.decide(node, allow = true, forRestOfRun = true) })
+                    Item(Strings.Actions.DENY, onClick = { runs.decide(node, allow = false) })
                     Separator()
-                    Item(Strings.Tray.SHOW, onClick = { show(run) })
+                    Item(Strings.Actions.SHOW, onClick = { show(run) })
                 }
             }
             Separator()
@@ -90,11 +90,11 @@ fun ApplicationScope.ZopfTray(
                 .flatMap { snapshot -> snapshot.state.awaitingApproval.map { snapshot.run to it } }
         if (gates.isNotEmpty()) {
             gates.forEach { (run, node) ->
-                Menu(Strings.Tray.runLine(run.workflowName, node.nodeTitle)) {
-                    Item(Strings.Tray.APPROVE, onClick = { runs.approve(node, true) })
-                    Item(Strings.Tray.REJECT, onClick = { runs.approve(node, false) })
+                Menu("${run.workflowName} · ${node.nodeTitle}") {
+                    Item(Strings.Actions.APPROVE, onClick = { runs.approve(node, true) })
+                    Item(Strings.Actions.REJECT, onClick = { runs.approve(node, false) })
                     Separator()
-                    Item(Strings.Tray.SHOW, onClick = { show(run) })
+                    Item(Strings.Actions.SHOW, onClick = { show(run) })
                 }
             }
             Separator()
@@ -105,7 +105,7 @@ fun ApplicationScope.ZopfTray(
             questions.forEach { (snapshot, node) ->
                 val run = snapshot.run
                 val question = snapshot.state.of(node).pendingQuestion
-                Menu(Strings.Tray.runLine(run.workflowName, question?.question?.take(40) ?: Strings.Tray.NEEDS_AN_ANSWER)) {
+                Menu("${run.workflowName} · ${question?.question?.take(40) ?: Strings.Tray.NEEDS_AN_ANSWER}") {
                     if (question != null && question.choices.isNotEmpty()) {
                         question.choices.forEach { choice ->
                             Item(choice, onClick = { runs.answer(node, choice) })
@@ -114,8 +114,8 @@ fun ApplicationScope.ZopfTray(
                         Item(Strings.Tray.TYPE_AN_ANSWER, onClick = { show(run) })
                     }
                     Separator()
-                    Item(Strings.Tray.CANCEL_RUN, onClick = { runs.answer(node, null) })
-                    Item(Strings.Tray.SHOW, onClick = { show(run) })
+                    Item(Strings.Actions.CANCEL_RUN, onClick = { runs.answer(node, null) })
+                    Item(Strings.Actions.SHOW, onClick = { show(run) })
                 }
             }
             Separator()
@@ -125,14 +125,14 @@ fun ApplicationScope.ZopfTray(
             Item(Strings.Tray.NOTHING_RUNNING, enabled = false, onClick = {})
         } else {
             active.forEach { (run, state) ->
-                Menu(Strings.Tray.runLine(run.workflowName, state.summary())) {
-                    Item(Strings.Tray.SHOW, onClick = { show(run) })
-                    Item(Strings.Tray.STOP, onClick = { runs.stop(run) })
+                Menu("${run.workflowName} · ${state.summary()}") {
+                    Item(Strings.Actions.SHOW, onClick = { show(run) })
+                    Item(Strings.Actions.STOP, onClick = { runs.stop(run) })
 
                     val handover =
                         state.nodes.firstOrNull { state.of(it).status.isActive && it.canTakeOver(state.of(it)) }
                     handover?.let { node ->
-                        Item(Strings.Tray.takeOverIn(runs.terminalApp), onClick = { runs.takeOver(node) })
+                        Item(Strings.Actions.takeOverIn(runs.terminalApp), onClick = { runs.takeOver(node) })
                     }
                 }
             }
@@ -140,7 +140,7 @@ fun ApplicationScope.ZopfTray(
         }
 
         Separator()
-        Menu(Strings.Tray.RUN, enabled = app.listing.workflows.isNotEmpty()) {
+        Menu(Strings.Actions.RUN, enabled = app.listing.workflows.isNotEmpty()) {
             app.listing.workflows.forEach { workflow ->
                 Item(workflow.name, onClick = { app.runWorkflowNamed(workflow.name) })
             }

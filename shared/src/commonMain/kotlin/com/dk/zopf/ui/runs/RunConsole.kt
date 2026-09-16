@@ -166,14 +166,14 @@ private fun RunHeader(
                     Icon(ZopfIcons.Terminal, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
 
-                    Text(Strings.Console.takeOverIn(terminalApp))
+                    Text(Strings.Actions.takeOverIn(terminalApp))
                 }
             }
             if (state.status.isActive && !isElsewhere) {
                 TextButton(onClick = onStop) {
                     Icon(ZopfIcons.Stop, contentDescription = null, Modifier.size(14.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(Strings.Console.STOP)
+                    Text(Strings.Actions.STOP)
                 }
             }
             onClose?.let {
@@ -517,7 +517,7 @@ private fun PermissionBar(
     AttentionBar(RunStatus.FAILED) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
             Text(
-                Strings.Console.wantsToRun(request.toolName),
+                Strings.Transcript.wantsToRun(request.toolName),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -532,14 +532,14 @@ private fun PermissionBar(
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { onDecide(false, false) }) { Text(Strings.Console.DENY) }
+                TextButton(onClick = { onDecide(false, false) }) { Text(Strings.Actions.DENY) }
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = { onDecide(true, true) }) { Text(Strings.Console.ALLOW_FOR_THIS_RUN) }
+                TextButton(onClick = { onDecide(true, true) }) { Text(Strings.Actions.ALLOW_FOR_THIS_RUN) }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = { onDecide(true, false) }) {
                     Icon(ZopfIcons.Check, contentDescription = null, Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(Strings.Console.ALLOW)
+                    Text(Strings.Actions.ALLOW)
                 }
             }
         }
@@ -562,12 +562,12 @@ private fun GateBar(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = { onApprove(false) }) { Text(Strings.Console.REJECT) }
+            TextButton(onClick = { onApprove(false) }) { Text(Strings.Actions.REJECT) }
             Spacer(Modifier.width(8.dp))
             Button(onClick = { onApprove(true) }) {
                 Icon(ZopfIcons.Check, contentDescription = null, Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(Strings.Console.APPROVE)
+                Text(Strings.Actions.APPROVE)
             }
         }
     }
@@ -620,7 +620,7 @@ private fun InputBar(
                     Spacer(Modifier.weight(1f))
                 }
                 Spacer(Modifier.width(8.dp))
-                TextButton(onClick = { onAnswer(null) }) { Text(Strings.Console.CANCEL_RUN) }
+                TextButton(onClick = { onAnswer(null) }) { Text(Strings.Actions.CANCEL_RUN) }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = { onAnswer(text.trim()) }, enabled = text.isNotBlank()) {
                     Icon(ZopfIcons.Send, contentDescription = null, Modifier.size(16.dp))
