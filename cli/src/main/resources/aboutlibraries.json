@@ -1,20 +1,20 @@
 {
     "libraries": [
         {
-            "uniqueId": "com.squareup.okio:okio-jvm",
-            "artifactVersion": "3.17.0",
+            "uniqueId": "com.squareup.okio:okio",
+            "artifactVersion": "3.18.2",
             "name": "okio",
             "description": "A modern I/O library for Android, Java, and Kotlin Multiplatform.",
-            "website": "https://github.com/square/okio/",
+            "website": "https://github.com/lysine-dev/okio/",
             "developers": [
                 {
                     "name": "Square, Inc."
                 }
             ],
             "scm": {
-                "connection": "scm:git:git://github.com/square/okio.git",
-                "developerConnection": "scm:git:ssh://git@github.com/square/okio.git",
-                "url": "https://github.com/square/okio/"
+                "connection": "scm:git:git://github.com/lysine-dev/okio.git",
+                "developerConnection": "scm:git:ssh://git@github.com/lysine-dev/okio.git",
+                "url": "https://github.com/lysine-dev/okio/"
             },
             "licenses": [
                 "Apache-2.0"
@@ -24,8 +24,8 @@
             ]
         },
         {
-            "uniqueId": "io.heapy.kotaml:kotaml-jvm",
-            "artifactVersion": "0.110.0",
+            "uniqueId": "io.heapy.kotaml:kotaml",
+            "artifactVersion": "0.111.0",
             "name": "kotaml",
             "description": "YAML support for kotlinx.serialization",
             "website": "https://github.com/Heapy/kotaml",
@@ -50,7 +50,7 @@
             ]
         },
         {
-            "uniqueId": "it.krzeminski:snakeyaml-engine-kmp-jvm",
+            "uniqueId": "it.krzeminski:snakeyaml-engine-kmp",
             "artifactVersion": "4.0.1",
             "name": "SnakeYAML Engine KMP",
             "description": "SnakeYAML Engine KMP is a YAML 1.2 processor for Kotlin Multiplatform",
@@ -76,7 +76,7 @@
             ]
         },
         {
-            "uniqueId": "net.thauvin.erik.urlencoder:urlencoder-lib-jvm",
+            "uniqueId": "net.thauvin.erik.urlencoder:urlencoder-lib",
             "artifactVersion": "1.6.0",
             "name": "UrlEncoder for Kotlin Multiplatform",
             "description": "A simple defensive library to encode/decode URL components",
@@ -106,7 +106,7 @@
         },
         {
             "uniqueId": "org.jetbrains.kotlin:kotlin-stdlib",
-            "artifactVersion": "2.4.10",
+            "artifactVersion": "2.4.21",
             "name": "Kotlin Stdlib",
             "description": "Kotlin Standard Library",
             "website": "https://kotlinlang.org/",
@@ -129,7 +129,7 @@
             ]
         },
         {
-            "uniqueId": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm",
+            "uniqueId": "org.jetbrains.kotlinx:kotlinx-coroutines-core",
             "artifactVersion": "1.11.0",
             "name": "kotlinx-coroutines-core",
             "description": "Coroutines support libraries for Kotlin",
@@ -151,7 +151,7 @@
             ]
         },
         {
-            "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm",
+            "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-core",
             "artifactVersion": "1.11.0",
             "name": "kotlinx-serialization-core",
             "description": "Kotlin multiplatform serialization runtime library",
@@ -173,7 +173,7 @@
             ]
         },
         {
-            "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm",
+            "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-json",
             "artifactVersion": "1.11.0",
             "name": "kotlinx-serialization-json",
             "description": "Kotlin multiplatform serialization runtime library",

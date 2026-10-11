@@ -24,6 +24,7 @@ import com.dk.zopf.ui.ZopfApp
 import com.dk.zopf.util.Strings
 import java.awt.Desktop
 import java.awt.Dimension
+import java.awt.desktop.AppReopenedListener
 
 fun main() {
     System.setProperty("apple.awt.enableTemplateImages", "true")
@@ -55,16 +56,18 @@ fun main() {
             exitApplication()
         }
 
-        remember {
-            runCatching {
-                Desktop.getDesktop().setQuitHandler { _, _ -> quit() }
-            }
-        }
-
         fun showWindow() {
             windowVisible = true
             windowState.isMinimized = false
             showRequests++
+        }
+
+        remember {
+            runCatching {
+                val desktop = Desktop.getDesktop()
+                desktop.setQuitHandler { _, _ -> quit() }
+                desktop.addAppEventListener(AppReopenedListener { showWindow() })
+            }
         }
 
         remember {
