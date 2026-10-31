@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.height
 import com.dk.kuiver.model.layout.LayoutDirection
 import com.dk.kuiver.renderer.KuiverNodeScope
 import com.dk.kuiver.ui.ArrowDrawer
-import com.dk.kuiver.ui.DefaultArrowDrawer
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.WorkflowNode
@@ -238,21 +237,20 @@ class CanvasPixelsTest {
     }
 
     @Test
-    fun `the round arrow head reaches the endpoint and the default stops short`() {
+    fun `the round arrow head reaches the endpoint`() {
         val from = Offset(EdgeStart, EdgeCross)
         val to = Offset(EdgeEnd, EdgeCross)
         val round = paintedEdge(from, to, LayoutDirection.HORIZONTAL).maxOf { it.first }
-        val default =
-            paintedEdge(from, to, LayoutDirection.HORIZONTAL, DefaultArrowDrawer).maxOf { it.first }
+        val bare = paintedEdge(from, to, LayoutDirection.HORIZONTAL) { _, _, _, _ -> }.maxOf { it.first }
 
         assertTrue(
             round >= EdgeEnd.toInt() - 2,
             "the round head stopped ${EdgeEnd.toInt() - round}px short of the endpoint",
         )
         assertTrue(
-            default < round - 4,
-            "the default head is no shorter than the round one ($default vs $round), so this " +
-                "test can no longer tell them apart",
+            bare < round - 4,
+            "the line alone reaches as far as the head ($bare vs $round), so this test can no " +
+                "longer tell whether the head is drawn",
         )
     }
 

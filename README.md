@@ -141,6 +141,10 @@ what it should do and let an agent draft the graph for you. Or you can invoke th
 /plugin install zopf@zopf
 ```
 
+Once a Claude Code session has done something you'll want again, run `/zopf:save-workflow <name>` in it, or just ask
+Claude to turn the session into a zopf workflow. It reads the session's transcript, keeps the commands and decisions
+that mattered, puts gates where you stepped in, and writes a validated workflow into the nearest `.zopf/`.
+
 ## What you could build with it
 
 * Fan one migration out over a dozen repos in parallel and collect a diff from each
