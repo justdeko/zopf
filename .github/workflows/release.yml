@@ -11,7 +11,7 @@ permissions:
 jobs:
   release:
     # apple silicon only
-    runs-on: macos-14
+    runs-on: macos-latest
     environment: release
 
     steps:

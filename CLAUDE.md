@@ -39,7 +39,7 @@ cli/build/install/zopf-cli/bin/zopf validate --workspace .zopf   # what CI runs 
 Kotlin/JVM → `test`. Root `check` also drags in Compose's resource tasks; name the three.
 
 CI (`.github/workflows/check.yml`): ktlint, those three, `zopf validate` on the committed `.zopf`,
-macos-14 (the release runner). It re-runs `exportLibraryDefinitions` and fails on `git diff`, so a
+macos-latest like the release. It re-runs `exportLibraryDefinitions` and fails on `git diff`, so a
 new dependency needs an `aboutLibraries`-allowed license and a committed `aboutlibraries.json`.
 
 ## Modules
