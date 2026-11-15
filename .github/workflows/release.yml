@@ -84,6 +84,10 @@ jobs:
             -Pcompose.desktop.mac.notarization.password="$NOTARIZATION_PASSWORD" \
             -Pcompose.desktop.mac.notarization.teamID="$NOTARIZATION_TEAM_ID"
 
+      - name: Print the packaging tool logs
+        if: failure()
+        run: find desktopApp/build/compose/logs -type f -exec sh -c 'echo "== $1"; cat "$1"' _ {} \; || true
+
       - name: Build the CLI tarball
         env:
           VERSION: ${{ steps.version.outputs.value }}
