@@ -125,6 +125,12 @@ the `Result` event's text, else the last assistant message (codex sends none). `
 result only in an interactive run. Connector timeout: node, then manifest, never workflow defaults. A
 non-executable connector script runs through its shebang, never `chmod` — `git status` stays clean.
 
+`isolation: worktree` (`runtime/exec/Worktrees.kt`): zopf runs `git worktree add` itself, never `claude --worktree`,
+so every provider and shell nodes get the same thing. Under Caches, not Application Support — the space in that path
+breaks an unquoted `cd ${node.worktree}`. Removal never forces: leftovers are committed to the node's branch first.
+A worktree with no run record counts as expired, so its root comes from `AppPaths.worktreesFor(archiveRoot)`, or a
+test archive retires real work. Front ends delete a run through `RunHistory.delete`, not `RunArchive.delete`.
+
 `NodeRun.onEntrySettled` is what the CLI prints its transcript from — on the node's own coroutine, in
 step with `onProgress`. Print from anywhere else and the verdict overtakes the lines.
 
@@ -206,7 +212,7 @@ and would write workspace defaults into every file. `EditorState.resolvedWorkflo
 A workspace holds only committable things: workflow YAML, connector manifests and scripts, prompt
 files, `skills/`. Machine-local lives in `store/AppPaths.kt` — `settings.json`, `workspaces.json`,
 `update.json`, the generated `zopf-notify.app`, the run archive (Application Support), update
-downloads (`~/Library/Caches/zopf`), logs (`~/Library/Logs/zopf`). `git status` stays clean in a repo
+downloads and node worktrees (`~/Library/Caches/zopf`), logs (`~/Library/Logs/zopf`). `git status` stays clean in a repo
 with a `.zopf/`. Exception: node positions go in the YAML, part of the document.
 
 YAML through kotaml with `encodeDefaults = false` (`store/Serialization.kt`), so a hand-written file

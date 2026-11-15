@@ -161,6 +161,7 @@ private fun RunHeader(
                         StatusPill(state.status)
                         FactChip(format(state.elapsed(run.startedAt, now)))
                         spend(state.costUsd, state.tokens)?.let { FactChip(it) }
+                        run.worktree?.let { FactChip(it.branch) }
                         state.exitCode?.takeIf { it != 0 }?.let { FactChip(Strings.Console.exitCode(it), isError = true) }
                     }
                 }

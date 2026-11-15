@@ -54,6 +54,7 @@ Declare `self` explicitly even though zopf can infer it from the enclosing git r
 | key              | applies to                    | notes                                                               |
 |------------------|-------------------------------|---------------------------------------------------------------------|
 | `repo`           | every node                    | The repo id nodes run in unless they name their own. Set this once. |
+| `isolation`      | `agent`, `shell` nodes        | `worktree` gives each its own checkout. See the node table.         |
 | `provider`       | `agent` nodes                 | `claude` (default), `codex` or `dsh`. A node naming its own wins.   |
 | `model`          | `agent` nodes                 | e.g. `opus`, `sonnet`. A node naming its own wins.                  |
 | `permissionMode` | `agent` nodes                 | Claude Code only. See the node table.                               |
@@ -72,6 +73,7 @@ node → workflow `defaults` → workspace `defaults` → the app's Settings.
 | `title`          | string            | all                           | Display name, a few words. Falls back to `id`. **Not interpolated.**                                                                |
 | `provider`       | enum              | `agent`                       | `claude` \| `codex` \| `dsh`. Which agent CLI runs the node. Absent means `defaults.provider`, then the app's default, then claude. |
 | `repo`           | string            | `agent`, `shell`              | Repo id to run in. Must be declared.                                                                                                |
+| `isolation`      | enum              | `agent`, `shell`              | `worktree` \| `none`. Its own git worktree on a new branch. See [isolation](#isolation-a-worktree-per-node).                        |
 | `timeoutSeconds` | int               | `agent`, `shell`, `connector` | Overrides `defaults`.                                                                                                               |
 | `position`       | `{x, y}`          | all                           | Canvas coordinate. **Do not hand-write** — one manual position turns off auto-layout for the whole graph.                           |
 | `prompt`         | string            | `agent`, `input`, `gate`      | The prompt, the question, or what a gate shows you before you approve. **Interpolated.**                                            |
@@ -125,6 +127,14 @@ anything else it has a model plugin for.
 A field the chosen CLI has no version of is left out of the command and `zopf validate` warns, naming it — so `skills:`
 on a codex node is a warning rather than a silent no-op.
 
+### isolation: a worktree per node
+
+`isolation: worktree` starts the node in its own git worktree, on a new branch from the repo's last commit, so nodes
+that edit one repo side by side don't share files. Uncommitted changes in the repo are not in it. The node gains
+`${id.worktree}` and `${id.branch}`, and nothing is committed for you: a later shell node does
+`git -C "${id.worktree}" commit -am ...` and `git merge "${id.branch}"`. Quote the path. zopf removes worktrees by
+itself and saves uncommitted edits to the branch first, so no node needs to clean up.
+
 ### permissionMode, in practice
 
 `acceptEdits` is the usual choice for a node that edits files unattended. `plan` makes the node produce a plan without
@@ -138,8 +148,8 @@ Fields that don't apply to a type are not errors — they are silently ignored. 
 
 | type        | required                    | also reads                                                                             |
 |-------------|-----------------------------|----------------------------------------------------------------------------------------|
-| `agent`     | `prompt` or `promptFile`    | `provider`, `repo`, `model`, `timeoutSeconds`, and whatever the chosen CLI has (below) |
-| `shell`     | `command`                   | `repo`, `timeoutSeconds`                                                               |
+| `agent`     | `prompt` or `promptFile`    | `provider`, `repo`, `isolation`, `model`, `timeoutSeconds`, plus what the CLI has      |
+| `shell`     | `command`                   | `repo`, `isolation`, `timeoutSeconds`                                                  |
 | `connector` | `connector`                 | `inputs`, `timeoutSeconds`                                                             |
 | `gate`      | — (`title` is the question) | `prompt`, what to show you before you answer it                                        |
 | `branch`    | `expression`                | —                                                                                      |
@@ -175,6 +185,8 @@ Cycles, self-edges, duplicate node ids and edges naming a node that doesn't exis
 | `gate`      | `result` — `approved` or `rejected`                               |
 | `branch`    | `result`                                                          |
 | `input`     | `result` — the answer                                             |
+
+An `agent` or `shell` node with `isolation: worktree` also has `worktree` and `branch`.
 
 Interpolation is `${nodeId.field}` and nothing else. An unresolved reference is left in the text verbatim rather than
 blanked, and the node gets a warning in its transcript.

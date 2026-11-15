@@ -18,6 +18,10 @@ object AppPaths {
         homeDir().resolve("Library/Caches/zopf").also { it.createDirectories() }
     }
 
+    val worktreesDir: Path get() = cacheDir.resolve("worktrees")
+
+    fun worktreesFor(archiveRoot: Path): Path = if (archiveRoot == runsDir) worktreesDir else archiveRoot.resolve(".worktrees")
+
     val logsDir: Path by lazy {
         homeDir().resolve("Library/Logs/zopf").also { it.createDirectories() }
     }

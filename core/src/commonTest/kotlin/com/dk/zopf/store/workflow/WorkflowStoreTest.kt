@@ -1,5 +1,6 @@
 package com.dk.zopf.store.workflow
 
+import com.dk.zopf.model.Isolation
 import com.dk.zopf.model.NodeDefaults
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.PermissionMode
@@ -89,6 +90,28 @@ class WorkflowStoreTest {
         val (_, store) = newStore()
         store.save(sample)
         assertEquals(sample, store.load("refactor-api"))
+    }
+
+    @Test
+    fun `isolation is written only where it is set`() {
+        val (_, store) = newStore()
+        val workflow =
+            Workflow(
+                name = "apart",
+                defaults = NodeDefaults(isolation = Isolation.WORKTREE),
+                nodes =
+                    listOf(
+                        WorkflowNode("fix", NodeType.AGENT, prompt = "fix it"),
+                        WorkflowNode("check", NodeType.SHELL, isolation = Isolation.NONE, command = "make check"),
+                    ),
+            )
+
+        store.save(workflow)
+        val text = store.fileFor("apart").readText()
+
+        assertEquals(1, Regex("isolation: worktree").findAll(text).count(), text)
+        assertEquals(1, Regex("isolation: none").findAll(text).count(), text)
+        assertEquals(workflow, store.load("apart"))
     }
 
     @Test

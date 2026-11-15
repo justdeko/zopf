@@ -44,6 +44,8 @@ data class NodeRunRecord(
     val startedAt: String,
     val finishedAt: String? = null,
     val cwd: String? = null,
+    val worktree: String? = null,
+    val branch: String? = null,
     val sessionId: String? = null,
     val command: List<String> = emptyList(),
     val exitCode: Int? = null,
@@ -116,6 +118,18 @@ class RunArchive(
                 .filter { it.resolve(RUN_FILE).exists() }
                 .map { RunArchive(it) }
                 .sortedByDescending { it.startedAt() ?: it.dir.getLastModifiedTime().toInstant() }
+        }
+
+        fun find(
+            runId: String,
+            root: Path = AppPaths.runsDir,
+        ): RunArchive? {
+            if (!root.isDirectory()) return null
+            return root
+                .listDirectoryEntries()
+                .map { it.resolve(runId) }
+                .firstOrNull { it.resolve(RUN_FILE).exists() }
+                ?.let { RunArchive(it) }
         }
 
         fun prune(

@@ -35,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.EdgeTrigger
+import com.dk.zopf.model.Isolation
 import com.dk.zopf.model.NodeRefs
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.PermissionMode
@@ -222,6 +223,8 @@ private fun AgentFields(
 
     Gap()
     RepoDropdown(state, node, onAddRepo)
+    Gap(8)
+    IsolationDropdown(state, node)
 
     if (can.extraDirectories) {
         Gap(8)
@@ -578,6 +581,8 @@ private fun ShellFields(
 
     Gap()
     RepoDropdown(state, node, onAddRepo)
+    Gap(8)
+    IsolationDropdown(state, node)
 }
 
 @Composable
@@ -826,6 +831,25 @@ private fun PromptField(
 }
 
 @Composable
+private fun IsolationDropdown(
+    state: EditorState,
+    node: WorkflowNode,
+) {
+    InspectorDropdown(
+        label = Strings.Labels.ISOLATION,
+        selected = node.isolation,
+        options = Isolation.entries,
+        optionLabel = { it.cliValue },
+        onSelect = { state.updateNode(node.copy(isolation = it)) },
+        noneLabel =
+            state.resolvedWorkflow.defaults.isolation
+                ?.let { Strings.Inspector.workflowDefault(it.cliValue) }
+                ?: Strings.Inspector.WORKFLOW_DEFAULT,
+        supportingText = Strings.Inspector.ISOLATION_HINT,
+    )
+}
+
+@Composable
 private fun RepoDropdown(
     state: EditorState,
     node: WorkflowNode,
@@ -949,7 +973,7 @@ private fun EditorState.upstreamReferences(nodeId: String): List<UpstreamNodeRef
     workflow
         .ancestorsOf(nodeId)
         .mapNotNull { workflow.node(it) }
-        .map { upstream -> UpstreamNodeReferences(upstream, upstream.outputFields(connector(upstream.connector)?.manifest)) }
+        .map { upstream -> UpstreamNodeReferences(upstream, resolvedWorkflow.outputFields(upstream, connector(upstream.connector)?.manifest)) }
 
 private val InspectorPreviewWidth = 340.dp
 

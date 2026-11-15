@@ -101,6 +101,12 @@ const val DEFAULT_KEEP_RUNS = KEEP_EVERY_RUN
 
 const val MAX_KEEP_RUNS = 5_000
 
+const val KEEP_WORKTREES_WITH_RUN = 0
+
+const val DEFAULT_KEEP_WORKTREE_DAYS = 7
+
+const val MAX_KEEP_WORKTREE_DAYS = 365
+
 @Serializable
 data class WindowFrame(
     val width: Int,
@@ -119,6 +125,7 @@ data class AppSettings(
     val notify: NotifyLevel = NotifyLevel.EVERYTHING,
     val theme: ThemePreference = ThemePreference.SYSTEM,
     val keepRuns: Int = DEFAULT_KEEP_RUNS,
+    val keepWorktreeDays: Int = DEFAULT_KEEP_WORKTREE_DAYS,
     val checkForUpdates: Boolean = true,
     val autoUpdate: Boolean = false,
     val window: WindowFrame? = null,
@@ -133,6 +140,7 @@ data class AppSettings(
             notify = notify,
             theme = theme,
             keepRuns = keepRuns.coerceIn(0, MAX_KEEP_RUNS),
+            keepWorktreeDays = keepWorktreeDays.coerceIn(0, MAX_KEEP_WORKTREE_DAYS),
             checkForUpdates = checkForUpdates,
             autoUpdate = autoUpdate && checkForUpdates,
             window = window?.takeIf { it.width > 0 && it.height > 0 },

@@ -44,7 +44,7 @@ class Workspace(
     val connectorsDir: Path get() = root.resolve("connectors")
     val skillsDir: Path get() = root.resolve("skills")
 
-    val selfRepo: Path? by lazy { findEnclosingGitRepo(root) }
+    val selfRepo: Path? by lazy { enclosingGitRepo(root) }
 
     fun resolvePath(raw: String): Path = resolvePathAgainst(raw, root)
 
@@ -113,16 +113,16 @@ class Workspace(
         }
 
         private fun defaultName(root: Path): String = root.parent?.takeIf { it != homeDir() }?.name ?: "zopf"
-
-        private fun findEnclosingGitRepo(from: Path): Path? {
-            var current: Path? = from.toAbsolutePath().normalize()
-            while (current != null) {
-                if (Files.exists(current.resolve(".git"))) return current
-                current = current.parent
-            }
-            return null
-        }
     }
+}
+
+fun enclosingGitRepo(from: Path): Path? {
+    var current: Path? = from.toAbsolutePath().normalize()
+    while (current != null) {
+        if (Files.exists(current.resolve(".git"))) return current
+        current = current.parent
+    }
+    return null
 }
 
 internal fun homeDir(): Path = Paths.get(System.getProperty("user.home"))

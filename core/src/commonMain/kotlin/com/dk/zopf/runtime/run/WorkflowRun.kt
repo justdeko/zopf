@@ -2,6 +2,7 @@ package com.dk.zopf.runtime.run
 
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
+import com.dk.zopf.runtime.exec.Worktree
 import com.dk.zopf.runtime.macos.NotificationAction
 import com.dk.zopf.runtime.outcome
 import com.dk.zopf.store.NodeRunRecord
@@ -134,6 +135,8 @@ class WorkflowRun(
                         startedAt = node.startedAt.toString(),
                         finishedAt = node.finishedAt?.toString(),
                         cwd = node.cwd?.toString(),
+                        worktree = node.worktree?.path?.toString(),
+                        branch = node.worktree?.branch,
                         sessionId = node.sessionId,
                         command = node.command,
                         exitCode = node.exitCode,
@@ -197,6 +200,7 @@ class WorkflowRun(
                         cwd = node.cwd?.let { Paths.get(it) },
                         startedAt = parseInstant(node.startedAt),
                         provider = node.provider,
+                        worktree = node.worktree?.let { Worktree(Paths.get(it), node.branch.orEmpty()) },
                     ),
                 )
             }

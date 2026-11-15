@@ -48,6 +48,7 @@ data class NodeDefaults(
     val permissionMode: PermissionMode? = null,
     val sandbox: Sandbox? = null,
     val repo: String? = null,
+    val isolation: Isolation? = null,
     val timeoutSeconds: Int? = null,
 ) {
     val isEmpty: Boolean get() = this == NodeDefaults()
@@ -62,12 +63,15 @@ data class NodeDefaults(
                 permissionMode = permissionMode ?: fallback.permissionMode,
                 sandbox = sandbox ?: fallback.sandbox,
                 repo = repo ?: fallback.repo,
+                isolation = isolation ?: fallback.isolation,
                 timeoutSeconds = timeoutSeconds ?: fallback.timeoutSeconds,
             )
         }
 }
 
 fun Workflow.withDefaultsFrom(workspace: NodeDefaults): Workflow = if (workspace.isEmpty) this else copy(defaults = defaults.orElse(workspace))
+
+fun Workflow.isolates(node: WorkflowNode): Boolean = node.type.canIsolate() && (node.isolation ?: defaults.isolation) == Isolation.WORKTREE
 
 @Serializable
 data class WorkflowNode(
@@ -77,6 +81,7 @@ data class WorkflowNode(
     val title: String = "",
     val position: Position? = null,
     val repo: String? = null,
+    val isolation: Isolation? = null,
     val model: String? = null,
     val permissionMode: PermissionMode? = null,
     val sandbox: Sandbox? = null,
@@ -109,6 +114,8 @@ enum class NodeType {
     ;
 
     val serialName: String get() = name.lowercase()
+
+    fun canIsolate(): Boolean = this == AGENT || this == SHELL
 }
 
 internal const val LEGACY_AGENT_TYPE = "claude"
@@ -181,6 +188,24 @@ enum class Sandbox {
                 READ_ONLY -> "read-only"
                 WORKSPACE_WRITE -> "workspace-write"
                 DANGER_FULL_ACCESS -> "danger-full-access"
+            }
+}
+
+@Serializable
+enum class Isolation {
+    @SerialName("none")
+    NONE,
+
+    @SerialName("worktree")
+    WORKTREE,
+
+    ;
+
+    val cliValue: String
+        get() =
+            when (this) {
+                NONE -> "none"
+                WORKTREE -> "worktree"
             }
 }
 

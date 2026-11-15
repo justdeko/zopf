@@ -2,6 +2,7 @@ package com.dk.zopf.runtime
 
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.EdgeTrigger
+import com.dk.zopf.model.Isolation
 import com.dk.zopf.model.NodeDefaults
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.RepoRef
@@ -9,6 +10,9 @@ import com.dk.zopf.model.WORKFLOW_VERSION
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowEdge
 import com.dk.zopf.model.WorkflowNode
+import com.dk.zopf.runtime.exec.Worktree
+import com.dk.zopf.runtime.exec.gitIn
+import com.dk.zopf.runtime.exec.gitRepo
 import com.dk.zopf.runtime.run.ConsoleEntry
 import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.runtime.run.RunStatus
@@ -33,10 +37,13 @@ import java.nio.file.Path
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.io.path.exists
+import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -753,10 +760,210 @@ class WorkflowEngineTest {
         concurrency: Int = DEFAULT_CONCURRENCY,
         archiveRoot: Path = tempDir(),
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
+        worktreeRoot: Path = tempDir(),
     ): WorkflowEngine {
         val scope = CoroutineScope(Job() + dispatcher).also { scopes.add(it) }
         val settings = LiveSettings(AppSettings(concurrency = concurrency))
-        return WorkflowEngine(scope, executor, archiveRoot, settings)
+        return WorkflowEngine(scope, executor, archiveRoot, settings, worktreeRoot = worktreeRoot)
+    }
+
+    private fun isolated(node: WorkflowNode) = node.copy(repo = "app", isolation = Isolation.WORKTREE)
+
+    private fun onRepo(
+        repo: Path,
+        nodes: List<WorkflowNode>,
+        edges: List<Pair<String, String>> = emptyList(),
+    ) = workflow(nodes, edges).copy(repos = listOf(RepoRef("app", repo.toString())))
+
+    private fun editing(fail: Set<String> = emptySet()) =
+        FakeExecutor(fail = fail, visit = { execution ->
+            execution.run.worktree?.let {
+                execution.run.cwd
+                    ?.resolve("notes.txt")
+                    ?.writeText(execution.node.id)
+            }
+        })
+
+    private fun runIsolated(
+        workflow: Workflow,
+        executor: FakeExecutor = editing(),
+        worktreeRoot: Path = tempDir(),
+        archiveRoot: Path = tempDir(),
+        inherited: Map<String, NodeOutput> = emptyMap(),
+    ): WorkflowRun =
+        runBlocking {
+            val engine = engine(executor, archiveRoot = archiveRoot, worktreeRoot = worktreeRoot)
+            val run = engine.start(workspace(), workflow, inherited = inherited).getOrThrow()
+            withTimeout(30.seconds) { run.job?.join() }
+            run
+        }
+
+    @Test
+    fun `an isolated node runs in a worktree of its repo`() {
+        val repo = gitRepo(tempDir())
+        val worktreeRoot = tempDir()
+        val archiveRoot = tempDir()
+
+        val run = runIsolated(onRepo(repo, listOf(isolated(claude("fix")))), worktreeRoot = worktreeRoot, archiveRoot = archiveRoot)
+
+        val node = assertNotNull(run.node("fix"))
+        val worktree = assertNotNull(node.worktree)
+        assertEquals(RunStatus.SUCCEEDED, run.status)
+        assertEquals(worktreeRoot.resolve(run.id).resolve("fix"), node.cwd)
+        assertEquals("zopf/fix-${run.id.take(8)}", worktree.branch)
+        assertTrue(worktree.path.resolve("README.md").exists())
+        assertEquals(worktree.branch, gitIn(worktree.path, "rev-parse", "--abbrev-ref", "HEAD"))
+
+        val record = assertNotNull(RunArchive.all(archiveRoot).single().read()).nodes.single()
+        assertEquals(worktree.path.toString(), record.worktree)
+        assertEquals(worktree.branch, record.branch)
+    }
+
+    @Test
+    fun `isolated nodes side by side get a worktree each`() {
+        val repo = gitRepo(tempDir())
+
+        val run = runIsolated(onRepo(repo, listOf(isolated(claude("left")), isolated(shell("right")))))
+
+        val places = run.nodes.map { assertNotNull(it.cwd) }
+        assertEquals(RunStatus.SUCCEEDED, run.status)
+        assertEquals(2, places.distinct().size)
+        places.forEach { assertTrue(it.resolve("README.md").exists(), "$it") }
+    }
+
+    @Test
+    fun `a later node reads the worktree and branch`() {
+        val repo = gitRepo(tempDir())
+        val executor = editing()
+        val merge = claude("merge").copy(repo = "app", prompt = "\${fix.worktree} \${fix.branch}")
+
+        val run = runIsolated(onRepo(repo, listOf(isolated(claude("fix")), merge), listOf("fix" to "merge")), executor)
+
+        val worktree = assertNotNull(run.node("fix")?.worktree)
+        assertEquals("${worktree.path} ${worktree.branch}", executor.prompts["merge"])
+        assertEquals(repo, run.node("merge")?.cwd)
+    }
+
+    @Test
+    fun `an isolated node keeps its place inside the repo`() {
+        val repo = gitRepo(tempDir(), files = listOf("app/build.txt"))
+        val workflow = workflow(listOf(isolated(shell("build"))), emptyList()).copy(repos = listOf(RepoRef("app", repo.resolve("app").toString())))
+
+        val run = runIsolated(workflow)
+
+        val node = assertNotNull(run.node("build"))
+        assertEquals(assertNotNull(node.worktree).path.resolve("app"), node.cwd)
+        assertTrue(assertNotNull(node.cwd).resolve("build.txt").exists())
+    }
+
+    @Test
+    fun `an isolated node outside a git repository fails`() {
+        val executor = FakeExecutor()
+
+        val run = runIsolated(onRepo(tempDir(), listOf(isolated(shell("build")))), executor)
+
+        assertEquals(RunStatus.FAILED, run.status)
+        assertEquals(emptyList(), executor.started)
+        assertTrue(run.node("build")!!.entries.any { it is ConsoleEntry.Notice && "isn't inside a git repository" in it.text })
+    }
+
+    @Test
+    fun `a directory missing from the last commit fails the node`() {
+        val repo = gitRepo(tempDir())
+        Files.createDirectory(repo.resolve("fresh"))
+        val workflow = workflow(listOf(isolated(shell("build"))), emptyList()).copy(repos = listOf(RepoRef("app", repo.resolve("fresh").toString())))
+
+        val run = runIsolated(workflow)
+
+        assertEquals(RunStatus.FAILED, run.status)
+        assertTrue(run.node("build")!!.entries.any { it is ConsoleEntry.Notice && "isn't committed" in it.text })
+    }
+
+    @Test
+    fun `isolation in defaults skips a node that says none`() {
+        val repo = gitRepo(tempDir())
+        val worktreeRoot = tempDir()
+        val workflow =
+            onRepo(repo, listOf(claude("fix"), shell("check").copy(isolation = Isolation.NONE)))
+                .copy(defaults = NodeDefaults(repo = "app", isolation = Isolation.WORKTREE))
+
+        val run = runIsolated(workflow, worktreeRoot = worktreeRoot)
+
+        assertEquals(worktreeRoot.resolve(run.id).resolve("fix"), run.node("fix")?.cwd)
+        assertEquals(repo, run.node("check")?.cwd)
+        assertNull(run.node("check")?.worktree)
+    }
+
+    @Test
+    fun `uncommitted changes in the repo are flagged`() {
+        val repo = gitRepo(tempDir())
+        repo.resolve("README.md").toFile().writeText("edited\n")
+
+        val run = runIsolated(onRepo(repo, listOf(isolated(claude("fix")))))
+
+        val node = assertNotNull(run.node("fix"))
+        assertTrue(node.entries.any { it is ConsoleEntry.Notice && it.isWarning && "uncommitted changes" in it.text })
+        assertEquals("first\n", assertNotNull(node.cwd).resolve("README.md").toFile().readText())
+    }
+
+    @Test
+    fun `a succeeded run drops a worktree nothing changed in`() {
+        val repo = gitRepo(tempDir())
+        val worktreeRoot = tempDir()
+        val executor =
+            FakeExecutor(visit = { execution ->
+                if (execution.node.id == "fix") {
+                    execution.run.cwd
+                        ?.resolve("notes.txt")
+                        ?.writeText("fix")
+                }
+            })
+
+        val run = runIsolated(onRepo(repo, listOf(isolated(claude("fix")), isolated(claude("look")))), executor, worktreeRoot = worktreeRoot)
+
+        assertEquals(RunStatus.SUCCEEDED, run.status)
+        assertTrue(worktreeRoot.resolve(run.id).resolve("fix").exists())
+        assertFalse(worktreeRoot.resolve(run.id).resolve("look").exists())
+        assertEquals(listOf("main", "zopf/fix-${run.id.take(8)}"), gitIn(repo, "branch", "--format=%(refname:short)").lines())
+    }
+
+    @Test
+    fun `a failed run keeps every worktree`() {
+        val repo = gitRepo(tempDir())
+        val worktreeRoot = tempDir()
+
+        val run =
+            runIsolated(
+                onRepo(repo, listOf(isolated(claude("look")), isolated(claude("fix"))), listOf("look" to "fix")),
+                FakeExecutor(fail = setOf("fix")),
+                worktreeRoot = worktreeRoot,
+            )
+
+        assertEquals(RunStatus.FAILED, run.status)
+        assertTrue(worktreeRoot.resolve(run.id).resolve("look").exists())
+        assertTrue(worktreeRoot.resolve(run.id).resolve("fix").exists())
+    }
+
+    @Test
+    fun `a carried node keeps the worktree it had`() {
+        val repo = gitRepo(tempDir())
+        val worktreeRoot = tempDir()
+        val executor = FakeExecutor()
+        val earlier = Worktree(tempDir().resolve("fix"), "zopf/fix-earlier")
+        val merge = claude("merge").copy(prompt = "\${fix.worktree} \${fix.branch}")
+
+        val run =
+            runIsolated(
+                onRepo(repo, listOf(isolated(claude("fix")), merge), listOf("fix" to "merge")),
+                executor,
+                worktreeRoot = worktreeRoot,
+                inherited = mapOf("fix" to NodeOutput(result = "done", worktree = earlier.path.toString(), branch = earlier.branch)),
+            )
+
+        assertEquals(listOf("merge"), executor.started)
+        assertEquals(earlier, run.node("fix")?.worktree)
+        assertEquals("${earlier.path} ${earlier.branch}", executor.prompts["merge"])
+        assertFalse(worktreeRoot.resolve(run.id).exists())
     }
 
     private fun runToCompletion(
@@ -831,6 +1038,7 @@ private class FakeExecutor(
     private val fail: Set<String> = emptySet(),
     private val work: suspend () -> Unit = {},
     private val output: (String) -> String = { "green" },
+    private val visit: (NodeExecution) -> Unit = {},
 ) : NodeExecutor {
     val started: List<String> = Collections.synchronizedList(mutableListOf<String>())
     val prompts = ConcurrentHashMap<String, String>()
@@ -842,6 +1050,7 @@ private class FakeExecutor(
         val id = execution.node.id
         (started as MutableList<String>).add(id)
         prompts[id] = execution.outputs.interpolate(execution.node.prompt).text
+        visit(execution)
 
         peak.accumulateAndGet(running.incrementAndGet()) { a, b -> maxOf(a, b) }
         try {

@@ -1,12 +1,15 @@
 package com.dk.zopf.runtime.run
 
+import com.dk.zopf.model.NodeRefs
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.descendantsOf
+import com.dk.zopf.model.interpolatedFields
 import com.dk.zopf.runtime.NodeOutput
 import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.RunArchive
 import com.dk.zopf.util.Strings
 import java.nio.file.Path
+import kotlin.io.path.exists
 import kotlin.io.path.name
 
 data class ResumePoint(
@@ -73,7 +76,14 @@ object Resume {
         val added = workflow.nodes.map { it.id }.filterNot { it in archived }
         val unfinished = run.nodes.filterNot { it.status == RunStatus.SUCCEEDED }.map { it.nodeId }
         val undecided = run.nodes.filter { !it.nodeType.needsProcess() && it.output().result.isBlank() }.map { it.nodeId }
-        val redo = (added + unfinished + undecided + alsoRedo).flatMapTo(mutableSetOf()) { setOf(it) + workflow.descendantsOf(it) }
+        val needed =
+            workflow.nodes
+                .flatMap { it.interpolatedFields() }
+                .flatMap { NodeRefs.references(it) }
+                .filter { it.second == "worktree" }
+                .mapTo(mutableSetOf()) { it.first }
+        val uprooted = run.nodes.filter { it.nodeId in needed && it.worktree?.path?.exists() == false }.map { it.nodeId }
+        val redo = (added + unfinished + undecided + uprooted + alsoRedo).flatMapTo(mutableSetOf()) { setOf(it) + workflow.descendantsOf(it) }
 
         val carried =
             workflow.nodes

@@ -25,6 +25,7 @@ import com.dk.zopf.runtime.macos.Finder
 import com.dk.zopf.runtime.macos.MacNotifier
 import com.dk.zopf.runtime.macos.TerminalLauncher
 import com.dk.zopf.runtime.macos.UpdateInstall
+import com.dk.zopf.runtime.run.RunHistory
 import com.dk.zopf.runtime.run.RunRegistry
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
@@ -258,11 +259,11 @@ class AppState(
     private fun housekeep() {
         scope.launch(Dispatchers.IO) {
             val keep = settings.current.keepRuns
-            if (keep <= 0) return@launch
-            val gone = RunArchive.prune(root = archiveRoot, keep = keep)
+            val gone = if (keep > 0) RunArchive.prune(root = archiveRoot, keep = keep) else emptyList()
+            val stuck = gone.flatMap { RunHistory.delete(it) } + RunHistory.sweepWorktrees(archiveRoot, settings.current.keepWorktreeDays)
+            stuck.forEach { Log.warn("kept the worktree at $it, git couldn't save and remove it") }
             if (gone.isEmpty()) return@launch
 
-            gone.forEach { RunArchive.delete(it) }
             Log.info("pruned ${gone.size} archived run(s), keeping $keep")
             prunedRunsMessage(gone.size, keep)?.let { message = it }
         }

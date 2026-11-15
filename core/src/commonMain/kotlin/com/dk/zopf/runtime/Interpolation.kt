@@ -8,6 +8,8 @@ data class NodeOutput(
     val exitCode: Int? = null,
     val sessionId: String? = null,
     val costUsd: Double? = null,
+    val worktree: String? = null,
+    val branch: String? = null,
     val extras: Map<String, String> = emptyMap(),
 ) {
     fun field(name: String): String? =
@@ -16,6 +18,8 @@ data class NodeOutput(
             "exitCode" -> exitCode?.toString()
             "sessionId" -> sessionId
             "costUsd" -> costUsd?.toString()
+            "worktree" -> worktree ?: extras[name]
+            "branch" -> branch ?: extras[name]
             else -> extras[name]
         }
 }

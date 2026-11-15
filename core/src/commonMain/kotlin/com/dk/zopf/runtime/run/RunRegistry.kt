@@ -14,7 +14,7 @@ import com.dk.zopf.runtime.macos.Notifier
 import com.dk.zopf.runtime.macos.SilentNotifier
 import com.dk.zopf.runtime.macos.TerminalLauncher
 import com.dk.zopf.store.LiveSettings
-import com.dk.zopf.store.RunArchive
+import com.dk.zopf.store.Log
 import com.dk.zopf.store.workflow.WorkflowStore
 import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.util.Strings
@@ -453,7 +453,7 @@ class RunRegistry(
         val dir = run.archiveDir
         if (run.isElsewhere || dir == null) return Result.failure(IllegalStateException("delete of ${run.id}, elsewhere or not archived"))
         return runCatching {
-            RunArchive.delete(dir)
+            RunHistory.delete(dir).forEach { Log.warn("kept the worktree at $it, git couldn't save and remove it") }
             remove(run)
         }
     }

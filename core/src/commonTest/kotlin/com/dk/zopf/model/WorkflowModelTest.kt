@@ -200,6 +200,53 @@ class WorkflowValidationTest {
     }
 
     @Test
+    fun `only an isolated node exposes a worktree and a branch`() {
+        val w =
+            wf(
+                shell("fix").copy(isolation = Isolation.WORKTREE),
+                shell("plain"),
+                WorkflowNode("tell", NodeType.AGENT, prompt = "\${fix.worktree} \${fix.branch} \${plain.worktree}"),
+                edges = listOf(WorkflowEdge("fix", "tell"), WorkflowEdge("plain", "tell")),
+            )
+
+        assertEquals(1, w.validate().mentioning("but plain only has").size)
+        assertEquals(emptyList(), w.validate().mentioning("but fix only has"))
+    }
+
+    @Test
+    fun `isolation follows the defaults unless the node says otherwise`() {
+        val isolating = NodeDefaults(isolation = Isolation.WORKTREE)
+
+        listOf(
+            Triple(shell("a"), NodeDefaults(), false),
+            Triple(shell("a"), isolating, true),
+            Triple(shell("a").copy(isolation = Isolation.NONE), isolating, false),
+            Triple(shell("a").copy(isolation = Isolation.WORKTREE), NodeDefaults(), true),
+            Triple(WorkflowNode("a", NodeType.AGENT, prompt = "go"), isolating, true),
+            Triple(WorkflowNode("a", NodeType.GATE), isolating, false),
+            Triple(WorkflowNode("a", NodeType.CONNECTOR, connector = "slack-post"), isolating, false),
+        ).forEach { (node, defaults, expected) ->
+            assertEquals(expected, wf(node).copy(defaults = defaults).isolates(node), "${node.type} ${node.isolation} under ${defaults.isolation}")
+        }
+    }
+
+    @Test
+    fun `isolation on a node that runs nowhere is a warning`() {
+        val issue = wf(WorkflowNode("approve", NodeType.GATE, isolation = Isolation.WORKTREE)).validate().single()
+
+        assertEquals(WorkflowIssue.Severity.WARNING, issue.severity)
+        assertTrue("\"isolation\" does nothing" in issue.message, issue.message)
+    }
+
+    @Test
+    fun `an isolated node reserves worktree and branch as field names`() {
+        fun asking(isolation: Isolation?) = wf(WorkflowNode("plan", NodeType.AGENT, prompt = "go", isolation = isolation, schema = listOf(SchemaField("branch")))).validate()
+
+        assertEquals(1, asking(Isolation.WORKTREE).size)
+        assertEquals(emptyList(), asking(null).messages())
+    }
+
+    @Test
     fun `a connector output is checked only against a manifest`() {
         val w =
             wf(

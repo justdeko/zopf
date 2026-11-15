@@ -12,6 +12,7 @@ import com.dk.zopf.runtime.errors
 import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.runtime.run.Resume
 import com.dk.zopf.runtime.run.ResumePoint
+import com.dk.zopf.runtime.run.RunHistory
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.store.AppPaths
@@ -93,6 +94,7 @@ fun runWorkflow(
     }
 
     val settings = LiveSettings(runSettings(options))
+    runCatching { RunHistory.sweepWorktrees(archiveRoot, settings.current.keepWorktreeDays) }
     val screen = renderer(format, out, colour = System.console() != null)
     val decisions = Decisions(gatePolicy, answers)
 

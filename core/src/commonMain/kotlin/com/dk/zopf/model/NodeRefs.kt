@@ -48,3 +48,10 @@ fun WorkflowNode.outputFields(manifest: ConnectorManifest? = null): List<String>
 
     return (type.outputFields() + declared).distinct()
 }
+
+val ISOLATION_FIELDS = listOf("worktree", "branch")
+
+fun Workflow.outputFields(
+    node: WorkflowNode,
+    manifest: ConnectorManifest? = null,
+): List<String> = (node.outputFields(manifest) + if (isolates(node)) ISOLATION_FIELDS else emptyList()).distinct()

@@ -54,9 +54,9 @@ fun Workflow.validate(
 
         fun producedFields(upstream: WorkflowNode): List<String>? =
             when {
-                upstream.type != NodeType.CONNECTOR -> upstream.outputFields()
+                upstream.type != NodeType.CONNECTOR -> outputFields(upstream)
                 connector == null || upstream.connector.isBlank() -> null
-                else -> connector(upstream.connector)?.let { upstream.outputFields(it) }
+                else -> connector(upstream.connector)?.let { outputFields(upstream, it) }
             }
 
         fun checkReferences(
@@ -111,7 +111,8 @@ fun Workflow.validate(
         issues += node.choiceIssues()
         issues += node.promptFileIssues(fileExists)
         issues += node.skillIssues(knownSkills)
-        issues += node.schemaIssues()
+        issues += node.schemaIssues(isolates(node))
+        issues += node.isolationIssues()
         issues += node.providerIssues(providerFor(node, defaultProvider), executableExists)
         issues += branchIssues(node)
         issues += edgeTriggerIssues(node)
@@ -217,7 +218,18 @@ private fun WorkflowNode.promptFileIssues(fileExists: (String) -> Boolean): List
     return issues
 }
 
-private fun WorkflowNode.schemaIssues(): List<WorkflowIssue> {
+private fun WorkflowNode.isolationIssues(): List<WorkflowIssue> {
+    if (isolation == null || type.canIsolate()) return emptyList()
+    return listOf(
+        WorkflowIssue(
+            Strings.Validation.fieldDoesNothing(displayTitle, type.serialName, "isolation"),
+            id,
+            WorkflowIssue.Severity.WARNING,
+        ),
+    )
+}
+
+private fun WorkflowNode.schemaIssues(isolated: Boolean): List<WorkflowIssue> {
     if (schema.isEmpty()) return emptyList()
 
     val issues = mutableListOf<WorkflowIssue>()
@@ -241,7 +253,7 @@ private fun WorkflowNode.schemaIssues(): List<WorkflowIssue> {
             issues += WorkflowIssue(Strings.Validation.duplicateOutputField(displayTitle, it), id)
         }
 
-    val builtIn = NodeType.AGENT.outputFields().toSet()
+    val builtIn = NodeType.AGENT.outputFields().toSet() + if (isolated) ISOLATION_FIELDS else emptyList()
     schema.map { it.name }.filter { it in builtIn }.forEach {
         issues +=
             WorkflowIssue(

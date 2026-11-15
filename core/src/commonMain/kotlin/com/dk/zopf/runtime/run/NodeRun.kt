@@ -11,6 +11,7 @@ import com.dk.zopf.runtime.agent.ContentBlock
 import com.dk.zopf.runtime.agent.PendingPermission
 import com.dk.zopf.runtime.agent.PermissionRequest
 import com.dk.zopf.runtime.exec.ShellLine
+import com.dk.zopf.runtime.exec.Worktree
 import com.dk.zopf.util.Strings
 import com.dk.zopf.util.toFields
 import kotlinx.coroutines.CompletableDeferred
@@ -173,6 +174,7 @@ class NodeRun(
     val cwd: Path?,
     val startedAt: Instant = Instant.now(),
     val provider: AgentProviderId? = null,
+    val worktree: Worktree? = null,
 ) {
     private val _state = MutableStateFlow(NodeRunState())
 
@@ -268,6 +270,8 @@ class NodeRun(
             exitCode = exitCode,
             sessionId = sessionId,
             costUsd = costUsd,
+            worktree = worktree?.path?.toString(),
+            branch = worktree?.branch,
             extras = outputFields,
         )
 

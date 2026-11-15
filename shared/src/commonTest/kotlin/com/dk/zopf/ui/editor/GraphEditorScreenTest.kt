@@ -23,6 +23,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.rightClick
@@ -1042,7 +1043,7 @@ class NodeInspectorTest {
 
             assertEquals(listOf("code-review"), state.skills.map { it.name })
 
-            onNodeWithText("code-review").performClick()
+            onNodeWithText("code-review").performScrollTo().performClick()
             waitForIdle()
 
             assertEquals(listOf("code-review"), state.workflow.node("review")?.skills)

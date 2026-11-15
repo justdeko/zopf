@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.dk.zopf.model.AgentProviderId
+import com.dk.zopf.model.Isolation
 import com.dk.zopf.model.PermissionMode
 import com.dk.zopf.model.RepoRef
 import com.dk.zopf.model.Sandbox
@@ -106,6 +107,18 @@ fun WorkflowSettingsDialog(
                     onSelect = { repo -> state.edit { it.copy(defaults = it.defaults.copy(repo = repo)) } },
                     noneLabel = Strings.WorkflowSettings.REPO_NONE,
                     supportingText = Strings.WorkflowSettings.REPO_HINT,
+                )
+                Gap(8)
+                InspectorDropdown(
+                    label = Strings.Labels.ISOLATION,
+                    selected = workflow.defaults.isolation,
+                    options = Isolation.entries,
+                    optionLabel = { it.cliValue },
+                    onSelect = { isolation ->
+                        state.edit { it.copy(defaults = it.defaults.copy(isolation = isolation)) }
+                    },
+                    noneLabel = Strings.Labels.defaultOf(Isolation.NONE.cliValue),
+                    supportingText = Strings.WorkflowSettings.ISOLATION_HINT,
                 )
                 Gap(8)
                 InspectorDropdown(

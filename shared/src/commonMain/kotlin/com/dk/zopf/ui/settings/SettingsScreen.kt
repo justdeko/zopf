@@ -46,6 +46,7 @@ import com.dk.zopf.store.BuildInfo
 import com.dk.zopf.store.DEFAULT_KEEP_RUNS
 import com.dk.zopf.store.DEFAULT_TERMINAL_APP
 import com.dk.zopf.store.KEEP_EVERY_RUN
+import com.dk.zopf.store.KEEP_WORKTREES_WITH_RUN
 import com.dk.zopf.store.Log
 import com.dk.zopf.store.MAX_CONCURRENCY
 import com.dk.zopf.store.NotifyLevel
@@ -64,6 +65,8 @@ private val TerminalSuggestions = listOf(DEFAULT_TERMINAL_APP, "iTerm", "Ghostty
 private val FormWidth = 620.dp
 
 private val KeepRunsOptions = listOf(0, 50, 200, 1000)
+
+private val KeepWorktreeOptions = listOf(1, 7, 30, KEEP_WORKTREES_WITH_RUN)
 
 @Composable
 fun SettingsScreen(
@@ -141,6 +144,7 @@ fun SettingsScreen(
             Gap(8)
             SectionLabel(Strings.Settings.HISTORY)
             KeepRunsField(settings.keepRuns) { chosen -> onChange { it.copy(keepRuns = chosen) } }
+            KeepWorktreesField(settings.keepWorktreeDays) { chosen -> onChange { it.copy(keepWorktreeDays = chosen) } }
 
             Gap()
             HorizontalDivider()
@@ -348,6 +352,27 @@ private fun KeepRunsField(
     )
     Hint(
         Strings.Settings.PRUNE_HINT,
+    )
+}
+
+@Composable
+private fun KeepWorktreesField(
+    value: Int,
+    onSelect: (Int) -> Unit,
+) {
+    Text(
+        Strings.Settings.WORKTREES_TO_KEEP,
+        Modifier.padding(top = 8.dp),
+        style = MaterialTheme.typography.bodyMedium,
+    )
+    ConnectedChoices(
+        options = KeepWorktreeOptions,
+        selected = if (value == KEEP_WORKTREES_WITH_RUN) value else KeepWorktreeOptions.filter { it > 0 }.minBy { kotlin.math.abs(it - value) },
+        label = { if (it == KEEP_WORKTREES_WITH_RUN) Strings.Settings.WORKTREES_WITH_RUN else Strings.Settings.days(it) },
+        onSelect = onSelect,
+    )
+    Hint(
+        Strings.Settings.WORKTREES_HINT,
     )
 }
 

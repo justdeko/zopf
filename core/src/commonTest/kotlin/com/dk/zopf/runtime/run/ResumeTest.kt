@@ -133,6 +133,29 @@ class ResumeTest {
     }
 
     @Test
+    fun `a node whose worktree is gone and still read runs again`() {
+        val kept = Files.createDirectory(root.resolve("kept"))
+        archived(
+            "run",
+            listOf(
+                node("a", "SUCCEEDED").copy(worktree = kept.toString(), branch = "zopf/a-run"),
+                node("b", "SUCCEEDED").copy(worktree = root.resolve("gone").toString(), branch = "zopf/b-run"),
+                node("c", "SUCCEEDED").copy(worktree = root.resolve("gone-too").toString(), branch = "zopf/c-run"),
+                node("d", "FAILED"),
+            ),
+        )
+        val workflow = graph(listOf("a", "b", "c", "d"), listOf("a" to "d", "b" to "d", "c" to "d"))
+        val reading = workflow.copy(nodes = workflow.nodes.map { if (it.id == "d") it.copy(command = "ls \${a.worktree} \${b.worktree}") else it })
+
+        val point = Resume.pointFor(Resume.find("run", root).getOrThrow(), reading)
+
+        assertEquals(setOf("a", "c"), point.carried.keys)
+        assertEquals(kept.toString(), point.carried.getValue("a").worktree)
+        assertEquals("zopf/a-run", point.carried.getValue("a").branch)
+        assertEquals(listOf("b", "d"), point.redo)
+    }
+
+    @Test
     fun `a node that succeeded after a failed one runs again`() {
         archived(
             "run",

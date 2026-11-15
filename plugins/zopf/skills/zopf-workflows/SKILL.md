@@ -178,7 +178,7 @@ This is the entire data-passing mechanism. There is no expression language, no d
 
 Fields by type: every node has `result`. A `agent` node also has `sessionId` and `costUsd`; `shell`
 and `connector` also have `exitCode`; a connector adds whatever its manifest declares as outputs, and an `agent` node
-adds whatever its `schema:` declares.
+adds whatever its `schema:` declares. A node with `isolation: worktree` also has `worktree` and `branch`.
 
 A reference works **only in these places**: a node's `prompt`, `command`, `expression`, the values of a connector's
 `inputs`, and inside the file named by `promptFile`. It does **not** work in `title`,

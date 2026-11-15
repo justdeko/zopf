@@ -60,6 +60,7 @@ object Strings {
         const val REPOS = "Repos"
         const val PERMISSION_MODE = "Permission mode"
         const val SANDBOX = "Sandbox"
+        const val ISOLATION = "Isolation"
         const val UNREADABLE = "Can't be read"
         const val CHOOSE_SKILL_DIRECTORY = "Choose a skill directory"
         const val CLI_DEFAULT = "Whatever the CLI is set to"
@@ -315,6 +316,12 @@ object Strings {
         const val INSTALL_IT = "Install it"
 
         const val RUNS_TO_KEEP = "Runs to keep"
+        const val WORKTREES_TO_KEEP = "Keep worktrees for"
+        const val WORKTREES_WITH_RUN = "As long as the run"
+        const val WORKTREES_HINT = "After a run ends. Uncommitted edits are saved to the node's branch first."
+
+        fun days(count: Int) = if (count == 1) "1 day" else "$count days"
+
         const val KEEP_ALL = "All"
         const val RUNS_TO_KEEP_HINT =
             "A run archives every message, tool call and output line, so a chatty build can be megabytes. " +
@@ -572,6 +579,8 @@ object Strings {
 
         fun workflowDefault(value: String) = "Workflow default ($value)"
 
+        const val ISOLATION_HINT = "worktree runs the node in its own checkout on a new branch."
+
         fun sandboxHint(label: String) = "Chosen before launch, since $label has no way to ask mid-turn. Nothing here can be approved inline."
 
         fun ignoredFields(
@@ -617,6 +626,7 @@ object Strings {
         const val PROVIDER_HINT = "Which agent CLI this workflow's agent nodes run, unless they name their own."
         const val PERMISSION_MODE_HINT = "Claude Code only."
         const val SANDBOX_HINT = "codex only."
+        const val ISOLATION_HINT = "worktree gives each node its own checkout."
 
         const val NO_REPOS_DECLARED = "None declared. Nodes fall back to the workspace directory."
         const val USED_BY_OTHER_WORKFLOWS = "Used by other workflows"
@@ -995,6 +1005,18 @@ object Strings {
 
         fun sandbox(mode: String) = "Sandbox: $mode"
 
+        fun worktree(
+            path: Any,
+            branch: String,
+        ) = "Worktree: $path on $branch"
+
+        fun leftoverCommit(
+            node: String,
+            run: String,
+        ) = "zopf: uncommitted work left by $node in run $run"
+
+        fun uncommittedLeftBehind(repo: Any) = "$repo has uncommitted changes. The worktree starts from the last commit and doesn't have them."
+
         fun autoModeUnavailable(mode: String) = "Auto mode is not available here. The session runs in $mode mode and may stop to ask."
 
         fun loginExpires(days: Long) = if (days == 0L) "The login for this CLI expires today. Sign in again." else "The login for this CLI expires in $days days. Sign in again."
@@ -1082,6 +1104,21 @@ object Strings {
 
         fun pathGone(path: Any) = "$path isn't there any more"
 
+        fun notAGitRepo(
+            title: String,
+            path: Any,
+        ) = "$title asks for a worktree, but $path isn't inside a git repository"
+
+        fun worktreeFailed(
+            repo: Any,
+            output: String,
+        ) = "git couldn't add a worktree for $repo: $output"
+
+        fun notInWorktree(
+            dir: Any?,
+            repo: Any,
+        ) = "$dir isn't committed in $repo, so the worktree doesn't have it"
+
         fun executableMissing(executable: String) = "Couldn't find \"$executable\" on your PATH"
 
         fun missingExecutables(
@@ -1159,6 +1196,8 @@ object Strings {
         ) = "$name: warning: $rendered"
 
         fun okLine(name: String) = "$name: ok"
+
+        fun keptWorktree(path: Any) = "kept the worktree at $path, git couldn't save and remove it"
 
         fun nothingToPrune(keep: Int) = "nothing to prune, keeping $keep"
 

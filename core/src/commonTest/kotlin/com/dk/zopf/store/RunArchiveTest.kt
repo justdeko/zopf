@@ -10,6 +10,8 @@ import com.dk.zopf.runtime.ProcessNodeExecutor
 import com.dk.zopf.runtime.Reconciliation
 import com.dk.zopf.runtime.SessionReconciler
 import com.dk.zopf.runtime.WorkflowEngine
+import com.dk.zopf.runtime.exec.Worktrees
+import com.dk.zopf.runtime.exec.gitRepo
 import com.dk.zopf.runtime.run.ConsoleEntry
 import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.runtime.run.Restore
@@ -17,6 +19,7 @@ import com.dk.zopf.runtime.run.RunHistory
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.runtime.run.showing
+import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.NodeRunRecord
 import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.RunRecord
@@ -31,12 +34,14 @@ import java.nio.file.Path
 import java.nio.file.attribute.FileTime
 import java.time.Instant
 import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
 import kotlin.io.path.name
 import kotlin.io.path.readLines
 import kotlin.io.path.setLastModifiedTime
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -60,6 +65,79 @@ class RunHistoryTest {
     private fun liveProcess(): Process = ProcessBuilder("/bin/sleep", "60").start().also { spawned.add(it) }
 
     private fun deadPid(): Long = ProcessBuilder("/usr/bin/true").start().also { it.waitFor() }.pid()
+
+    @Test
+    fun `deleting a run takes its worktrees with it`() {
+        val archiveRoot = tempDir()
+        val worktreeRoot = tempDir()
+        val repo = gitRepo(tempDir())
+        val archive = RunArchive.create("4f6a21c8-run", "ws", archiveRoot)
+        archive.write(RunRecord(id = "4f6a21c8-run", workflow = "demo", startedAt = "2026-08-11T09:00:00Z", status = "SUCCEEDED"))
+        val worktree = Worktrees.planned(worktreeRoot, "4f6a21c8-run", "fix").also { Worktrees.create(repo, it).getOrThrow() }
+
+        assertEquals(emptyList(), RunHistory.delete(archive.dir, worktreeRoot))
+
+        assertFalse(worktree.path.exists())
+        assertFalse(archive.dir.exists())
+    }
+
+    @Test
+    fun `worktrees go a set number of days after their run`() {
+        val archiveRoot = tempDir()
+        val repo = gitRepo(tempDir())
+        val now = Instant.parse("2026-08-20T12:00:00Z")
+
+        fun worktreeOf(
+            runId: String,
+            finishedAt: String?,
+            pid: Long? = null,
+            archived: Boolean = true,
+            startedAt: String = "2026-08-01T09:00:00Z",
+        ): Path {
+            if (archived) {
+                RunArchive.create(runId, "ws", archiveRoot).write(
+                    RunRecord(
+                        id = runId,
+                        workflow = "demo",
+                        startedAt = startedAt,
+                        finishedAt = finishedAt,
+                        status = if (finishedAt == null) "RUNNING" else "FAILED",
+                        pid = pid,
+                    ),
+                )
+            }
+            val worktree = Worktrees.planned(AppPaths.worktreesFor(archiveRoot), runId, "fix")
+            Worktrees.create(repo, worktree).getOrThrow()
+            return worktree.path
+        }
+
+        val cases =
+            listOf(
+                Triple("old", worktreeOf("11111111-old", "2026-08-12T12:00:00Z"), false),
+                Triple("recent", worktreeOf("22222222-recent", "2026-08-14T12:00:00Z"), true),
+                Triple("running elsewhere", worktreeOf("33333333-live", null, pid = liveProcess().pid(), startedAt = "2999-01-01T00:00:00Z"), true),
+                Triple("died mid-run", worktreeOf("44444444-dead", null, pid = deadPid()), false),
+                Triple("run deleted", worktreeOf("55555555-gone", null, archived = false), false),
+            )
+
+        assertEquals(emptyList(), RunHistory.sweepWorktrees(archiveRoot, keepDays = 7, now = now))
+
+        cases.forEach { (case, path, stays) -> assertEquals(stays, path.exists(), case) }
+    }
+
+    @Test
+    fun `keeping worktrees with the run turns the clock off`() {
+        val archiveRoot = tempDir()
+        val repo = gitRepo(tempDir())
+        RunArchive.create("11111111-old", "ws", archiveRoot).write(
+            RunRecord(id = "11111111-old", workflow = "demo", startedAt = "2020-01-01T09:00:00Z", finishedAt = "2020-01-01T09:05:00Z", status = "FAILED"),
+        )
+        val worktree = Worktrees.planned(AppPaths.worktreesFor(archiveRoot), "11111111-old", "fix").also { Worktrees.create(repo, it).getOrThrow() }
+
+        RunHistory.sweepWorktrees(archiveRoot, keepDays = 0)
+
+        assertTrue(worktree.path.exists())
+    }
 
     @Test
     fun `a finished run comes back with its verdict and output`() {

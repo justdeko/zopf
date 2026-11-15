@@ -5,17 +5,22 @@ import com.dk.zopf.model.NodeDefaults
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowNode
+import com.dk.zopf.model.isolates
 import com.dk.zopf.model.withDefaultsFrom
+import com.dk.zopf.runtime.exec.Worktree
+import com.dk.zopf.runtime.exec.Worktrees
 import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.runtime.run.needsProcess
+import com.dk.zopf.store.AppPaths
 import com.dk.zopf.store.LiveSettings
 import com.dk.zopf.store.Log
 import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.RunRecord
 import com.dk.zopf.store.workspace.ConnectorStore
 import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.store.workspace.enclosingGitRepo
 import com.dk.zopf.util.Strings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -27,10 +32,13 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -46,7 +54,10 @@ class WorkflowEngine(
     private val onFinished: (WorkflowRun) -> Unit = {},
     private val onWaiting: (NodeRun) -> Unit = {},
     private val onRaw: (String, String) -> Unit = { _, _ -> },
+    private val worktreeRoot: Path = AppPaths.worktreesFor(archiveRoot),
 ) {
+    private val checkouts = Mutex()
+
     fun start(
         workspace: Workspace?,
         workflow: Workflow,
@@ -87,14 +98,15 @@ class WorkflowEngine(
             )
         }
 
-        val placements = plan.associate { it.id to resolveCwd(workspace, workflow, it) }
+        val runId = UUID.randomUUID().toString()
+        val placements = plan.associate { it.id to place(workspace, workflow, it, runId, inherited[it.id]) }
         if (only != null) {
             placements.getValue(only.id).exceptionOrNull()?.let { return Result.failure(it) }
         }
 
         val run =
             WorkflowRun(
-                id = UUID.randomUUID().toString(),
+                id = runId,
                 workflowName = workflow.name,
                 workspaceRoot = workspace?.root,
                 isInteractive = only != null,
@@ -110,11 +122,12 @@ class WorkflowEngine(
                     nodeId = node.id,
                     nodeTitle = node.displayTitle,
                     nodeType = node.type,
-                    cwd = placements.getValue(node.id).getOrNull(),
+                    cwd = placements.getValue(node.id).getOrNull()?.cwd,
                     provider =
                         node.takeIf { it.type == NodeType.AGENT }?.let {
                             resolveProvider(it, workflow, settings.current)
                         },
+                    worktree = placements.getValue(node.id).getOrNull()?.worktree,
                 ),
             )
         }
@@ -167,7 +180,7 @@ class WorkflowEngine(
         workflow: Workflow,
         workspace: Workspace?,
         plan: List<WorkflowNode>,
-        placements: Map<String, Result<Path?>>,
+        placements: Map<String, Result<Placement>>,
         archive: RunArchive,
         inherited: Map<String, NodeOutput>,
     ) {
@@ -280,7 +293,7 @@ class WorkflowEngine(
         workspace: Workspace?,
         outputs: RunContext,
         branches: MutableMap<String, Boolean>,
-        placements: Map<String, Result<Path?>>,
+        placements: Map<String, Result<Placement>>,
         archive: RunArchive,
         permits: Semaphore,
     ) {
@@ -292,7 +305,7 @@ class WorkflowEngine(
 
                 else ->
                     permits.withPermit {
-                        placements.getValue(node.id).getOrThrow()
+                        checkOut(nodeRun, placements.getValue(node.id).getOrThrow())
                         executor.execute(
                             NodeExecution(
                                 run = nodeRun,
@@ -396,6 +409,12 @@ class WorkflowEngine(
                 run.nodes.any { it.status == RunStatus.DETACHED } -> RunStatus.DETACHED
                 else -> RunStatus.SUCCEEDED
             }
+        if (outcome == RunStatus.SUCCEEDED) {
+            run.nodes
+                .mapNotNull { it.worktree }
+                .filter { it.path.startsWith(worktreeRoot.resolve(run.id)) }
+                .forEach { runCatching { Worktrees.dropUnchanged(it) } }
+        }
         run.settle(outcome = outcome, finishedAt = Instant.now())
         archive.keep(run.record())
         archive.close()
@@ -413,6 +432,55 @@ class WorkflowEngine(
             val rescue = node(edge.to)?.status ?: return@any false
             rescue != RunStatus.SKIPPED
         }
+
+    private class Placement(
+        val cwd: Path?,
+        val worktree: Worktree? = null,
+        val repo: Path? = null,
+    )
+
+    private suspend fun checkOut(
+        nodeRun: NodeRun,
+        placement: Placement,
+    ) {
+        val repo = placement.repo ?: return
+        val worktree = placement.worktree ?: return
+        val leftBehind =
+            checkouts.withLock {
+                withContext(Dispatchers.IO) {
+                    Worktrees.create(repo, worktree).getOrThrow()
+                    Worktrees.hasUncommittedChanges(repo)
+                }
+            }
+        check(placement.cwd?.isDirectory() == true) {
+            Strings.RunErrors.notInWorktree(worktree.path.relativize(placement.cwd), repo)
+        }
+        nodeRun.notice(Strings.Transcript.worktree(worktree.path, worktree.branch))
+        if (leftBehind) nodeRun.notice(Strings.Transcript.uncommittedLeftBehind(repo), isWarning = true)
+    }
+
+    private fun place(
+        workspace: Workspace?,
+        workflow: Workflow,
+        node: WorkflowNode,
+        runId: String,
+        carried: NodeOutput?,
+    ): Result<Placement> {
+        val dir = resolveCwd(workspace, workflow, node).getOrElse { return Result.failure(it) }
+        if (dir == null || !workflow.isolates(node)) return Result.success(Placement(dir))
+
+        val home = dir.toAbsolutePath().normalize()
+        val repo =
+            enclosingGitRepo(home)
+                ?: return Result.failure(IllegalStateException(Strings.RunErrors.notAGitRepo(node.displayTitle, home)))
+        val inside = repo.relativize(home)
+        if (carried != null) {
+            val kept = carried.worktree?.let { Worktree(Paths.get(it), carried.branch.orEmpty()) }
+            return Result.success(Placement(kept?.path?.resolve(inside) ?: dir, kept))
+        }
+        val worktree = Worktrees.planned(worktreeRoot, runId, node.id)
+        return Result.success(Placement(worktree.path.resolve(inside), worktree, repo))
+    }
 
     private fun resolveCwd(
         workspace: Workspace?,

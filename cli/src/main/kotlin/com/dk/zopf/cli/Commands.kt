@@ -4,8 +4,10 @@ import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowIssue
 import com.dk.zopf.runtime.UpdateCheck
 import com.dk.zopf.runtime.issues
+import com.dk.zopf.runtime.run.RunHistory
 import com.dk.zopf.runtime.updateChecksSilenced
 import com.dk.zopf.store.AppPaths
+import com.dk.zopf.store.AppSettings
 import com.dk.zopf.store.BuildInfo
 import com.dk.zopf.store.RunArchive
 import com.dk.zopf.store.RunRecord
@@ -130,19 +132,23 @@ fun pruneRuns(
     options: Options,
     out: PrintStream,
     archiveRoot: Path = AppPaths.runsDir,
+    keepWorktreeDays: Int = SettingsStore().read().getOrElse { AppSettings() }.keepWorktreeDays,
 ) {
     val keep = options.int("keep", 0..100_000) ?: DEFAULT_KEEP
     val olderThan = options.int("older-than", 1..36_500)?.let { Duration.ofDays(it.toLong()) }
     val dryRun = options.has("dry-run")
 
     val doomed = RunArchive.prune(archiveRoot, keep, olderThan)
+    val stuck =
+        doomed.flatMap { dir ->
+            out.println("${if (dryRun) Strings.Cli.WOULD_DELETE else Strings.Cli.DELETED} $dir")
+            if (dryRun) emptyList() else RunHistory.delete(dir)
+        } + if (dryRun) emptyList() else RunHistory.sweepWorktrees(archiveRoot, keepWorktreeDays)
+    stuck.forEach { out.println(Strings.Cli.keptWorktree(it)) }
+
     if (doomed.isEmpty()) {
         out.println(Strings.Cli.nothingToPrune(keep))
         return
-    }
-    doomed.forEach { dir ->
-        out.println("${if (dryRun) Strings.Cli.WOULD_DELETE else Strings.Cli.DELETED} $dir")
-        if (!dryRun) RunArchive.delete(dir)
     }
     out.println(Strings.Cli.pruned(doomed.size, if (dryRun) Strings.Cli.WOULD_GO else Strings.Cli.GONE, keep))
 }
