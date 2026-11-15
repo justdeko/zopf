@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0
+
+- worktree isolation for nodes
+- save a session as a workflow
+- livelier canvas and run views
+- login expiry and auto mode warnings
+
 ## 1.4.0
 
 - generate workflows from a prompt
