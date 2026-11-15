@@ -162,6 +162,8 @@ internal interface LiveProcess {
     fun endInput()
 }
 
+private const val LOGIN_WARNING_DAYS = 10L
+
 class NodeRun(
     val id: String,
     val workflowName: String,
@@ -310,6 +312,10 @@ class NodeRun(
                 event.permissionDenials.forEach {
                     notice(Strings.Transcript.denied(it.toolName, it.summary), isWarning = true)
                 }
+                event.loginExpiresAt
+                    ?.let { Duration.between(Instant.now(), it).toDays() }
+                    ?.takeIf { it in 0..LOGIN_WARNING_DAYS }
+                    ?.let { notice(Strings.Transcript.loginExpires(it), isWarning = true) }
 
                 (event.text?.takeIf { it.isNotBlank() } ?: lastMessage)?.let {
                     outputBuffer.setLength(0)

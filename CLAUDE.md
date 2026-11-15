@@ -252,6 +252,9 @@ kuiver (`io.github.justdeko:kuiver`) is a viewer. zopf owns:
   goes through `startConnecting`/`completeConnection`.
 - Positions — `manualPositions`/`moveNode()`, default `RelayoutPolicy.KEEP_MANUAL`, reapplied after
   each layout pass.
+- Camera — `ui/editor/Camera.kt`. Pans to a node that goes live or gets selected, only if off
+  screen; a user pan stops run-following until the run ends. Hover focus is off while a run is on
+  the canvas: the camera slides nodes under a resting cursor and dims the run at random.
 - Theme — kuiver reads `LocalKuiverColors`, not `MaterialTheme`; black-on-white and broken in dark
   mode without `ui/theme/KuiverBridge.kt`.
 

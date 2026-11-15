@@ -1,12 +1,20 @@
 package com.dk.zopf.ui.editor
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,18 +29,25 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.toPath
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -40,6 +55,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.graphics.shapes.Morph
+import androidx.graphics.shapes.RoundedPolygon
 import com.dk.kuiver.SelectionMode
 import com.dk.kuiver.renderer.KuiverInteractionCallbacks
 import com.dk.kuiver.renderer.KuiverNodeScope
@@ -52,6 +69,7 @@ import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.label
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.ui.preview.PreviewFixtures
+import com.dk.zopf.ui.runs.ThinWavyBar
 import com.dk.zopf.ui.runs.color
 import com.dk.zopf.ui.theme.KuiverBridge
 import com.dk.zopf.ui.theme.PathIcon
@@ -63,6 +81,15 @@ import com.dk.zopf.util.Strings
 private val CardWidth = 260.dp
 private val BadgeSize = 15.dp
 private const val PulseMillis = 850
+private const val StatusTint = 0.10f
+private val GlyphSize = 20.dp
+private val GlyphIconSize = 11.dp
+private const val SpinMillis = 6_000
+private const val BreatheMillis = 1_100
+private const val BreatheScale = 1.18f
+private const val DragLift = 1.03f
+private const val BadgeInMillis = 180
+private const val BadgeOutMillis = 120
 private val SkippedAlpha = 0.5f
 private val SelectedTint = 0.07f
 
@@ -120,17 +147,46 @@ fun KuiverNodeScope.WorkflowNodeCard(
         label = "nodeOutlineWidth",
     )
 
+    val motion = MaterialTheme.motionScheme
+    val lift by animateFloatAsState(if (isDragging) DragLift else 1f, motion.fastSpatialSpec(), label = "nodeLift")
+    val elevation by animateDpAsState(
+        when {
+            isDragging -> 8.dp
+            isHovered -> 3.dp
+            else -> 1.dp
+        },
+        motion.fastEffectsSpec(),
+        label = "nodeElevation",
+    )
+
+    val live = runStatus?.takeIf { it != RunStatus.QUEUED && it != RunStatus.SKIPPED }
+    val body by animateColorAsState(
+        when {
+            live != null ->
+                live
+                    .colors()
+                    .accent
+                    .copy(alpha = StatusTint)
+                    .compositeOver(roles.surface)
+            isSelected -> accent.copy(alpha = SelectedTint).compositeOver(scheme.secondaryContainer)
+            else -> roles.surface
+        },
+        motion.slowEffectsSpec(),
+        label = "nodeBody",
+    )
+
     Surface(
-        modifier = Modifier.width(CardWidth).alpha(if (runStatus == RunStatus.SKIPPED) SkippedAlpha else 1f),
+        modifier =
+            Modifier
+                .width(CardWidth)
+                .graphicsLayer {
+                    scaleX = lift
+                    scaleY = lift
+                }.alpha(if (runStatus == RunStatus.SKIPPED) SkippedAlpha else 1f),
         shape = RoundedCornerShape(14.dp),
-        color =
-            if (isSelected) {
-                accent.copy(alpha = SelectedTint).compositeOver(scheme.secondaryContainer)
-            } else {
-                roles.surface
-            },
+        color = body,
         border = androidx.compose.foundation.BorderStroke(outlineWidth, outline),
-        shadowElevation = if (isDragging) 8.dp else 1.dp,
+        shadowElevation = elevation,
     ) {
         Column(Modifier.fillMaxWidth()) {
             Row(
@@ -140,11 +196,11 @@ fun KuiverNodeScope.WorkflowNodeCard(
                     .padding(start = 10.dp, end = 4.dp, top = 3.dp, bottom = 3.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PathIcon(
-                    node.type.icon,
-                    contentDescription = node.type.label,
-                    size = 14.dp,
-                    tint = if (hasIssue) scheme.error else roles.onContainer,
+                NodeGlyph(
+                    type = node.type,
+                    status = runStatus,
+                    fill = if (hasIssue) scheme.error else accent,
+                    tint = if (hasIssue) scheme.onError else roles.container,
                 )
                 Spacer(Modifier.width(7.dp))
                 Text(
@@ -166,23 +222,31 @@ fun KuiverNodeScope.WorkflowNodeCard(
                 )
             }
 
-            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp)) {
-                Text(
-                    node.displayTitle,
-                    style = MaterialTheme.typography.titleSmallEmphasized,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val subtitle = node.subtitle()
-                if (subtitle.isNotBlank()) {
-                    Spacer(Modifier.size(2.dp))
+            Box(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp)) {
                     Text(
-                        subtitle,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontFamily = if (node.type.subtitleIsCode) FontFamily.Monospace else null,
-                        color = scheme.onSurfaceVariant,
-                        maxLines = 1,
+                        node.displayTitle,
+                        style = MaterialTheme.typography.titleSmallEmphasized,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                    val subtitle = node.subtitle()
+                    if (subtitle.isNotBlank()) {
+                        Spacer(Modifier.size(2.dp))
+                        Text(
+                            subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = if (node.type.subtitleIsCode) FontFamily.Monospace else null,
+                            color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (runStatus?.showsProgress == true) {
+                    ThinWavyBar(
+                        runStatus.colors().accent,
+                        Modifier.align(Alignment.BottomCenter).padding(horizontal = 12.dp, vertical = 1.dp),
                     )
                 }
             }
@@ -192,10 +256,22 @@ fun KuiverNodeScope.WorkflowNodeCard(
 
 @Composable
 private fun StatusBadge(status: RunStatus) {
+    AnimatedContent(
+        targetState = status,
+        transitionSpec = {
+            (fadeIn(tween(BadgeInMillis)) + scaleIn(initialScale = 0.5f)) togetherWith
+                (fadeOut(tween(BadgeOutMillis)) + scaleOut(targetScale = 0.5f))
+        },
+        label = "statusBadge",
+    ) { shown -> StatusGlyph(shown) }
+}
+
+@Composable
+private fun StatusGlyph(status: RunStatus) {
     val roles = status.colors()
 
     if (status.showsProgress) {
-        LoadingIndicator(Modifier.size(BadgeSize), color = roles.accent)
+        Spacer(Modifier.size(BadgeSize))
         return
     }
 
@@ -353,3 +429,74 @@ private fun WorkflowNodeCardPreview() {
         }
     }
 }
+
+private val NodeType.polygon: RoundedPolygon
+    get() =
+        when (this) {
+            NodeType.AGENT -> MaterialShapes.Cookie9Sided
+            NodeType.SHELL -> MaterialShapes.Square
+            NodeType.CONNECTOR -> MaterialShapes.Clover4Leaf
+            NodeType.GATE -> MaterialShapes.Cookie4Sided
+            NodeType.BRANCH -> MaterialShapes.PuffyDiamond
+            NodeType.INPUT -> MaterialShapes.Gem
+        }
+
+@Composable
+private fun NodeGlyph(
+    type: NodeType,
+    status: RunStatus?,
+    fill: Color,
+    tint: Color,
+) {
+    val morph = remember(type) { Morph(type.polygon, MaterialShapes.SoftBurst) }
+    val live = status?.showsProgress == true
+    val progress by animateFloatAsState(
+        if (live) 1f else 0f,
+        MaterialTheme.motionScheme.slowSpatialSpec(),
+        label = "glyphMorph",
+    )
+    val turn = if (live) spin() else null
+    val breath = if (status == RunStatus.WAITING) breathe() else null
+    val path = remember { Path() }
+    val scale = remember { Matrix() }
+
+    Box(Modifier.size(GlyphSize), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .size(GlyphSize)
+                .graphicsLayer {
+                    rotationZ = turn?.value ?: 0f
+                    val grow = breath?.value ?: 1f
+                    scaleX = grow
+                    scaleY = grow
+                }.drawBehind {
+                    path.rewind()
+                    morph.toPath(progress, path)
+                    scale.reset()
+                    scale.scale(size.width, size.height)
+                    path.transform(scale)
+                    path.translate(center - path.getBounds().center)
+                    drawPath(path, fill)
+                },
+        )
+        PathIcon(type.icon, contentDescription = type.label, size = GlyphIconSize, tint = tint)
+    }
+}
+
+@Composable
+private fun spin(): State<Float> =
+    rememberInfiniteTransition(label = "glyphSpin").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(SpinMillis, easing = LinearEasing)),
+        label = "glyphSpinAngle",
+    )
+
+@Composable
+private fun breathe(): State<Float> =
+    rememberInfiniteTransition(label = "glyphBreath").animateFloat(
+        initialValue = 1f,
+        targetValue = BreatheScale,
+        animationSpec = infiniteRepeatable(tween(BreatheMillis), repeatMode = RepeatMode.Reverse),
+        label = "glyphBreathScale",
+    )

@@ -1,8 +1,14 @@
 package com.dk.zopf.ui.editor
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -21,11 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.dk.kuiver.model.layout.LayoutDirection
 import com.dk.kuiver.ui.ArrowDrawer
-import com.dk.kuiver.ui.DefaultEdgeLabel
 import com.dk.kuiver.ui.EdgeCanvas
 import com.dk.kuiver.ui.EdgePath
-import com.dk.kuiver.ui.KuiverDefaults
 import com.dk.kuiver.ui.boundingRect
+import kotlin.math.min
 
 @Composable
 internal fun WorkflowEdgeContent(
@@ -37,7 +42,9 @@ internal fun WorkflowEdgeContent(
     dashed: Boolean,
     arrowDrawer: ArrowDrawer = RoundArrowDrawer,
     width: Dp = EdgeStroke,
-    dashPhase: Float = 0f,
+    flowPhase: State<Float>? = null,
+    labelContainer: Color = MaterialTheme.colorScheme.secondaryContainer,
+    labelContent: Color = MaterialTheme.colorScheme.onSecondaryContainer,
 ) {
     val density = LocalDensity.current
     val curve = remember(from, to, direction, density) { flowCurve(from, to, direction, density) }
@@ -47,7 +54,11 @@ internal fun WorkflowEdgeContent(
         }
 
     val edge = @Composable {
-        EdgeCanvas(bounds) { drawFlowCurve(curve, color, dashed, arrowDrawer, width, dashPhase) }
+        EdgeCanvas(bounds) {
+            val track = if (flowPhase == null) color else color.copy(alpha = color.alpha * FlowingTrackAlpha)
+            drawFlowCurve(curve, track, dashed, arrowDrawer, width)
+            flowPhase?.let { drawParticles(curve, color, it.value) }
+        }
     }
 
     val labelPosition =
@@ -74,9 +85,14 @@ internal fun WorkflowEdgeContent(
                 .graphicsLayer {
                     translationX = labelPosition.position.x - size.width / 2f
                     translationY = labelPosition.position.y - size.height / 2f
-                },
+                }.background(labelContainer.copy(alpha = labelContainer.alpha * color.alpha), RoundedCornerShape(percent = 50))
+                .padding(horizontal = 8.dp, vertical = 2.dp),
         ) {
-            DefaultEdgeLabel(label, style = KuiverDefaults.edgeLabelStyle())
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = labelContent.copy(alpha = labelContent.alpha * color.alpha),
+            )
         }
     }
 }
@@ -125,7 +141,6 @@ internal fun DrawScope.drawFlowCurve(
     dashed: Boolean,
     arrowDrawer: ArrowDrawer,
     width: Dp = EdgeStroke,
-    dashPhase: Float = 0f,
 ) {
     val path =
         Path().apply {
@@ -148,10 +163,7 @@ internal fun DrawScope.drawFlowCurve(
                 width = width.toPx(),
                 pathEffect =
                     if (dashed) {
-                        PathEffect.dashPathEffect(
-                            floatArrayOf(DashLength.toPx(), DashGap.toPx()),
-                            phase = dashPhase,
-                        )
+                        PathEffect.dashPathEffect(floatArrayOf(DashLength.toPx(), DashGap.toPx()))
                     } else {
                         null
                     },
@@ -181,7 +193,25 @@ private const val LineAlpha = 0.8f
 private val DashLength = 10.dp
 private val DashGap = 5.dp
 
-internal val DashPeriod = DashLength + DashGap
+private val ParticleSpacing = 70.dp
+private val ParticleRadius = 4.dp
+private const val FlowingTrackAlpha = 0.4f
+private const val MaxParticles = 6
+private const val ParticleFade = 6f
+
+private fun DrawScope.drawParticles(
+    curve: EdgePath.Orthogonal,
+    color: Color,
+    phase: Float,
+) {
+    val count = (curve.edgeLength / ParticleSpacing.toPx()).toInt().coerceIn(1, MaxParticles)
+    repeat(count) { index ->
+        val t = (phase + index.toFloat() / count) % 1f
+        val point = curve.calculateLabelPosition(t, 0f)?.position ?: return@repeat
+        val fade = (min(t, 1f - t) * ParticleFade).coerceAtMost(1f)
+        drawCircle(color.copy(alpha = color.alpha * fade), radius = ParticleRadius.toPx(), center = point)
+    }
+}
 
 private val MinLengthForLabel = 50.dp
 

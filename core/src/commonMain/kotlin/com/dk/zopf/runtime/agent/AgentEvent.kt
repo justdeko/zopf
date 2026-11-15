@@ -2,6 +2,7 @@ package com.dk.zopf.runtime.agent
 
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import java.time.Instant
 
 sealed interface AgentEvent {
     val sessionId: String?
@@ -63,6 +64,7 @@ sealed interface AgentEvent {
         val permissionDenials: List<PermissionDenial>,
         val fields: Map<String, String>,
         val raw: JsonObject,
+        val loginExpiresAt: Instant? = null,
     ) : AgentEvent
 
     data class Unknown(

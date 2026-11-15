@@ -2,6 +2,7 @@ package com.dk.zopf.runtime.agent
 
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.NodeType
+import com.dk.zopf.model.PermissionMode
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.runtime.agentPromptText
 import com.dk.zopf.runtime.exec.ShellLine
@@ -10,6 +11,7 @@ import com.dk.zopf.runtime.run.NodeRun
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.runtime.run.showing
+import com.dk.zopf.runtime.warnNotAuto
 import com.dk.zopf.store.workspace.Workspace
 import com.dk.zopf.util.tokens
 import java.nio.file.Files
@@ -642,6 +644,42 @@ class NodeRunTest {
             notices.any { it.isWarning && "Bash" in it.text && "rm -rf build" in it.text },
             "a turn that ended short has to say what it wasn't allowed to do",
         )
+    }
+
+    @Test
+    fun `a login about to expire is a warning`() {
+        listOf(3L to true, 60L to false).forEach { (days, warned) ->
+            val run = run()
+            val expires =
+                java.time.Instant
+                    .now()
+                    .plus(java.time.Duration.ofDays(days))
+                    .plusSeconds(3600)
+            run.consume(
+                ClaudeEvents.parse(
+                    """{"type":"result","subtype":"success","is_error":false,"result":"ok","credential_expires_at":"$expires"}""",
+                )!!,
+            )
+
+            val warnings = run.entries.filterIsInstance<ConsoleEntry.Notice>().filter { it.isWarning }
+            assertEquals(warned, warnings.any { "expires in $days days" in it.text }, "$days days out")
+        }
+    }
+
+    @Test
+    fun `auto mode falling back is a warning`() {
+        listOf(
+            Triple(PermissionMode.AUTO, "default", true),
+            Triple(PermissionMode.AUTO, "auto", false),
+            Triple(PermissionMode.ACCEPT_EDITS, "default", false),
+            Triple(null, "default", false),
+            Triple(PermissionMode.AUTO, null, false),
+        ).forEach { (asked, got, warned) ->
+            val run = run()
+            warnNotAuto(run, asked, got)
+
+            assertEquals(warned, run.entries.any { it is ConsoleEntry.Notice && it.isWarning }, "$asked then $got")
+        }
     }
 }
 

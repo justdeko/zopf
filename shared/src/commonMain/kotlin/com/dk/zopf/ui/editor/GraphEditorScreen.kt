@@ -1,8 +1,10 @@
 package com.dk.zopf.ui.editor
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -46,6 +48,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,10 +65,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isMetaPressed
@@ -103,6 +106,7 @@ import com.dk.zopf.model.providerFor
 import com.dk.zopf.model.validate
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.store.workspace.Workspace
+import com.dk.zopf.ui.EmptyState
 import com.dk.zopf.ui.LocalTitleBarInset
 import com.dk.zopf.ui.LocalWindowDragArea
 import com.dk.zopf.ui.preview.PreviewFixtures
@@ -116,26 +120,36 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import java.awt.Cursor
 import kotlin.time.Duration.Companion.milliseconds
 
 private val TakenEdgeStroke = 3.dp
 private const val DeadEdgeAlpha = 0.28f
-private const val FlowMillis = 900
+private const val FlowMillis = 1_500
+private const val DimmedNodeAlpha = 0.35f
+private const val DimmedEdgeAlpha = 0.2f
+private const val LayoutWaitMillis = 1_200L
 
 private val InspectorWidth = 340.dp
 private val MinInspectorWidth = 260.dp
 private val MaxInspectorWidth = 720.dp
 
-private fun canvasConfig(nodeDragEnabled: Boolean) =
-    KuiverViewerConfig(
-        selectionMode = SelectionMode.NONE,
-        nodeDragEnabled = nodeDragEnabled,
-        hoverEnabled = true,
-        relayoutPolicy = RelayoutPolicy.KEEP_MANUAL,
-        fitToContent = false,
-        contentPadding = FitPadding,
-    )
+private fun canvasConfig(
+    nodeDragEnabled: Boolean,
+    motion: MotionScheme,
+) = KuiverViewerConfig(
+    selectionMode = SelectionMode.NONE,
+    nodeDragEnabled = nodeDragEnabled,
+    hoverEnabled = true,
+    relayoutPolicy = RelayoutPolicy.KEEP_MANUAL,
+    fitToContent = false,
+    contentPadding = FitPadding,
+    scaleAnimationSpec = CameraScaleSpec,
+    offsetAnimationSpec = CameraOffsetSpec,
+    layoutAnimationSpec = motion.slowSpatialSpec(),
+    enterAnimationSpec = motion.slowEffectsSpec(),
+)
 
 private const val ReflowSettleMillis = 220L
 
@@ -186,13 +200,14 @@ fun GraphEditorScreen(
             .distinctUntilChanged()
             .collectLatest { wanted ->
 
-                if (settled) delay(ReflowSettleMillis.milliseconds)
+                val later = settled
+                if (later) delay(ReflowSettleMillis.milliseconds)
                 settled = true
                 if (canvas.direction == wanted) return@collectLatest
                 val before = viewerState.layoutedKuiver
                 canvas.direction = wanted
                 snapshotFlow { viewerState.layoutedKuiver }.first { it !== before }
-                viewerState.fitGraph()
+                viewerState.fitGraph(animated = later)
             }
     }
 
@@ -232,7 +247,7 @@ fun GraphEditorScreen(
                 toggleNodeDrag = { nodeDragEnabled = !nodeDragEnabled },
                 zoomIn = viewerState::zoomIn,
                 zoomOut = viewerState::zoomOut,
-                fit = viewerState::fitGraph,
+                fit = { viewerState.fitGraph(animated = true) },
                 relayout = {
                     viewerState.clearManualPositions()
                     viewerState.relayout()
@@ -373,7 +388,7 @@ fun GraphEditorScreen(
                 CanvasControls(
                     onZoomIn = { viewerState.zoomIn() },
                     onZoomOut = { viewerState.zoomOut() },
-                    onFit = { viewerState.fitGraph() },
+                    onFit = { viewerState.fitGraph(animated = true) },
                     onRelayout = {
                         viewerState.clearManualPositions()
                         viewerState.relayout()
@@ -485,13 +500,51 @@ private fun Canvas(
 
     val sources = remember(workflow.edges) { workflow.edges.map { it.from }.toSet() }
 
-    val dashPhase = if (runStatuses.values.any { it.holdsTheRun }) rememberDashPhase() else null
+    val motion = MaterialTheme.motionScheme
+    val interaction = viewerState.interaction
+    val hovered =
+        interaction.hoveredNodeId?.takeIf {
+            runStatuses.isEmpty() && connectFrom == null && drag == null && !interaction.isDragging
+        }
+    val neighbourhood =
+        remember(hovered, workflow.edges) {
+            hovered?.let { id ->
+                workflow.edges
+                    .filter { it.from == id || it.to == id }
+                    .flatMapTo(mutableSetOf(id)) { listOf(it.from, it.to) }
+            }
+        }
+    val presentAtStart = remember { workflow.nodes.map { it.id }.toSet() }
+
+    val flowPhase = if (runStatuses.values.any { it.holdsTheRun }) rememberFlowPhase() else null
+
+    var cameraTakenOver by remember { mutableStateOf(false) }
+    val latestStatuses by rememberUpdatedState(runStatuses)
+    LaunchedEffect(viewerState) {
+        var previous = emptyMap<String, RunStatus>()
+        snapshotFlow { latestStatuses }.collect { now ->
+            if (now.values.none { it.isActive }) cameraTakenOver = false
+            val next = now.followed(previous)
+            previous = now
+            if (next != null && !cameraTakenOver) viewerState.reveal(next)
+        }
+    }
+    LaunchedEffect(viewerState, state) {
+        snapshotFlow { state.selectedNodeId }
+            .filterNotNull()
+            .collectLatest { id ->
+                withTimeoutOrNull(LayoutWaitMillis.milliseconds) {
+                    snapshotFlow { viewerState.layoutedKuiver.nodes[id]?.dimensions }.first { it != null }
+                }
+                viewerState.reveal(id)
+            }
+    }
 
     KuiverBridge {
         KuiverViewer(
             state = viewerState,
-            modifier = Modifier.fillMaxSize(),
-            config = remember(nodeDragEnabled) { canvasConfig(nodeDragEnabled) },
+            modifier = Modifier.fillMaxSize().onUserCameraMove { cameraTakenOver = true },
+            config = remember(nodeDragEnabled, motion) { canvasConfig(nodeDragEnabled, motion) },
             callbacks =
                 remember(state) {
                     KuiverInteractionCallbacks(
@@ -518,11 +571,23 @@ private fun Canvas(
                             ?.takeIf { it.capabilities.modelSelection }
                             ?.let { resolved.modelFor(node, it, state.defaultProvider, state.defaultModel) }
 
-                    val dimmed = connectFrom != null && !isConnectable && !isConnectSource
+                    val dimmed =
+                        (connectFrom != null && !isConnectable && !isConnectSource) ||
+                            (neighbourhood != null && node.id !in neighbourhood)
+                    val alpha by animateFloatAsState(
+                        if (dimmed) DimmedNodeAlpha else 1f,
+                        motion.defaultEffectsSpec(),
+                        label = "nodeFocus",
+                    )
+                    val appear = remember { Animatable(if (node.id in presentAtStart) 1f else 0f) }
+                    LaunchedEffect(appear) { appear.animateTo(1f, motion.defaultSpatialSpec()) }
                     Box(
                         Modifier
-                            .alpha(if (dimmed) 0.35f else 1f)
-                            .connectRubberBand(
+                            .graphicsLayer {
+                                scaleX = appear.value
+                                scaleY = appear.value
+                                this.alpha = alpha * appear.value.coerceIn(0f, 1f)
+                            }.connectRubberBand(
                                 drag = drag?.takeIf { it.from == node.id },
                                 direction = canvas.direction,
                                 color = MaterialTheme.colorScheme.primary,
@@ -563,17 +628,39 @@ private fun Canvas(
 
                 val model = workflow.edges.firstOrNull { it.from == edge.fromId && it.to == edge.toId }
                 val failure = model?.on == EdgeTrigger.FAILURE
+                val branch = model?.condition != null
                 val label = model?.let { it.condition?.toString() ?: Strings.Editor.FAILED_EDGE_LABEL.takeIf { _ -> failure } }
 
                 val toStatus = runStatuses[edge.toId]
                 val flow = edgeFlow(runStatuses[edge.fromId], toStatus, failure)
-                val marching = flow == EdgeFlow.TAKEN && toStatus?.holdsTheRun == true
+                val flowing = flow == EdgeFlow.TAKEN && toStatus?.holdsTheRun == true
 
+                val focus by animateFloatAsState(
+                    if (neighbourhood != null && edge.fromId != hovered && edge.toId != hovered) DimmedEdgeAlpha else 1f,
+                    motion.defaultEffectsSpec(),
+                    label = "edgeFocus",
+                )
+
+                val scheme = MaterialTheme.colorScheme
                 val resting =
                     when {
-                        failure -> MaterialTheme.colorScheme.error
-                        model?.condition != null -> NodeType.BRANCH.colors().accent
+                        failure -> scheme.error
+                        branch -> NodeType.BRANCH.colors().accent
                         else -> LocalKuiverColors.current.edge
+                    }
+                val color =
+                    when (flow) {
+                        EdgeFlow.TAKEN -> {
+                            if (failure) RunStatus.FAILED.colors().accent else RunStatus.SUCCEEDED.colors().accent
+                        }
+
+                        EdgeFlow.DEAD -> {
+                            resting.copy(alpha = DeadEdgeAlpha)
+                        }
+
+                        EdgeFlow.IDLE -> {
+                            resting
+                        }
                     }
 
                 WorkflowEdgeContent(
@@ -581,23 +668,22 @@ private fun Canvas(
                     to = to,
                     direction = canvas.direction,
                     label = label,
-                    color =
-                        when (flow) {
-                            EdgeFlow.TAKEN -> {
-                                if (failure) RunStatus.FAILED.colors().accent else RunStatus.SUCCEEDED.colors().accent
-                            }
-
-                            EdgeFlow.DEAD -> {
-                                resting.copy(alpha = DeadEdgeAlpha)
-                            }
-
-                            EdgeFlow.IDLE -> {
-                                resting
-                            }
-                        },
-                    dashed = failure || flow == EdgeFlow.DEAD || marching,
+                    color = color.copy(alpha = color.alpha * focus),
+                    dashed = failure || flow == EdgeFlow.DEAD,
                     width = if (flow == EdgeFlow.TAKEN) TakenEdgeStroke else EdgeStroke,
-                    dashPhase = if (marching && dashPhase != null) dashPhase.value else 0f,
+                    flowPhase = flowPhase?.takeIf { flowing },
+                    labelContainer =
+                        when {
+                            failure -> scheme.errorContainer
+                            branch -> NodeType.BRANCH.colors().container
+                            else -> scheme.secondaryContainer
+                        },
+                    labelContent =
+                        when {
+                            failure -> scheme.onErrorContainer
+                            branch -> NodeType.BRANCH.colors().onContainer
+                            else -> scheme.onSecondaryContainer
+                        },
                 )
             },
         )
@@ -608,16 +694,13 @@ private val RunStatus.holdsTheRun: Boolean
     get() = this == RunStatus.STARTING || this == RunStatus.WAITING
 
 @Composable
-private fun rememberDashPhase(): State<Float> {
-    val period = with(LocalDensity.current) { DashPeriod.toPx() }
-    val transition = rememberInfiniteTransition(label = "edgeFlow")
-    return transition.animateFloat(
+private fun rememberFlowPhase(): State<Float> =
+    rememberInfiniteTransition(label = "edgeFlow").animateFloat(
         initialValue = 0f,
-        targetValue = -period,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(durationMillis = FlowMillis, easing = LinearEasing)),
-        label = "dashPhase",
+        label = "flowPhase",
     )
-}
 
 private fun nodeMenu(
     state: EditorState,
@@ -920,13 +1003,7 @@ private fun CanvasControls(
 
 @Composable
 private fun EmptyCanvasHint() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            Strings.Editor.EMPTY_CANVAS,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    EmptyState(Strings.Editor.EMPTY_CANVAS_TITLE, Strings.Editor.EMPTY_CANVAS, ZopfIcons.Add)
 }
 
 @Preview

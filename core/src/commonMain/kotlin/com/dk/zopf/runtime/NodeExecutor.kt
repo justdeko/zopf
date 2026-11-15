@@ -3,12 +3,14 @@ package com.dk.zopf.runtime
 import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.ConnectorManifest
 import com.dk.zopf.model.NodeType
+import com.dk.zopf.model.PermissionMode
 import com.dk.zopf.model.Workflow
 import com.dk.zopf.model.WorkflowNode
 import com.dk.zopf.model.ignoredFields
 import com.dk.zopf.model.modelFor
 import com.dk.zopf.model.providerFor
 import com.dk.zopf.model.toJsonSchema
+import com.dk.zopf.runtime.agent.AgentEvent
 import com.dk.zopf.runtime.agent.AgentInvocation
 import com.dk.zopf.runtime.agent.AgentProviders
 import com.dk.zopf.runtime.agent.AgentRunner
@@ -150,9 +152,15 @@ class ProcessNodeExecutor(
         }
         if (sandbox != null) run.notice(Strings.Transcript.sandbox(sandbox.cliValue))
 
-        if (provider.promptChannel == PromptChannel.STDIN) {
-            session.send(prompt).getOrThrow()
-            if (!execution.interactive) session.endInput()
+        when (provider.promptChannel) {
+            PromptChannel.STDIN -> {
+                session.send(prompt).getOrThrow()
+                if (!execution.interactive) session.endInput()
+            }
+
+            PromptChannel.STDIN_ONCE -> session.sendOnce(prompt).getOrThrow()
+
+            PromptChannel.ARGUMENT -> Unit
         }
 
         val exit =
@@ -165,7 +173,10 @@ class ProcessNodeExecutor(
                     runCatching {
                         session
                             .events { line -> execution.archive.appendRaw(node.id, line) }
-                            .collect { event -> run.consume(event) }
+                            .collect { event ->
+                                run.consume(event)
+                                if (event is AgentEvent.SystemInit) warnNotAuto(run, mode, event.permissionMode)
+                            }
                     }.onFailure { run.notice("Stream ended: ${it.message}", isWarning = true) }
                 },
                 awaitExit = session::awaitExit,
@@ -411,6 +422,15 @@ internal fun outcome(
         run.status == RunStatus.FAILED -> RunStatus.FAILED
         else -> RunStatus.SUCCEEDED
     }
+
+internal fun warnNotAuto(
+    run: NodeRun,
+    asked: PermissionMode?,
+    got: String?,
+) {
+    if (asked != PermissionMode.AUTO || got == null || got == asked.cliValue) return
+    run.notice(Strings.Transcript.autoModeUnavailable(got), isWarning = true)
+}
 
 internal fun warnUnresolved(
     run: NodeRun,

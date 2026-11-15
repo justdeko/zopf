@@ -7,6 +7,7 @@ import com.dk.kuiver.model.Kuiver
 import com.dk.kuiver.model.KuiverEdge
 import com.dk.kuiver.model.KuiverNode
 import com.dk.kuiver.model.layout.LayoutDirection
+import com.dk.kuiver.util.calculateNodeBounds
 import com.dk.zopf.model.EdgeTrigger
 import com.dk.zopf.model.NodeType
 import com.dk.zopf.model.Position
@@ -179,9 +180,19 @@ fun KuiverViewerState.applyPositions(workflow: Workflow) {
     }
 }
 
-fun KuiverViewerState.fitGraph() {
-    centerGraph(animated = false)
-    if (scale > 1f) updateTransform(scale = 1f, offset = offset)
+fun KuiverViewerState.fitGraph(animated: Boolean = false) {
+    val bounds = layoutedKuiver.nodes.values.calculateNodeBounds()
+    if (!animated || bounds.width <= 0.dp || bounds.height <= 0.dp || canvasWidth <= 0.dp || canvasHeight <= 0.dp) {
+        centerGraph(animated = false)
+        if (scale > 1f) updateTransform(scale = 1f, offset = offset)
+        return
+    }
+    val fit = minOf(canvasWidth * FitPadding / bounds.width, canvasHeight * FitPadding / bounds.height)
+    updateTransform(
+        scale = fit.coerceAtMost(1f),
+        offset = DpOffset(contentOffset.x / 2, contentOffset.y / 2),
+        animated = true,
+    )
 }
 
 fun Position.toDpOffset(): DpOffset = DpOffset(x.dp, y.dp)

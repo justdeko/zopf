@@ -26,6 +26,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dk.zopf.runtime.run.NodeRun
@@ -34,12 +37,31 @@ import com.dk.zopf.runtime.run.RunRegistry
 import com.dk.zopf.runtime.run.RunStatus
 import com.dk.zopf.runtime.run.WorkflowRun
 import com.dk.zopf.runtime.run.WorkflowRunState
+import com.dk.zopf.ui.EmptyState
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.util.Strings
 import com.dk.zopf.util.format
 import java.time.Instant
 
 private val RunListWidth = 280.dp
+private val TimelineStart = 28.dp
+private val TimelineSlot = 14.dp
+private val TimelineGap = 6.dp
+private val TimelineStroke = 1.5.dp
+
+private fun Modifier.timeline(
+    color: Color,
+    isFirst: Boolean,
+    isLast: Boolean,
+): Modifier =
+    drawBehind {
+        val x = (TimelineStart + TimelineSlot / 2).toPx()
+        val middle = size.height / 2
+        val gap = TimelineGap.toPx()
+        val stroke = TimelineStroke.toPx()
+        if (!isFirst) drawLine(color, Offset(x, 0f), Offset(x, middle - gap), stroke)
+        if (!isLast) drawLine(color, Offset(x, middle + gap), Offset(x, size.height), stroke)
+    }
 
 @Composable
 fun RunsScreen(
@@ -55,13 +77,7 @@ fun RunsScreen(
     val shownNode = open.shownNode
 
     if (runs.isEmpty()) {
-        Box(modifier.fillMaxSize().padding(48.dp)) {
-            Text(
-                Strings.Runs.EMPTY,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        EmptyState(Strings.Runs.EMPTY_TITLE, Strings.Runs.EMPTY, ZopfIcons.Play, modifier)
         return
     }
 
@@ -148,6 +164,8 @@ fun RunsScreen(
                                     node = node,
                                     state = selectedState.of(node),
                                     isSelected = node.id == shownNode?.id,
+                                    isFirst = index == 0,
+                                    isLast = index == selectedState.nodes.lastIndex,
                                     onClick = { registry.select(run, node) },
                                     onRetry = retry,
                                 )
@@ -162,13 +180,7 @@ fun RunsScreen(
         val run = selectedRun
         val node = shownNode
         if (run == null || node == null) {
-            Box(Modifier.fillMaxSize().padding(32.dp)) {
-                Text(
-                    Strings.Runs.SELECT_ONE,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            EmptyState(Strings.Runs.SELECT_ONE, Strings.Runs.SELECT_ONE_DETAIL, ZopfIcons.List)
         } else {
             RunConsole(
                 run = node,
@@ -199,11 +211,29 @@ private fun RunRow(
     val background =
         if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
 
+    val elsewhere = run.isElsewhere(state)
+    Box(Modifier.fillMaxWidth().background(background).clickable(onClick = onClick)) {
+        RunRowContent(run, state, elsewhere, onStop, onRemove)
+        if (state.isActive && !elsewhere) {
+            ThinWavyBar(
+                state.status.color(),
+                Modifier.align(Alignment.BottomStart).padding(start = 30.dp, end = 16.dp, bottom = 2.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RunRowContent(
+    run: WorkflowRun,
+    state: WorkflowRunState,
+    elsewhere: Boolean,
+    onStop: () -> Unit,
+    onRemove: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(background)
-            .clickable(onClick = onClick)
             .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -228,7 +258,7 @@ private fun RunRow(
                 )
             }
             Text(
-                "${state.summary()} · ${format(state.elapsed(run.startedAt, now))}",
+                "${state.summary()} · ${format(state.elapsed(run.startedAt, now))}".withStatusTint(state.status),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -236,7 +266,7 @@ private fun RunRow(
             )
         }
         when {
-            run.isElsewhere(state) -> Unit
+            elsewhere -> Unit
             state.isActive ->
                 IconButton(onClick = onStop) {
                     Icon(ZopfIcons.Stop, contentDescription = Strings.Runs.STOP_RUN, Modifier.size(12.dp))
@@ -256,8 +286,11 @@ private fun NodeRow(
     state: NodeRunState,
     isSelected: Boolean,
     onClick: () -> Unit,
+    isFirst: Boolean = false,
+    isLast: Boolean = false,
     onRetry: (() -> Unit)? = null,
 ) {
+    val line = MaterialTheme.colorScheme.outlineVariant
     Row(
         Modifier
             .fillMaxWidth()
@@ -268,11 +301,14 @@ private fun NodeRow(
                     MaterialTheme.colorScheme.surfaceContainerLow
                 },
             ).clickable(onClick = onClick)
-            .padding(start = 34.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+            .timeline(line, isFirst, isLast)
+            .padding(start = TimelineStart, end = 12.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusDot(state.status, size = 6)
-        Spacer(Modifier.width(10.dp))
+        Box(Modifier.width(TimelineSlot), contentAlignment = Alignment.Center) {
+            StatusDot(state.status, size = 7)
+        }
+        Spacer(Modifier.width(6.dp))
         Text(
             node.nodeTitle,
             style = MaterialTheme.typography.labelMedium,
@@ -289,7 +325,7 @@ private fun NodeRow(
         Text(
             state.status.label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (state.status == RunStatus.QUEUED) MaterialTheme.colorScheme.onSurfaceVariant else state.status.color(),
             maxLines = 1,
         )
         onRetry?.let {

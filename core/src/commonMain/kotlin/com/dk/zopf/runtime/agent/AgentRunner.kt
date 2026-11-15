@@ -103,6 +103,12 @@ class AgentSession internal constructor(
         }
     }
 
+    fun sendOnce(text: String): Result<Unit> =
+        runCatching {
+            stdin.write(text)
+            stdin.close()
+        }
+
     fun endInput() {
         runCatching { stdin.close() }
     }
@@ -143,7 +149,7 @@ internal fun spawnFor(
     channel: PromptChannel,
 ): Process =
     when (channel) {
-        PromptChannel.STDIN -> spawnProcess(command, cwd, env)
+        PromptChannel.STDIN, PromptChannel.STDIN_ONCE -> spawnProcess(command, cwd, env)
         PromptChannel.ARGUMENT -> spawnWithoutInput(command, cwd, env)
     }
 

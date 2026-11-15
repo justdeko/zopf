@@ -10,7 +10,7 @@ object CodexProvider : AgentProvider {
 
     override val executable = "codex"
 
-    override val promptChannel = PromptChannel.ARGUMENT
+    override val promptChannel = PromptChannel.STDIN_ONCE
 
     override fun newSessionId(): String? = null
 
@@ -37,7 +37,7 @@ object CodexProvider : AgentProvider {
                 add("--output-schema")
                 add(schemaFile(it).toString())
             }
-            add(invocation.prompt)
+            add("-")
         }
 
     internal fun schemaFile(schema: String): Path =

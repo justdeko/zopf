@@ -5,7 +5,7 @@ import com.dk.zopf.model.AgentProviderId
 import com.dk.zopf.model.capabilities
 import com.dk.zopf.runtime.exec.CommandLookup
 
-enum class PromptChannel { STDIN, ARGUMENT }
+enum class PromptChannel { STDIN, STDIN_ONCE, ARGUMENT }
 
 interface AgentProvider {
     val id: AgentProviderId

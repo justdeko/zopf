@@ -179,8 +179,10 @@ object Strings {
     }
 
     object Runs {
+        const val EMPTY_TITLE = "No runs yet"
         const val EMPTY = "Open a workflow and press Run, or run one node from the editor."
-        const val SELECT_ONE = "Select a run."
+        const val SELECT_ONE = "Select a run"
+        const val SELECT_ONE_DETAIL = "Nodes and transcript show up here."
         const val STOP_RUN = "Stop run"
         const val CLEAR = "Clear"
         const val CLEAR_RUN = "Clear run"
@@ -390,6 +392,7 @@ object Strings {
         const val LAY_OUT_AGAIN = "Lay out again"
         const val MOVE_NODES = "Move nodes"
         const val STOP_MOVING_NODES = "Stop moving nodes"
+        const val EMPTY_CANVAS_TITLE = "Nothing here yet"
         const val EMPTY_CANVAS = "Add a node from the palette on the left."
         const val DIRTY_MARKER = " •"
 
@@ -991,6 +994,10 @@ object Strings {
         fun willAskBefore(tools: String) = "Will ask before $tools"
 
         fun sandbox(mode: String) = "Sandbox: $mode"
+
+        fun autoModeUnavailable(mode: String) = "Auto mode is not available here. The session runs in $mode mode and may stop to ask."
+
+        fun loginExpires(days: Long) = if (days == 0L) "The login for this CLI expires today. Sign in again." else "The login for this CLI expires in $days days. Sign in again."
 
         fun secretsFound(names: String) = "Secrets: $names"
 

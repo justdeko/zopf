@@ -159,7 +159,7 @@ class AgentInvocationTest {
         assertTrue(command.indexOf("--ask-for-approval") < exec)
         assertTrue(command.indexOf("--sandbox") < exec)
         assertTrue(command.indexOf("--model") < exec)
-        assertEquals(listOf("exec", "--json", "--skip-git-repo-check", "hi"), command.drop(exec))
+        assertEquals(listOf("exec", "--json", "--skip-git-repo-check", "-"), command.drop(exec))
     }
 
     @Test
@@ -198,12 +198,15 @@ class AgentInvocationTest {
     }
 
     @Test
-    fun `codex takes the prompt on the command line`() {
-        assertEquals(PromptChannel.ARGUMENT, CodexProvider.promptChannel)
+    fun `only dsh takes the prompt on the command line`() {
+        assertEquals(PromptChannel.STDIN_ONCE, CodexProvider.promptChannel)
         assertEquals(PromptChannel.STDIN, ClaudeProvider.promptChannel)
+        assertEquals(PromptChannel.ARGUMENT, DshProvider.promptChannel)
 
-        assertTrue("hi" in codex())
+        assertEquals("-", codex().last())
+        assertFalse("hi" in codex())
         assertFalse("hi" in claude())
+        assertTrue("hi" in DshProvider.command(invocation, "dsh"))
     }
 
     @Test
@@ -266,6 +269,7 @@ class AgentCapabilitiesTest {
     @Test
     fun `a provider that takes a model suggests models`() {
         assertContains(AgentProviderId.CLAUDE.modelOptions, "opus")
+        assertContains(AgentProviderId.CLAUDE.modelOptions, "fable")
         assertTrue(AgentProviderId.CODEX.modelOptions.isNotEmpty())
         assertEquals(emptyList(), AgentProviderId.DSH.modelOptions)
     }

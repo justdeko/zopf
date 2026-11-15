@@ -51,6 +51,7 @@ import com.dk.zopf.store.workflow.Templates
 import com.dk.zopf.store.workflow.WorkflowListing
 import com.dk.zopf.store.workflow.WorkflowStore
 import com.dk.zopf.store.workspace.OpenWorkspace
+import com.dk.zopf.ui.EmptyState
 import com.dk.zopf.ui.preview.PreviewFixtures
 import com.dk.zopf.ui.theme.ZopfIcons
 import com.dk.zopf.ui.theme.ZopfTheme
@@ -521,23 +522,7 @@ private fun EmptyMessage(
     detail: String,
     isError: Boolean = false,
 ) {
-    Column(
-        Modifier.fillMaxSize().padding(48.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLargeEmphasized,
-            color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            detail,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    EmptyState(title, detail, if (isError) ZopfIcons.Warning else ZopfIcons.Workflow, isError = isError)
 }
 
 private fun String.firstParagraph(): String = trim().substringBefore('\n').trim()

@@ -1,6 +1,7 @@
 package com.dk.zopf.ui.runs
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -130,56 +131,63 @@ private fun RunHeader(
     }
 
     Surface(tonalElevation = 2.dp) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            StatusDot(state.status)
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    run.nodeTitle,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    buildString {
-                        append(run.workflowName)
-                        run.agentLabel(state)?.let { append(" · $it") }
-                        append(" · ")
-                        append(state.status.label)
-                        append(" · ")
-                        append(format(state.elapsed(run.startedAt, now)))
-                        spend(state.costUsd, state.tokens)?.let { append(" · $it") }
-                        state.exitCode?.takeIf { it != 0 }?.let { append(" · " + Strings.Console.exitCode(it)) }
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+        Box {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusDot(state.status)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            run.nodeTitle,
+                            style = MaterialTheme.typography.titleSmallEmphasized,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            listOfNotNull(run.workflowName, run.agentLabel(state)).joinToString(" · "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        StatusPill(state.status)
+                        FactChip(format(state.elapsed(run.startedAt, now)))
+                        spend(state.costUsd, state.tokens)?.let { FactChip(it) }
+                        state.exitCode?.takeIf { it != 0 }?.let { FactChip(Strings.Console.exitCode(it), isError = true) }
+                    }
+                }
 
-            if (run.canTakeOver(state) && !isElsewhere) {
-                TextButton(onClick = onTakeOver) {
-                    Icon(ZopfIcons.Terminal, contentDescription = null, Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
+                if (run.canTakeOver(state) && !isElsewhere) {
+                    TextButton(onClick = onTakeOver) {
+                        Icon(ZopfIcons.Terminal, contentDescription = null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
 
-                    Text(Strings.Actions.takeOverIn(terminalApp))
+                        Text(Strings.Actions.takeOverIn(terminalApp))
+                    }
+                }
+                if (state.status.isActive && !isElsewhere) {
+                    TextButton(onClick = onStop) {
+                        Icon(ZopfIcons.Stop, contentDescription = null, Modifier.size(14.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(Strings.Actions.STOP)
+                    }
+                }
+                onClose?.let {
+                    IconButton(onClick = it) {
+                        Icon(ZopfIcons.Clear, contentDescription = Strings.Console.CLOSE_CONSOLE, Modifier.size(16.dp))
+                    }
                 }
             }
-            if (state.status.isActive && !isElsewhere) {
-                TextButton(onClick = onStop) {
-                    Icon(ZopfIcons.Stop, contentDescription = null, Modifier.size(14.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(Strings.Actions.STOP)
-                }
-            }
-            onClose?.let {
-                IconButton(onClick = it) {
-                    Icon(ZopfIcons.Clear, contentDescription = Strings.Console.CLOSE_CONSOLE, Modifier.size(16.dp))
-                }
+            if (state.status.showsProgress) {
+                ThinWavyBar(state.status.color(), Modifier.align(Alignment.BottomCenter))
             }
         }
     }
@@ -640,6 +648,12 @@ internal fun StatusDot(
     val color = status.color()
     if (status.showsProgress) {
         LoadingIndicator(Modifier.size((size + 4).dp), color = color)
+    } else if (status == RunStatus.QUEUED) {
+        Box(
+            Modifier
+                .size(size.dp)
+                .border(1.5.dp, color, RoundedCornerShape(percent = 50)),
+        )
     } else {
         Box(
             Modifier

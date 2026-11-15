@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import java.time.Instant
 
 object ClaudeEvents {
     private val json =
@@ -93,6 +94,7 @@ object ClaudeEvents {
                     permissionDenials = obj.permissionDenials(),
                     fields = obj["structured_output"]?.asObject()?.toFields().orEmpty(),
                     raw = obj,
+                    loginExpiresAt = obj.string("credential_expires_at")?.let { runCatching { Instant.parse(it) }.getOrNull() },
                 )
 
             else -> AgentEvent.Unknown(sessionId, type, obj)
